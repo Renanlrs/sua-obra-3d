@@ -51,8 +51,27 @@ var UI = (function () {
     });
     window.addEventListener('resize', function () { if (viewAtual === 'planta' && M.proj) { PLAN.setView(PLAN.view.x, PLAN.view.y, PLAN.view.w, PLAN.view.h); PLAN.render(); } });
 
-    /* ?demo=casa-terrea&l=10&p=25&v=planta — abre direto, para conferência e print */
     var q = new URLSearchParams(location.search);
+    /* ?cloud=1 — rodando dentro do app do Lovable: o pai manda o projeto e grava no banco */
+    if (q.has('cloud') && window.parent !== window) {
+      window.CLOUD = true;
+      document.body.classList.add('cloud');
+      window.addEventListener('message', function (e) {
+        var m = e.data || {};
+        if (m.type === 'suaobra:projeto') {
+          if (m.proj && m.proj.terreno) M.carregar(m.proj);
+          else M.novo(m.tipoKey || 'casa-terrea', m.largura || 1000, m.profundidade || 2500, m.nome);
+          if (m.nome) M.proj.nome = m.nome;
+          localStorage.setItem('suaobra3d.coach', '1');
+          entrarApp();
+          if (m.view) irPara(m.view);
+        }
+        if (m.type === 'suaobra:salvo') saveState('Salvo na nuvem');
+      });
+      window.parent.postMessage({type:'suaobra:pronto'}, '*');
+      return;
+    }
+    /* ?demo=casa-terrea&l=10&p=25&v=planta — abre direto, para conferência e print */
     if (q.has('demo')) {
       var k = q.get('demo') || 'casa-terrea';
       M.novo(M.PROGRAMAS[k] ? k : 'casa-terrea', M.parseM(q.get('l') || '10') , M.parseM(q.get('p') || '25'));
@@ -145,6 +164,7 @@ var UI = (function () {
     inspector(); refreshTop();
   }
   function voltarHome(){
+    if (window.CLOUD) { window.parent.postMessage({type:'suaobra:voltar'}, '*'); return; }
     fecharApres();
     $('#app').hidden = true; $('#home').hidden = false;
     montarHome();

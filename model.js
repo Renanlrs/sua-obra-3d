@@ -349,8 +349,17 @@ var M = (function () {
       all[proj.id] = proj;
       try { localStorage.setItem(KEY, JSON.stringify(all)); localStorage.setItem(KEY + '.ultimo', proj.id); }
       catch (e) { if (window.UI) UI.toast('Não consegui salvar: armazenamento cheio.', null, true); }
-      if (window.UI) UI.saveState('Salvo');
+      if (window.CLOUD && window.parent !== window) window.parent.postMessage({type:'suaobra:salvar', proj:proj}, '*');   /* o pai grava no banco */
+      if (window.UI) UI.saveState(window.CLOUD ? 'Salvando na nuvem…' : 'Salvo');
     }, 800);
+  }
+  /* modo nuvem (dentro do app do Lovable): recebe o projeto pronto do pai */
+  function carregar(p){
+    proj = p; hist = []; fut = [];
+    if (!proj.moveis) mobiliarAuto();
+    if (!proj.id) proj.id = uid();
+    base = snap();
+    emitir(); return proj;
   }
   function abrir(id){
     var all = todos();
@@ -379,6 +388,6 @@ var M = (function () {
     custoDe:custoDe, custoTotal:custoTotal, custoPorM2:custoPorM2, custoFachada:custoFachada, custoFachadaItens:custoFachadaItens, custoGeral:custoGeral, fachadaCfg:fachadaCfg, testada:testada, PRECO_FACHADA:PRECO_FACHADA, bbox:bbox, problemas:problemas,
     fmtM:fmtM, fmtMs:fmtMs, fmtM2:fmtM2, fmtPct:fmtPct, fmtBRL:fmtBRL, num:num, parseM:parseM,
     commit:commit, undo:undo, redo:redo, podeUndo:podeUndo, podeRedo:podeRedo, proxUndo:proxUndo,
-    salvar:salvar, abrir:abrir, excluir:excluir, todos:todos, ultimoId:ultimoId, onChange:onChange
+    salvar:salvar, abrir:abrir, carregar:carregar, excluir:excluir, todos:todos, ultimoId:ultimoId, onChange:onChange
   };
 })();
