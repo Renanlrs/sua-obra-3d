@@ -170,6 +170,25 @@ M.undo();
 t('undo remove o móvel', M.proj.moveis.length === antes);
 /* export embute o catálogo (o passeio precisa das medidas) */
 t('MOVEIS_LIB serializa (export)', MOVEIS_LIB.toString().length > 5000 && typeof MOVEIS_LIB === 'function');
+/* 10. fachada — presets, custo e elevação */
+var TF = TRES_ENGINE({}, M);
+M.novo('casa-terrea', 1000, 2500);
+var f0 = TF.fachadaDe(M.proj);
+t('fachada sem escolha = preset moderno completo', f0.estilo === 'moderno' && f0.revestimento === 'ripado' && f0.cobertura === 'platibanda' && f0.jardim === true);
+M.proj.fachada = {estilo:'classico', corParede:'#123456'};
+var f1 = TF.fachadaDe(M.proj);
+t('escolha manual vence o preset, o resto vem do preset', f1.corParede === '#123456' && f1.cobertura === 'telhado4' && f1.esquadria === 'branco');
+t('testada construída > 0', M.testada() > 0, M.fmtM(M.testada()));
+M.proj.fachada = {estilo:'moderno'}; var cA = M.custoFachada();
+M.proj.fachada = {estilo:'moderno', revestimento:'nenhum'}; var cB = M.custoFachada();
+t('tirar o revestimento baixa o custo da fachada', cB < cA && cA > 0, M.fmtBRL(cA) + ' → ' + M.fmtBRL(cB));
+t('custo geral = ambientes + fachada', M.custoGeral() === M.custoTotal() + M.custoFachada());
+Object.keys(TF.FACHADA_PRESETS).forEach(function(k){
+  M.proj.fachada = {estilo:k, numero:'128'};
+  var sv = VIEWS.fachada();
+  t('elevação ' + k + ' gera SVG com número da casa', sv.indexOf('<svg') === 0 && sv.indexOf('128') > 0 && sv.indexOf('NaN') < 0, sv.length + ' chars');
+});
+M.proj.fachada = null;
 M.novo('casa-terrea', 1000, 2500);
 
 var r=document.getElementById('resumo');

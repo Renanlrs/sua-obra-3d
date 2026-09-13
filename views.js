@@ -83,30 +83,73 @@ var VIEWS = (function () {
 
   /* ---------------- fachada frontal ---------------- */
   function fachada(){
-    var p = M.proj, t = p.terreno, H = p.peDireito, s = '';
-    var telhado = 90;
+    var p = M.proj, t = p.terreno, H = p.peDireito, s = '', F = M.fachadaCfg();
+    var telhado = F.cobertura === 'platibanda' ? 60 : (F.cobertura === 'telhado2' ? 150 : 110);
     var frente = p.ambientes.filter(function (a) { return a.tipo !== 'externo' && a.tipo !== 'agua'; })
       .sort(function (a, b) { return a.y - b.y; });
     var yMin = frente.length ? frente[0].y : t.recuoFrontal;
     var naFrente = frente.filter(function (a) { return a.y <= yMin + 60; });
+    var esq = F.esquadria === 'branco' ? '#F4F4F1' : (F.esquadria === 'madeira' ? '#7A5230' : '#1B2229');
+    var telha = F.telha === 'ceramica' ? '#B5533A' : (F.telha === 'metalica' ? '#3F4448' : '#6F6E6B');
+    var rev = {ripado:'#A87B4F', pedra:'#9C968A', tijolo:'#A0523F', cimento:'#9C9A94'}[F.revestimento];
 
+    s += '<defs><pattern id="ripas" width="9" height="9" patternUnits="userSpaceOnUse"><rect width="9" height="9" fill="#3B3128"/><rect x="1.5" width="6" height="9" fill="#A87B4F"/></pattern>' +
+         '<pattern id="pedra" width="60" height="26" patternUnits="userSpaceOnUse"><rect width="60" height="26" fill="#8E8A80"/><rect x="2" y="2" width="30" height="22" rx="3" fill="#B3ADA1"/><rect x="34" y="2" width="24" height="22" rx="3" fill="#A29C90"/></pattern>' +
+         '<pattern id="tijolo" width="40" height="20" patternUnits="userSpaceOnUse"><rect width="40" height="20" fill="#CFC3B4"/><rect x="1" y="1" width="18" height="8" fill="#A0523F"/><rect x="21" y="1" width="18" height="8" fill="#9A4E3B"/><rect x="-9" y="11" width="18" height="8" fill="#9A4E3B"/><rect x="11" y="11" width="18" height="8" fill="#A0523F"/><rect x="31" y="11" width="18" height="8" fill="#9A4E3B"/></pattern></defs>';
     s += '<line x1="-100" y1="0" x2="' + (t.largura + 100) + '" y2="0" stroke="#8A9199" stroke-width="6"/>';
     if (naFrente.length) {
       var x1 = Math.min.apply(null, naFrente.map(function (a) { return a.x; }));
       var x2 = Math.max.apply(null, naFrente.map(function (a) { return a.x + a.w; }));
-      s += '<rect x="' + x1 + '" y="' + (-H) + '" width="' + (x2 - x1) + '" height="' + H + '" fill="#EDF1F4" stroke="#1B2229" stroke-width="7"/>';
-      s += '<polygon points="' + (x1 - 30) + ',' + (-H) + ' ' + ((x1 + x2) / 2) + ',' + (-H - telhado) + ' ' + (x2 + 30) + ',' + (-H) + '" fill="#DDE3E9" stroke="#1B2229" stroke-width="7"/>';
+      var cx = (x1 + x2) / 2;
+      /* cobertura */
+      if (F.cobertura === 'platibanda') {
+        s += '<rect x="' + x1 + '" y="' + (-H - telhado) + '" width="' + (x2 - x1) + '" height="' + telhado + '" fill="' + F.corParede + '" stroke="#1B2229" stroke-width="7"/>';
+      } else if (F.cobertura === 'telhado2') {
+        s += '<polygon points="' + (x1 - 50) + ',' + (-H) + ' ' + cx + ',' + (-H - telhado) + ' ' + (x2 + 50) + ',' + (-H) + '" fill="' + telha + '" stroke="#1B2229" stroke-width="7"/>';
+        for (var i = 1; i < 6; i++) { var yy = -H - telhado * i / 6, dx = (x2 - x1 + 100) / 2 * (1 - i / 6); s += '<line x1="' + (cx - dx) + '" y1="' + yy + '" x2="' + (cx + dx) + '" y2="' + yy + '" stroke="#1B2229" stroke-opacity=".35" stroke-width="2"/>'; }
+      } else {
+        var rec = Math.min((x2 - x1) * .3, 260);
+        s += '<polygon points="' + (x1 - 50) + ',' + (-H) + ' ' + (x1 + rec) + ',' + (-H - telhado) + ' ' + (x2 - rec) + ',' + (-H - telhado) + ' ' + (x2 + 50) + ',' + (-H) + '" fill="' + telha + '" stroke="#1B2229" stroke-width="7"/>';
+        for (var j = 1; j < 5; j++) { var y2 = -H - telhado * j / 5, dx2 = 50 - (50 + rec) * j / 5; s += '<line x1="' + (x1 - dx2) + '" y1="' + y2 + '" x2="' + (x2 + dx2) + '" y2="' + y2 + '" stroke="#1B2229" stroke-opacity=".35" stroke-width="2"/>'; }
+      }
+      /* parede */
+      s += '<rect x="' + x1 + '" y="' + (-H) + '" width="' + (x2 - x1) + '" height="' + H + '" fill="' + F.corParede + '" stroke="#1B2229" stroke-width="7"/>';
       naFrente.forEach(function (a) {
-        var cx = a.x + a.w / 2;
-        if (a.tipo === 'circulacao' || a.tipo === 'garagem') {   /* porta */
-          s += '<rect x="' + (cx - 55) + '" y="' + (-210) + '" width="110" height="210" fill="#B7C0C8" stroke="#1B2229" stroke-width="5"/>';
+        var ax = a.x + a.w / 2, ehGar = a.tipo === 'garagem', ehPorta = a.tipo === 'circulacao' || ehGar;
+        /* revestimento nos trechos que não são garagem */
+        if (rev && !ehGar) {
+          var fill = F.revestimento === 'ripado' ? 'url(#ripas)' : (F.revestimento === 'pedra' ? 'url(#pedra)' : (F.revestimento === 'tijolo' ? 'url(#tijolo)' : rev));
+          s += '<rect x="' + (a.x + 4) + '" y="' + (-H - (F.cobertura === 'platibanda' ? telhado - 4 : 0) + 4) + '" width="' + (a.w - 8) + '" height="' + (H + (F.cobertura === 'platibanda' ? telhado - 4 : 0) - 8) + '" fill="' + fill + '"/>';
+        }
+        if (ehGar) {
+          var gw = Math.min(a.w - 40, 320);
+          s += '<rect x="' + (ax - gw / 2) + '" y="' + (-220) + '" width="' + gw + '" height="220" fill="#7D838A" stroke="#1B2229" stroke-width="5"/>';
+          for (var g = 1; g < 5; g++) s += '<line x1="' + (ax - gw / 2) + '" y1="' + (-220 * g / 5) + '" x2="' + (ax + gw / 2) + '" y2="' + (-220 * g / 5) + '" stroke="#1B2229" stroke-opacity=".5" stroke-width="3"/>';
+        } else if (ehPorta) {
+          s += '<rect x="' + (ax - 45) + '" y="' + (-210) + '" width="90" height="210" fill="' + (F.esquadria === 'preto' ? '#2B2F33' : '#7A5230') + '" stroke="' + esq + '" stroke-width="6"/>';
+          s += '<rect x="' + (ax - 45 - 35) + '" y="' + (-H - (F.cobertura === 'platibanda' ? telhado + 15 : 10)) + '" width="35" height="' + (H + (F.cobertura === 'platibanda' ? telhado + 15 : 10)) + '" fill="' + F.corDestaque + '"/>';   /* volume de destaque */
+          if (F.marquise) s += '<rect x="' + (ax - 45 - 50) + '" y="' + (-235) + '" width="' + (90 + 100) + '" height="12" fill="' + F.corDestaque + '"/>';
+          if (F.numero) s += '<rect x="' + (ax - 45 - 30) + '" y="-172" width="25" height="25" fill="' + (F.esquadria === 'preto' ? '#1B1F24' : '#F4F4F1') + '"/><text x="' + (ax - 45 - 17.5) + '" y="-153" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="16" fill="' + (F.esquadria === 'preto' ? '#F4F4F1' : '#1B1F24') + '">' + esc(F.numero) + '</text>';
         } else {                                                  /* janela */
           var jw = Math.min(a.w * .5, 180);
-          s += '<rect x="' + (cx - jw / 2) + '" y="' + (-H + 70) + '" width="' + jw + '" height="110" fill="#7FD6E8" fill-opacity=".55" stroke="#1B2229" stroke-width="5"/>';
-          s += '<line x1="' + cx + '" y1="' + (-H + 70) + '" x2="' + cx + '" y2="' + (-H + 180) + '" stroke="#1B2229" stroke-width="3"/>';
+          s += '<rect x="' + (ax - jw / 2) + '" y="' + (-H + 70) + '" width="' + jw + '" height="110" fill="#7FD6E8" fill-opacity=".55" stroke="' + esq + '" stroke-width="6"/>';
+          s += '<line x1="' + ax + '" y1="' + (-H + 70) + '" x2="' + ax + '" y2="' + (-H + 180) + '" stroke="' + esq + '" stroke-width="4"/>';
         }
       });
-      s += '<text x="' + ((x1 + x2) / 2) + '" y="60" text-anchor="middle" font-family="ui-monospace,monospace" font-size="34" fill="#6B7885">' + M.fmtM(x2 - x1) + ' de testada construída</text>';
+      /* muro e portão na frente */
+      var muroH = F.muro === 'alto' ? 180 : (F.muro === 'vidro' ? 160 : 100), gx = cx, gwid = 300;
+      var gar = naFrente.filter(function (a) { return a.tipo === 'garagem'; })[0];
+      if (gar) { gx = gar.x + gar.w / 2; gwid = Math.min(320, gar.w); } else { var ent = naFrente.filter(function (a) { return a.tipo === 'circulacao'; })[0]; if (ent) { gx = ent.x + ent.w / 2; gwid = 120; } }
+      var mf = F.muro === 'vidro' ? '#BFE6F2' : '#DDD8CC', mo = F.muro === 'vidro' ? .55 : 1;
+      s += '<rect x="0" y="' + (-muroH) + '" width="' + Math.max(0, gx - gwid / 2) + '" height="' + muroH + '" fill="' + mf + '" fill-opacity="' + mo + '" stroke="#1B2229" stroke-width="5"/>';
+      s += '<rect x="' + (gx + gwid / 2) + '" y="' + (-muroH) + '" width="' + Math.max(0, t.largura - gx - gwid / 2) + '" height="' + muroH + '" fill="' + mf + '" fill-opacity="' + mo + '" stroke="#1B2229" stroke-width="5"/>';
+      var pH = Math.min(muroH + 20, 190);
+      if (F.portao === 'chapa') s += '<rect x="' + (gx - gwid / 2) + '" y="' + (-pH) + '" width="' + gwid + '" height="' + pH + '" fill="#7D838A" stroke="#1B2229" stroke-width="5"/>';
+      else if (F.portao === 'ripado') { s += '<rect x="' + (gx - gwid / 2) + '" y="' + (-pH) + '" width="' + gwid + '" height="' + pH + '" fill="url(#ripas)" stroke="#1B2229" stroke-width="5"/>'; }
+      else { for (var b = 0; b <= gwid; b += 13) s += '<line x1="' + (gx - gwid / 2 + b) + '" y1="' + (-pH) + '" x2="' + (gx - gwid / 2 + b) + '" y2="0" stroke="#5B6570" stroke-width="3"/>'; s += '<line x1="' + (gx - gwid / 2) + '" y1="' + (-pH + 4) + '" x2="' + (gx + gwid / 2) + '" y2="' + (-pH + 4) + '" stroke="#1B2229" stroke-width="5"/>'; }
+      /* jardim */
+      if (F.jardim) { for (var fx = 20; fx < t.largura - 20; fx += 34) { if (Math.abs(fx - gx) < gwid / 2 + 20) continue; s += '<circle cx="' + fx + '" cy="' + (-muroH - 14) + '" r="18" fill="#4E9A5D"/>'; } }
+      s += '<text x="' + cx + '" y="60" text-anchor="middle" font-family="ui-monospace,monospace" font-size="34" fill="#6B7885">' + M.fmtM(x2 - x1) + ' de testada · ' + (window.TRES ? TRES.FACHADA_PRESETS[F.estilo].rot : F.estilo) + '</text>';
     }
     return '<svg viewBox="' + (-140) + ' ' + (-H - telhado - 120) + ' ' + (t.largura + 280) + ' ' + (H + telhado + 240) +
       '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">' + s + '</svg>';

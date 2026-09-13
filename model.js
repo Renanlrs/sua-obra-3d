@@ -209,6 +209,41 @@ var M = (function () {
   function custoTotal(){
     return proj.ambientes.reduce(function (s, a) { return s + custoDe(a); }, 0);
   }
+  /* ---------- fachada: custo do que foi escolhido (centavos), separado do custo dos ambientes ---------- */
+  var PRECO_FACHADA = {
+    revestimento:{nenhum:0, ripado:42000, pedra:38000, tijolo:26000, cimento:14000},   /* por m² de testada */
+    cobertura:{platibanda:0, telhado2:18000, telhado4:23000},                            /* por m² construído */
+    telha:{ceramica:0, concreto:3000, metalica:-4000},                                   /* ajuste por m² construído */
+    portao:{grade:350000, ripado:650000, chapa:480000},
+    muro:{baixo:0, alto:26000, vidro:90000},                                             /* alto: por m linear de testada */
+    jardim:180000, marquise:320000, iluminacao:240000
+  };
+  function fachadaCfg(){
+    if (window.TRES) return TRES.fachadaDe(proj);
+    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false};
+  }
+  function testada(){   /* largura da frente construída, em cm */
+    var cob = ambientesCobertos(); if (!cob.length) return 0;
+    var yMin = Math.min.apply(null, cob.map(function (a) { return a.y; }));
+    var frente = cob.filter(function (a) { return a.y <= yMin + 60 && a.tipo !== 'garagem'; });
+    return frente.reduce(function (s2, a) { return s2 + a.w; }, 0);
+  }
+  function custoFachadaItens(){
+    var f = fachadaCfg(), P = PRECO_FACHADA, ac = areaConstruida() / 10000, tf = testada() / 100 * proj.peDireito / 100, itens = [];
+    function add(rot, v){ if (v) itens.push({rot:rot, valor:Math.round(v)}); }
+    add('Revestimento ' + f.revestimento + ' (' + num(tf) + ' m²)', tf * (P.revestimento[f.revestimento] || 0));
+    add('Cobertura ' + (f.cobertura === 'platibanda' ? 'platibanda' : (f.cobertura === 'telhado2' ? '2 águas' : '4 águas')), ac * (P.cobertura[f.cobertura] || 0));
+    if (f.cobertura !== 'platibanda') add('Telha ' + f.telha, ac * (P.telha[f.telha] || 0));
+    add('Portão ' + f.portao, P.portao[f.portao] || 0);
+    if (f.muro === 'alto') add('Muro alto', proj.terreno.largura / 100 * P.muro.alto);
+    if (f.muro === 'vidro') add('Muro com vidro', P.muro.vidro);
+    if (f.jardim) add('Jardim frontal', P.jardim);
+    if (f.marquise) add('Marquise da entrada', P.marquise);
+    if (f.iluminacao) add('Iluminação de fachada', P.iluminacao);
+    return itens;
+  }
+  function custoFachada(){ return custoFachadaItens().reduce(function (s2, i) { return s2 + i.valor; }, 0); }
+  function custoGeral(){ return custoTotal() + custoFachada(); }
   function custoPorM2(){
     var ac = areaConstruida() / 10000;
     return ac ? Math.round(custoTotal() / ac) : 0;
@@ -334,7 +369,7 @@ var M = (function () {
     mobiliarAuto:mobiliarAuto, movelDe:movelDe, addMovel:addMovel, ambienteDe:ambienteDe, moveisDe:moveisDe,
     areaOf:areaOf, areaTerreno:areaTerreno, areaConstruida:areaConstruida,
     areaTotalAmbientes:areaTotalAmbientes, ocupacao:ocupacao, espelhoAgua:espelhoAgua,
-    custoDe:custoDe, custoTotal:custoTotal, custoPorM2:custoPorM2, bbox:bbox, problemas:problemas,
+    custoDe:custoDe, custoTotal:custoTotal, custoPorM2:custoPorM2, custoFachada:custoFachada, custoFachadaItens:custoFachadaItens, custoGeral:custoGeral, fachadaCfg:fachadaCfg, testada:testada, PRECO_FACHADA:PRECO_FACHADA, bbox:bbox, problemas:problemas,
     fmtM:fmtM, fmtMs:fmtMs, fmtM2:fmtM2, fmtPct:fmtPct, fmtBRL:fmtBRL, num:num, parseM:parseM,
     commit:commit, undo:undo, redo:redo, podeUndo:podeUndo, podeRedo:podeRedo, proxUndo:proxUndo,
     salvar:salvar, abrir:abrir, excluir:excluir, todos:todos, ultimoId:ultimoId, onChange:onChange
