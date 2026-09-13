@@ -125,10 +125,14 @@ var VIEWS = (function () {
           var gw = Math.min(a.w - 40, 320);
           s += '<rect x="' + (ax - gw / 2) + '" y="' + (-220) + '" width="' + gw + '" height="220" fill="#7D838A" stroke="#1B2229" stroke-width="5"/>';
           for (var g = 1; g < 5; g++) s += '<line x1="' + (ax - gw / 2) + '" y1="' + (-220 * g / 5) + '" x2="' + (ax + gw / 2) + '" y2="' + (-220 * g / 5) + '" stroke="#1B2229" stroke-opacity=".5" stroke-width="3"/>';
+        } else if (F.vitrine && a.tipo === 'social') {   /* vitrine: vidro do piso ao teto, com a porta no meio */
+          s += '<rect x="' + (a.x + 6) + '" y="' + (-H + 8) + '" width="' + (a.w - 12) + '" height="' + (H - 16) + '" fill="#BFE6F2" fill-opacity=".6" stroke="' + esq + '" stroke-width="6"/>';
+          for (var vb = 1; vb < Math.max(2, Math.round(a.w / 160)); vb++) s += '<line x1="' + (a.x + a.w * vb / Math.max(2, Math.round(a.w / 160))) + '" y1="' + (-H + 8) + '" x2="' + (a.x + a.w * vb / Math.max(2, Math.round(a.w / 160))) + '" y2="-8" stroke="' + esq + '" stroke-width="4"/>';
         } else if (ehPorta) {
           s += '<rect x="' + (ax - 45) + '" y="' + (-210) + '" width="90" height="210" fill="' + (F.esquadria === 'preto' ? '#2B2F33' : '#7A5230') + '" stroke="' + esq + '" stroke-width="6"/>';
           s += '<rect x="' + (ax - 45 - 35) + '" y="' + (-H - (F.cobertura === 'platibanda' ? telhado + 15 : 10)) + '" width="35" height="' + (H + (F.cobertura === 'platibanda' ? telhado + 15 : 10)) + '" fill="' + F.corDestaque + '"/>';   /* volume de destaque */
           if (F.marquise) s += '<rect x="' + (ax - 45 - 50) + '" y="' + (-235) + '" width="' + (90 + 100) + '" height="12" fill="' + F.corDestaque + '"/>';
+          if (F.pergolado) { s += '<rect x="' + (ax - 120) + '" y="-262" width="240" height="12" fill="#7A5230"/>'; for (var pg = 0; pg <= 8; pg++) s += '<rect x="' + (ax - 120 + pg * 30 - 3) + '" y="-274" width="6" height="12" fill="#7A5230"/>'; s += '<rect x="' + (ax - 120) + '" y="-262" width="10" height="262" fill="#7A5230"/><rect x="' + (ax + 110) + '" y="-262" width="10" height="262" fill="#7A5230"/>'; }
           if (F.numero) s += '<rect x="' + (ax - 45 - 30) + '" y="-172" width="25" height="25" fill="' + (F.esquadria === 'preto' ? '#1B1F24' : '#F4F4F1') + '"/><text x="' + (ax - 45 - 17.5) + '" y="-153" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="16" fill="' + (F.esquadria === 'preto' ? '#F4F4F1' : '#1B1F24') + '">' + esc(F.numero) + '</text>';
         } else {                                                  /* janela */
           var jw = Math.min(a.w * .5, 180);
@@ -136,6 +140,14 @@ var VIEWS = (function () {
           s += '<line x1="' + ax + '" y1="' + (-H + 70) + '" x2="' + ax + '" y2="' + (-H + 180) + '" stroke="' + esq + '" stroke-width="4"/>';
         }
       });
+      /* letreiro: centralizado na frente construída (na platibanda ou acima da porta) */
+      if (F.letreiro) {
+        var lw = Math.min(x2 - x1 - 60, Math.max(260, F.letreiro.length * 34)), ly = F.cobertura === 'platibanda' ? -H - telhado + 6 : -H + 10, lh = 54;
+        var fundoL = F.letreiroEstilo === 'placa' ? F.letreiroCor : (F.letreiroEstilo === 'caixa' ? '#F4F4F1' : (F.letreiroEstilo === 'backlight' ? '#FFFFFF' : '#14171B'));
+        var tintaL = F.letreiroEstilo === 'placa' ? '#FFFFFF' : (F.letreiroEstilo === 'backlight' ? '#1B1F24' : F.letreiroCor);
+        s += '<rect x="' + (cx - lw / 2) + '" y="' + ly + '" width="' + lw + '" height="' + lh + '" rx="4" fill="' + fundoL + '" stroke="#1B2229" stroke-width="4"/>';
+        s += '<text x="' + cx + '" y="' + (ly + lh * .7) + '" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="' + Math.min(36, lw / (F.letreiro.length * .66)) + '" fill="' + tintaL + '">' + esc(F.letreiro) + '</text>';
+      }
       /* muro e portão na frente */
       var muroH = F.muro === 'alto' ? 180 : (F.muro === 'vidro' ? 160 : 100), gx = cx, gwid = 300;
       var gar = naFrente.filter(function (a) { return a.tipo === 'garagem'; })[0];
@@ -147,6 +159,7 @@ var VIEWS = (function () {
       if (F.portao === 'chapa') s += '<rect x="' + (gx - gwid / 2) + '" y="' + (-pH) + '" width="' + gwid + '" height="' + pH + '" fill="#7D838A" stroke="#1B2229" stroke-width="5"/>';
       else if (F.portao === 'ripado') { s += '<rect x="' + (gx - gwid / 2) + '" y="' + (-pH) + '" width="' + gwid + '" height="' + pH + '" fill="url(#ripas)" stroke="#1B2229" stroke-width="5"/>'; }
       else { for (var b = 0; b <= gwid; b += 13) s += '<line x1="' + (gx - gwid / 2 + b) + '" y1="' + (-pH) + '" x2="' + (gx - gwid / 2 + b) + '" y2="0" stroke="#5B6570" stroke-width="3"/>'; s += '<line x1="' + (gx - gwid / 2) + '" y1="' + (-pH + 4) + '" x2="' + (gx + gwid / 2) + '" y2="' + (-pH + 4) + '" stroke="#1B2229" stroke-width="5"/>'; }
+      if (F.letreiro && F.totem) { s += '<rect x="' + (gx + gwid / 2 + 30) + '" y="-260" width="50" height="260" fill="' + F.corDestaque + '"/><rect x="' + (gx + gwid / 2 + 33) + '" y="-252" width="44" height="70" fill="' + (F.letreiroEstilo === 'placa' ? F.letreiroCor : '#14171B') + '"/>'; }
       /* jardim */
       if (F.jardim) { for (var fx = 20; fx < t.largura - 20; fx += 34) { if (Math.abs(fx - gx) < gwid / 2 + 20) continue; s += '<circle cx="' + fx + '" cy="' + (-muroH - 14) + '" r="18" fill="#4E9A5D"/>'; } }
       s += '<text x="' + cx + '" y="60" text-anchor="middle" font-family="ui-monospace,monospace" font-size="34" fill="#6B7885">' + M.fmtM(x2 - x1) + ' de testada · ' + (window.TRES ? TRES.FACHADA_PRESETS[F.estilo].rot : F.estilo) + '</text>';

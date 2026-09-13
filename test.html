@@ -188,6 +188,19 @@ Object.keys(TF.FACHADA_PRESETS).forEach(function(k){
   var sv = VIEWS.fachada();
   t('elevação ' + k + ' gera SVG com número da casa', sv.indexOf('<svg') === 0 && sv.indexOf('128') > 0 && sv.indexOf('NaN') < 0, sv.length + ' chars');
 });
+/* 11. fachada por prompt (regras, sem IA) */
+var pp = TF.fachadaPorPrompt('loja moderna com vitrine, esquadrias pretas, letreiro "Acqua Belo" em LED azul, totem, número 128').fachada;
+t('prompt: estilo, vitrine, esquadria, letreiro, LED, cor, totem e número', pp.estilo === 'moderno' && pp.vitrine === true && pp.esquadria === 'preto' && pp.letreiro === 'ACQUA BELO' && pp.letreiroEstilo === 'led' && pp.letreiroCor === '#2F5D8A' && pp.totem === true && pp.numero === '128', JSON.stringify(pp));
+var pp2 = TF.fachadaPorPrompt('casa rústica com telhado de telha cerâmica, pedra na frente, parede bege, jardim e pergolado').fachada;
+t('prompt: rústico mantém 2 águas do preset; cerâmica, pedra, bege, jardim, pergolado', pp2.estilo === 'rustico' && pp2.cobertura === 'telhado2' && pp2.telha === 'ceramica' && pp2.revestimento === 'pedra' && pp2.corParede === '#EFE3CF' && pp2.jardim === true && pp2.pergolado === true, JSON.stringify(pp2));
+var pp3 = TF.fachadaPorPrompt('placa com o nome Padaria Central em neon vermelho, sem jardim');
+t('prompt: nome sem aspas vira letreiro; neon; sem jardim', pp3.fachada.letreiro === 'PADARIA CENTRAL' && pp3.fachada.letreiroEstilo === 'neon' && pp3.fachada.jardim === false && pp3.lidos.length >= 4, JSON.stringify(pp3.fachada));
+t('prompt vazio não entende nada', TF.fachadaPorPrompt('bom dia').lidos.length === 0);
+M.proj.fachada = {estilo:'moderno', letreiro:'ACQUA BELO', letreiroEstilo:'led', vitrine:true, totem:true};
+var cf = M.custoFachadaItens().map(function(i){ return i.rot; }).join('|');
+t('custo da fachada lista letreiro, totem e vitrine', cf.indexOf('Letreiro LED') >= 0 && cf.indexOf('Totem') >= 0 && cf.indexOf('Vitrine') >= 0, cf);
+var svL = VIEWS.fachada();
+t('elevação desenha o letreiro com o nome', svL.indexOf('ACQUA BELO') > 0);
 M.proj.fachada = null;
 M.novo('casa-terrea', 1000, 2500);
 

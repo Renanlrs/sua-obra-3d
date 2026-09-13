@@ -73,6 +73,7 @@ var UI = (function () {
         if (mvq) { var ambq = M.ambienteDe(mvq); if (ambq && viewAtual === 'planta') PLAN.enquadrarAmb(ambq); selecionarMovel(mvq.id); }
       }
       if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'fachada') { fachPanel(); t3.verFachada(true); } }
+      if (q.get('fprompt') && viewAtual === 'fachada') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); }
       if (q.has('noite') && t3) t3.setNoite(true);
       if (q.has('estilos4')) setTimeout(compararEstilos, 100);
       if (q.has('htmlpasseio')) { location.href = URL.createObjectURL(new Blob([htmlPasseio()], {type:'text/html'})) + (q.get('scroll') ? '#s=' + q.get('scroll') : ''); return; }   /* testa o export in loco */
@@ -729,6 +730,7 @@ var UI = (function () {
     {n:'Ver em 2D (planta)',   g:'2',      f:function(){ irPara('planta'); }},
     {n:'Fachada',             g:'F',      f:function(){ irPara('fachada'); }},
     {n:'Fachada à noite',     g:'',       f:function(){ irPara('fachada'); if (t3) t3.setNoite(true); }},
+    {n:'Criar fachada por prompt', g:'',  f:function(){ irPara('fachada'); setTimeout(function(){ var p = document.querySelector('#fach-prompt'); if (p) p.focus(); }, 60); }},
     {n:'Ver a casa nos 4 estilos de fachada', g:'', f:function(){ irPara('fachada'); setTimeout(compararEstilos, 60); }},
     {n:'Corte',               g:'',       f:function(){ irPara('corte'); }},
     {n:'Orçamento',           g:'O',      f:function(){ irPara('orcamento'); }},
@@ -938,6 +940,9 @@ var UI = (function () {
     function chips(k, mapa){ return '<div class="chips">' + Object.keys(mapa).map(function (v) { return '<button class="chip' + (F[k] === v ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + v + '">' + mapa[v] + '</button>'; }).join('') + '</div>'; }
     function cores(k, lista){ return '<div class="swatches">' + lista.map(function (c) { return '<button class="sw-btn' + (F[k].toUpperCase() === c ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + c + '" style="background:' + c + '" title="' + c + '"></button>'; }).join('') + '</div>'; }
     function tg(k, rot){ return '<button class="chip' + (F[k] ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + (F[k] ? '0' : '1') + '">' + rot + '</button>'; }
+    /* criar por prompt: descreve em português, o app entende as escolhas */
+    h += '<section class="fach-prompt"><h6>CRIAR POR PROMPT</h6><div class="inp"><textarea id="fach-prompt" rows="2" placeholder="ex.: loja moderna com vitrine, ripado, letreiro &quot;Acqua Belo&quot; em LED azul, totem, número 128"></textarea></div>' +
+      '<div class="fach-prompt-acts"><button class="btn solid sm" id="fach-prompt-ok">✨ Criar fachada</button><span id="fach-prompt-msg"></span></div></section>';
     h += '<section><h6>ESTILO</h6><div class="estilos">';
     Object.keys(TRES.FACHADA_PRESETS).forEach(function (k) {
       var pr = TRES.FACHADA_PRESETS[k], telha = pr.cobertura === 'platibanda' ? pr.corParede : (pr.telha === 'ceramica' ? '#B5533A' : '#6F6E6B');
@@ -949,8 +954,15 @@ var UI = (function () {
     h += '<section><h6>REVESTIMENTO DA FRENTE</h6>' + chips('revestimento', ROT.revestimento) + '</section>';
     h += '<section><h6>ESQUADRIAS</h6>' + chips('esquadria', ROT.esquadria) + '</section>';
     h += '<section><h6>PORTÃO</h6>' + chips('portao', ROT.portao) + '<h6 style="margin-top:10px">MURO</h6>' + chips('muro', ROT.muro) + '</section>';
-    h += '<section><h6>EXTRAS</h6><div class="chips">' + tg('jardim', 'Jardim') + tg('marquise', 'Marquise') + tg('iluminacao', 'Iluminação') + '</div>' +
+    h += '<section><h6>EXTRAS</h6><div class="chips">' + tg('jardim', 'Jardim') + tg('marquise', 'Marquise') + tg('pergolado', 'Pergolado') + tg('iluminacao', 'Iluminação') + tg('vitrine', 'Vitrine') + '</div>' +
       '<div class="f" style="margin-top:10px"><label>NÚMERO DA CASA</label><div class="inp"><input id="fach-num" value="' + esc(F.numero) + '" placeholder="ex.: 128" maxlength="5"></div></div></section>';
+    /* letreiro comercial */
+    h += '<section><h6>LETREIRO · NOME DO ESTABELECIMENTO</h6>' +
+      '<div class="f"><div class="inp"><input id="fach-let" value="' + esc(F.letreiro) + '" placeholder="ex.: ACQUA BELO" maxlength="40"></div></div>' +
+      (F.letreiro ? '<h6 style="margin-top:10px">TIPO</h6>' + chips('letreiroEstilo', {placa:'Placa', caixa:'Letra caixa', led:'LED', neon:'Neon', backlight:'Backlight'}) +
+      '<h6 style="margin-top:10px">COR</h6>' + cores('letreiroCor', ['#22B8D6', '#2F5D8A', '#C4553B', '#E0B44C', '#4E9A5D', '#D96AA0', '#F4F4F1', '#1F2326']) +
+      '<div class="chips" style="margin-top:10px">' + tg('letreiroLuz', 'Acende à noite') + tg('totem', 'Totem no portão') +
+      '<button class="chip' + (F.letreiroPos === 'marquise' ? ' on' : '') + '" data-fk="letreiroPos" data-fv="' + (F.letreiroPos === 'marquise' ? 'parede' : 'marquise') + '">Sobre a marquise</button></div>' : '<div class="ins-empty">Digite o nome para a placa aparecer na frente.</div>') + '</section>';
     var itens = M.custoFachadaItens();
     h += '<section><h6>QUANTO ESSA FACHADA CUSTA</h6>' + (itens.length ? itens.map(function (it) { return kv(it.rot, M.fmtBRL(it.valor), ''); }).join('') : '<div class="ins-empty">Nada além da alvenaria.</div>') +
       '<div class="kv tot"><span>Fachada</span><b>' + M.fmtBRL(M.custoFachada()) + '</b></div>' +
@@ -959,13 +971,35 @@ var UI = (function () {
     el.querySelectorAll('[data-fk]').forEach(function (b) {
       b.onclick = function () {
         var k = b.getAttribute('data-fk'), v = b.getAttribute('data-fv');
-        if (k === 'jardim' || k === 'marquise' || k === 'iluminacao') v = v === '1';
+        if (['jardim', 'marquise', 'iluminacao', 'pergolado', 'vitrine', 'letreiroLuz', 'totem'].indexOf(k) >= 0) v = v === '1';
         setFachada(k, v);
       };
     });
     var num = el.querySelector('#fach-num');
     num.onchange = function () { setFachada('numero', this.value.trim()); };
     num.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); };
+    var let2 = el.querySelector('#fach-let');
+    let2.onchange = function () { setFachada('letreiro', this.value.trim().toUpperCase()); };
+    let2.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); };
+    var pr = el.querySelector('#fach-prompt'), prOk = el.querySelector('#fach-prompt-ok');
+    pr.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); prOk.click(); } };
+    prOk.onclick = function () { fachadaPorPrompt(pr.value); };
+  }
+  /* texto → fachada: aplica o que entendeu, diz o que entendeu */
+  function fachadaPorPrompt(txt){
+    if (!txt || !txt.trim()) { toast('Descreva a fachada primeiro.', null, true); return; }
+    var atual = TRES.fachadaDe(M.proj); atual.nomeProjeto = (M.proj.nome || '').toUpperCase();
+    var r = TRES.fachadaPorPrompt(txt, atual);
+    if (!r.lidos.length) { toast('Não entendi nada aí. Tente: "moderna com ripado, esquadrias pretas, letreiro em LED azul".', null, true); return; }
+    var f = M.proj.fachada || {};
+    if (r.fachada.estilo && r.fachada.estilo !== f.estilo) f = {estilo:r.fachada.estilo, numero:f.numero || '', letreiro:f.letreiro};   /* estilo novo zera o resto, como no cartão */
+    for (var k in r.fachada) f[k] = r.fachada[k];
+    M.proj.fachada = f;
+    M.commit('Fachada por prompt');
+    fachPanel();
+    var msg = document.querySelector('#fach-prompt-msg'); if (msg) msg.textContent = 'Entendi: ' + r.lidos.join(' · ');
+    var e = document.querySelector('#fach-elev-pad'); if (e && !e.hidden) e.innerHTML = VIEWS.fachada();
+    if (t3 && r.fachada.letreiroLuz && r.fachada.letreiro) t3.setNoite(true);   /* pediu letreiro aceso: mostra à noite */
   }
   function setFachada(k, v){
     if (k === 'estilo') M.proj.fachada = {estilo:v, numero:(M.proj.fachada || {}).numero || ''};   /* trocar de estilo zera as escolhas manuais */

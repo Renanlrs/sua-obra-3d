@@ -3,7 +3,7 @@
 **No ar: https://renanlrs.github.io/sua-obra-3d/**
 
 App de planta de casas que roda direto no navegador — pelo link acima ou com **duplo clique em `index.html`**. Sem instalação, sem `npm`, sem servidor, sem conta.
-Guia completo de uso, atalhos e arquitetura em [`LEIA-ME.md`](LEIA-ME.md). Verificação automática em [`test.html`](test.html) (93 checagens).
+Guia completo de uso, atalhos e arquitetura em [`LEIA-ME.md`](LEIA-ME.md). Verificação automática em [`test.html`](test.html) (99 checagens).
 
 ## O que o app faz — e de onde veio cada parte
 
@@ -30,6 +30,10 @@ Tecla `F`. Quatro estilos de partida (Moderno, Clássico, Contemporâneo, Rústi
 **☾ Noite** — janelas acesas, spots na fachada, luz da entrada e poste da rua.
 
 ![Fachada clássica à noite](docs/fachada-noite.jpg)
+
+**Fachada comercial e criar por prompt** — letreiro com o nome do estabelecimento (placa, letra caixa, LED, neon, backlight; aceso à noite; totem), vitrine, pergolado. Ou descreva em uma frase e o app monta.
+
+![Loja criada por prompt: neon, vitrine, pergolado](docs/fachada-loja-prompt.jpg)
 
 **✨ Ver os 4 estilos** — fotografa a *sua* planta nos quatro estilos, lado a lado, com o custo de cada um. Clicou, aplicou.
 

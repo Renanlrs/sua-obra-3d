@@ -216,11 +216,14 @@ var M = (function () {
     telha:{ceramica:0, concreto:3000, metalica:-4000},                                   /* ajuste por m² construído */
     portao:{grade:350000, ripado:650000, chapa:480000},
     muro:{baixo:0, alto:26000, vidro:90000},                                             /* alto: por m linear de testada */
-    jardim:180000, marquise:320000, iluminacao:240000
+    jardim:180000, marquise:320000, iluminacao:240000,
+    letreiro:{placa:120000, caixa:380000, led:650000, neon:550000, backlight:480000}, totem:450000,
+    vitrine:95000,                                                                        /* por m² de frente envidraçada */
+    pergolado:320000
   };
   function fachadaCfg(){
     if (window.TRES) return TRES.fachadaDe(proj);
-    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false};
+    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem};
   }
   function testada(){   /* largura da frente construída, em cm */
     var cob = ambientesCobertos(); if (!cob.length) return 0;
@@ -240,6 +243,10 @@ var M = (function () {
     if (f.jardim) add('Jardim frontal', P.jardim);
     if (f.marquise) add('Marquise da entrada', P.marquise);
     if (f.iluminacao) add('Iluminação de fachada', P.iluminacao);
+    if (f.vitrine) add('Vitrine (' + num(tf) + ' m² de vidro)', tf * P.vitrine);
+    if (f.pergolado) add('Pergolado da entrada', P.pergolado);
+    if (f.letreiro) add('Letreiro ' + ({placa:'placa', caixa:'letra caixa', led:'LED', neon:'neon', backlight:'backlight'}[f.letreiroEstilo] || f.letreiroEstilo), P.letreiro[f.letreiroEstilo] || P.letreiro.placa);
+    if (f.letreiro && f.totem) add('Totem', P.totem);
     return itens;
   }
   function custoFachada(){ return custoFachadaItens().reduce(function (s2, i) { return s2 + i.valor; }, 0); }

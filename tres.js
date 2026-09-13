@@ -285,11 +285,87 @@ function TRES_ENGINE(THREE, M){
     contemporaneo:{rot:'Contemporâneo', desc:'Cimento queimado, volumes pretos, muro alto',      cobertura:'platibanda', telha:'concreto', corParede:'#D9D9D4', corDestaque:'#1F2326', revestimento:'cimento', esquadria:'preto', portao:'chapa', muro:'alto', jardim:false, marquise:true, iluminacao:true},
     rustico:      {rot:'Rústico',       desc:'Telhado 2 águas, pedra e madeira',                 cobertura:'telhado2',   telha:'ceramica', corParede:'#EFE3CF', corDestaque:'#8B5E3C', revestimento:'pedra', esquadria:'madeira', portao:'ripado', muro:'baixo', jardim:true, marquise:false, iluminacao:true}
   };
+  /* campos que não dependem do estilo (comercial e extras) */
+  var FACHADA_EXTRA = {vitrine:false, pergolado:false, letreiro:'', letreiroEstilo:'led', letreiroCor:'#22B8D6', letreiroLuz:true, letreiroPos:'parede', totem:false};
   function fachadaDe(proj){
     var f = proj.fachada || {}, pr = FACHADA_PRESETS[f.estilo] || FACHADA_PRESETS.moderno, out = {estilo: f.estilo || 'moderno'};
     for (var k in pr) out[k] = (k in f) ? f[k] : pr[k];
+    for (var k2 in FACHADA_EXTRA) out[k2] = (k2 in f) ? f[k2] : FACHADA_EXTRA[k2];
     out.numero = f.numero || '';
     return out;
+  }
+  /* ---- criar por prompt: texto em português → escolhas de fachada (regras, sem IA, sem internet) ---- */
+  var CORES_NOME = {branco:'#F2EFE8', branca:'#F2EFE8', 'off white':'#F6F1E4', bege:'#EFE3CF', areia:'#EFE3CF', creme:'#F6F1E4', cinza:'#D9D9D4', chumbo:'#6B7885', grafite:'#2B2F33', preto:'#1F2326', preta:'#1F2326',
+    azul:'#2F5D8A', verde:'#4E9A5D', terracota:'#C4553B', vermelho:'#C4553B', laranja:'#D9722B', amarelo:'#E0B44C', marrom:'#8B5E3C', madeira:'#8B5E3C', turquesa:'#1E7E96', ciano:'#22B8D6', rosa:'#D96AA0', roxo:'#6B4E9E', dourado:'#C9A227'};
+  function norm(t){ return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ' ').replace(/[\u0300-\u036f]/g, ''); }
+  function fachadaPorPrompt(txt, atual){
+    var t = ' ' + String(txt || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') + ' ', f = {}, lidos = [];
+    function tem(){ for (var i = 0; i < arguments.length; i++) if (t.indexOf(' ' + arguments[i]) >= 0 || t.indexOf(arguments[i]) >= 0) return true; return false; }
+    function corApos(){   /* cor citada logo depois de uma das palavras */
+      for (var i = 0; i < arguments.length; i++) {
+        var m = t.match(new RegExp(arguments[i] + '[a-z]*\\s+(?:de\\s+|em\\s+|na\\s+cor\\s+)?([a-z]+(?: white)?)'));
+        if (m && CORES_NOME[m[1]]) return CORES_NOME[m[1]];
+      }
+      return null;
+    }
+    /* estilo */
+    if (tem('modern')) { f.estilo = 'moderno'; lidos.push('estilo moderno'); }
+    else if (tem('classic', 'colonial', 'tradicional')) { f.estilo = 'classico'; lidos.push('estilo clássico'); }
+    else if (tem('contempor', 'industrial', 'minimal')) { f.estilo = 'contemporaneo'; lidos.push('estilo contemporâneo'); }
+    else if (tem('rustic', 'campo', 'chale', 'sitio')) { f.estilo = 'rustico'; lidos.push('estilo rústico'); }
+    /* cobertura e telha */
+    if (tem('platibanda', 'laje', 'telhado embutido', 'sem telhado')) { f.cobertura = 'platibanda'; lidos.push('platibanda'); }
+    else if (tem('4 aguas', 'quatro aguas')) { f.cobertura = 'telhado4'; lidos.push('telhado 4 águas'); }
+    else if (tem('2 aguas', 'duas aguas')) { f.cobertura = 'telhado2'; lidos.push('telhado 2 águas'); }
+    else if (tem('telhado')) { var prC = FACHADA_PRESETS[f.estilo] ? FACHADA_PRESETS[f.estilo].cobertura : 'platibanda'; f.cobertura = prC !== 'platibanda' ? prC : 'telhado4'; lidos.push('telhado'); }
+    if (tem('ceramic', 'barro', 'colonial')) { f.telha = 'ceramica'; if (!f.cobertura) f.cobertura = 'telhado4'; lidos.push('telha cerâmica'); }
+    if (tem('metalic', 'zinco', 'sanduiche')) { f.telha = 'metalica'; if (!f.cobertura) f.cobertura = 'telhado2'; lidos.push('telha metálica'); }
+    if (tem('telha de concreto', 'telha concreto')) { f.telha = 'concreto'; lidos.push('telha de concreto'); }
+    /* revestimento */
+    if (tem('ripad', 'ripa', 'madeira na frente', 'brise')) { f.revestimento = 'ripado'; lidos.push('ripado'); }
+    else if (tem('pedra', 'canjiquinha', 'sao tome')) { f.revestimento = 'pedra'; lidos.push('pedra'); }
+    else if (tem('tijol', 'tijolinho')) { f.revestimento = 'tijolo'; lidos.push('tijolinho'); }
+    else if (tem('cimento queimado', 'concreto aparente', 'cimento')) { f.revestimento = 'cimento'; lidos.push('cimento queimado'); }
+    else if (tem('sem revestimento', 'so pintura', 'so pintada', 'apenas pintura')) { f.revestimento = 'nenhum'; lidos.push('sem revestimento'); }
+    /* cores */
+    var cp = corApos('parede', 'pintad', 'pintur', 'casa', 'fachada', 'cor');
+    if (cp) { f.corParede = cp; lidos.push('parede ' + cp); }
+    var cd = corApos('destaque', 'detalhe', 'volume', 'marquise');
+    if (cd) { f.corDestaque = cd; lidos.push('destaque ' + cd); }
+    /* esquadrias, portão, muro */
+    var ce = corApos('esquadria', 'janela', 'caixilho');
+    if (ce === '#1F2326' || ce === '#2B2F33' || tem('esquadria preta', 'esquadrias pretas', 'janelas pretas')) { f.esquadria = 'preto'; lidos.push('esquadrias pretas'); }
+    else if (ce === '#F2EFE8' || tem('esquadria branca', 'esquadrias brancas', 'janelas brancas')) { f.esquadria = 'branco'; lidos.push('esquadrias brancas'); }
+    else if (ce === '#8B5E3C' || tem('esquadria de madeira', 'esquadrias de madeira', 'janelas de madeira')) { f.esquadria = 'madeira'; lidos.push('esquadrias de madeira'); }
+    if (tem('portao de grade', 'portao grade', 'portao gradeado', 'grade')) { f.portao = 'grade'; lidos.push('portão de grade'); }
+    else if (tem('portao ripado', 'portao de madeira', 'portao de ripa')) { f.portao = 'ripado'; lidos.push('portão ripado'); }
+    else if (tem('portao de chapa', 'portao fechado', 'portao chapa', 'chapa')) { f.portao = 'chapa'; lidos.push('portão de chapa'); }
+    if (tem('muro alto', 'muro fechado')) { f.muro = 'alto'; lidos.push('muro alto'); }
+    else if (tem('muro de vidro', 'muro vidro', 'vidro no muro', 'gradil de vidro')) { f.muro = 'vidro'; lidos.push('muro com vidro'); }
+    else if (tem('muro baixo', 'mureta', 'sem muro')) { f.muro = 'baixo'; lidos.push('muro baixo'); }
+    /* extras */
+    if (tem('sem jardim')) { f.jardim = false; lidos.push('sem jardim'); } else if (tem('jardim', 'plantas', 'paisagismo', 'flores')) { f.jardim = true; lidos.push('jardim'); }
+    if (tem('sem marquise')) { f.marquise = false; } else if (tem('marquise', 'cobertura na entrada', 'pergola', 'pergolado')) { if (tem('pergola', 'pergolado')) { f.pergolado = true; lidos.push('pergolado'); } else { f.marquise = true; lidos.push('marquise'); } }
+    if (tem('sem iluminacao', 'sem luz')) { f.iluminacao = false; } else if (tem('iluminac', 'iluminad', 'spots', 'spot ', 'luz')) { f.iluminacao = true; lidos.push('iluminação'); }
+    if (tem('vitrine', 'fachada de vidro', 'frente de vidro', 'pele de vidro', 'toda de vidro')) { f.vitrine = true; lidos.push('vitrine'); }
+    /* letreiro: "letreiro/placa/nome ... 'X'" ou nome entre aspas */
+    var nome = t.match(/["\u201c\u201d']([^"\u201c\u201d']{2,40})["\u201c\u201d']/);
+    if (!nome) nome = t.match(/(?:letreiro|placa|nome|escrito|chamad[ao])\s+(?:com\s+|de\s+|do\s+|da\s+|escrito\s+)?(?:o\s+nome\s+)?([a-z0-9][a-z0-9 &\-]{1,30}?)(?=\s+(?:em|com|de|no|na|led|neon|luminos|ilumin|azul|verm|verde|preto|branc|amarel|laranja|rosa|roxo|dourad)\b|[.,;]|$)/);
+    if (nome && nome[1] && nome[1].trim().length > 1 && !/^(led|neon|luminoso|iluminado|na fachada|na frente)$/.test(nome[1].trim())) {
+      var nm = txt.match(new RegExp(nome[1].trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+      f.letreiro = (nm ? nm[0] : nome[1]).trim().toUpperCase(); lidos.push('letreiro "' + f.letreiro + '"');
+    } else if (tem('letreiro', 'placa', 'fachada comercial', 'nome da loja', 'nome do estabelecimento')) { f.letreiro = f.letreiro || (atual && atual.letreiro) || (atual && atual.nomeProjeto) || 'MINHA LOJA'; lidos.push('letreiro'); }
+    if (tem('neon')) { f.letreiroEstilo = 'neon'; f.letreiroLuz = true; lidos.push('neon'); }
+    else if (tem('led', 'luminos', 'iluminad', 'acesa', 'aceso')) { f.letreiroEstilo = 'led'; f.letreiroLuz = true; lidos.push('LED'); }
+    else if (tem('backlight', 'retroilumin')) { f.letreiroEstilo = 'backlight'; f.letreiroLuz = true; lidos.push('backlight'); }
+    else if (tem('caixa alta', 'letra caixa', 'letras caixa')) { f.letreiroEstilo = 'caixa'; lidos.push('letra caixa'); }
+    else if (tem('placa simples', 'placa pintada', 'placa de acm', 'acm')) { f.letreiroEstilo = 'placa'; lidos.push('placa'); }
+    var cl = corApos('letreiro', 'led', 'neon', 'placa', 'letras', 'luz');
+    if (cl) { f.letreiroCor = cl; lidos.push('letreiro ' + cl); }
+    if (tem('totem', 'pilone', 'pylon')) { f.totem = true; lidos.push('totem'); }
+    if (tem('na marquise', 'sobre a marquise', 'em cima da marquise')) { f.letreiroPos = 'marquise'; f.marquise = true; }
+    var num = t.match(/numero\s+(\d{1,5})/); if (num) { f.numero = num[1]; lidos.push('número ' + num[1]); }
+    return {fachada: f, lidos: lidos};
   }
 
   /* ============================ MATERIAIS ============================ */
@@ -417,6 +493,7 @@ function TRES_ENGINE(THREE, M){
       telhaCeramica: mapa(T.telhaCeramica, 1, {side:THREE.DoubleSide}), telhaConcreto: mapa(T.telhaConcreto, 1, {side:THREE.DoubleSide}), telhaMetal: mapa(T.telhaMetal, 1, {side:THREE.DoubleSide}),
       esqBranca: std('#F4F4F1', {roughness:.5}), esqMadeira: std('#7A5230', {roughness:.6}),
       vidroNoite: new THREE.MeshStandardMaterial({color:'#FFE3A6', emissive:'#FFD27A', emissiveIntensity:.9, transparent:true, opacity:.85, roughness:.2, side:THREE.DoubleSide}),
+      letreiroFundo: std('#1B1F24', {roughness:.6}), letreiroBranco: std('#F4F4F1', {roughness:.5}),
       flor1: std('#E4574F'), flor2: std('#F2C14E'), flor3: std('#F6F1E4'), poste: std('#3A3F45', {roughness:.5, metalness:.4}),
       /* estrutura (etapa 2) */
       concretoEstr: std('#C9C6BE', {roughness:.9}), ferro: std('#D9722B', {roughness:.5, metalness:.3}),
@@ -588,6 +665,27 @@ function TRES_ENGINE(THREE, M){
     var m = std('#FFFFFF', {roughness:.6}); m.map = tex; numCache[k] = m; return m;
   }
 
+  /* letreiro: texto em canvas; `estilo` decide fundo e cor; acende à noite pelo emissiveMap */
+  var letCache = {};
+  function letreiroMat(txt, estilo, cor, W, H){
+    var k = [txt, estilo, cor, Math.round(W * 10), Math.round(H * 10)].join('|'); if (letCache[k]) return letCache[k];
+    var pw = 1024, ph = Math.max(128, Math.round(1024 * H / W));
+    var fundo = estilo === 'placa' ? cor : (estilo === 'caixa' ? '#F4F4F1' : (estilo === 'backlight' ? '#FFFFFF' : '#14171B'));
+    var tinta = estilo === 'placa' ? '#FFFFFF' : (estilo === 'backlight' ? '#1B1F24' : cor);
+    var c = document.createElement('canvas'); c.width = pw; c.height = ph; var g = c.getContext('2d');
+    g.fillStyle = fundo; g.fillRect(0, 0, pw, ph);
+    var fonte = estilo === 'neon' ? 'italic 700 ' : (estilo === 'caixa' ? '800 ' : '700 ');
+    var fs = ph * .58; g.font = fonte + fs + 'px Inter, Arial, sans-serif';
+    while (g.measureText(txt).width > pw * .88 && fs > 20) { fs -= 4; g.font = fonte + fs + 'px Inter, Arial, sans-serif'; }
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (estilo === 'neon') { g.shadowColor = cor; g.shadowBlur = fs * .5; g.strokeStyle = cor; g.lineWidth = fs * .06; g.strokeText(txt, pw / 2, ph / 2 + fs * .04); g.fillStyle = '#FFFFFF'; g.fillText(txt, pw / 2, ph / 2 + fs * .04); }
+    else { if (estilo === 'led') { g.shadowColor = cor; g.shadowBlur = fs * .25; } g.fillStyle = tinta; g.fillText(txt, pw / 2, ph / 2 + fs * .04); }
+    var tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    var m = new THREE.MeshStandardMaterial({color:'#FFFFFF', map:tex, roughness:.5, emissive:'#FFFFFF', emissiveMap:tex, emissiveIntensity:0});
+    m.userData.acende = estilo !== 'placa' && estilo !== 'caixa';
+    letCache[k] = m; return m;
+  }
+
   /* ---- monta a cena inteira ---- */
   function construir(proj){
     var an = analise(proj), Mt = materiais(), t = proj.terreno, H = an.H * CM, F = fachadaDe(proj);
@@ -669,12 +767,23 @@ function TRES_ENGINE(THREE, M){
     /* ---------- paredes ---------- */
     var frenteCm = an.ambs.length ? Math.min.apply(null, an.ambs.map(function (a) { return a.y; })) : 0, luzes = [];
     var casaX0 = an.ambs.length ? Math.min.apply(null, an.ambs.map(function (a) { return a.x; })) * CM : 0, casaX1 = an.ambs.length ? Math.max.apply(null, an.ambs.map(function (a) { return a.x + a.w; })) * CM : TL;
+    var entradaInfo = null;
     an.pecas.forEach(function (pc) {
       var mat = pc.ext ? matExt : Mt.parede;
+      var naFrente = pc.ext && pc.o === 'h' && pc.c === frenteCm, salaF = naFrente ? (pc.A || pc.B) : null;
+      /* vitrine: a parede da frente dos ambientes sociais vira vidro do piso ao teto (loja, recepção, sala) */
+      var ehVitrine = F.vitrine && naFrente && salaF && salaF.tipo === 'social';
+      if (ehVitrine) {
+        var lenV = (pc.q2 - pc.p2) * CM, midV = (pc.p2 + pc.q2) / 2 * CM, zV = pc.c * CM;
+        var vid2 = caixa(G.paredes, lenV, H - .1, .04, Mt.vidro, midV, .1, zV, false); vid2.userData.janela = true; vid2.userData.pronto = Mt.vidro; vid2.userData.cru = Mt.cruParede;
+        caixa(G.paredes, lenV, .1, ESP * CM, matEsq, midV, 0, zV); caixa(G.paredes, lenV, .1, ESP * CM, matEsq, midV, H - .1, zV);
+        var nB = Math.max(1, Math.round(lenV / 1.6)); for (var bi = 0; bi <= nB; bi++) caixa(G.paredes, .06, H, .1, matEsq, midV - lenV / 2 + lenV * bi / nB, 0, zV);
+        pc.ab.forEach(function (ab) { if (ab.tipo === 'entrada') { var lenE = (ab.e - ab.s) * CM, midE = (ab.s + ab.e) / 2 * CM; caixa(G.paredes, lenE + .1, .08, .12, matEsq, midE, 2.12, zV); caixa(G.acabamento, .03, .03, .1, Mt.metal, midE + lenE / 2 - .12, 1.0, zV - .04); } });
+      }
       /* revestimento na frente da casa (peças da testada que não são garagem) */
       if (matRev && pc.ext && pc.o === 'h' && pc.c === frenteCm) {
         var salaFrente = pc.A || pc.B, ehGar = salaFrente && salaFrente.tipo === 'garagem';
-        if (!ehGar) {
+        if (!ehGar && !ehVitrine) {
           /* trechos da peça sem abertura (porta/janela ficam livres) */
           var zR = pc.c * CM - ESP * CM / 2 - .02, altR = H + (F.cobertura === 'platibanda' ? .6 : 0) - .03, trechos = [[pc.p2 + 1, pc.q2 - 1]];
           pc.ab.forEach(function (ab) { var out = []; trechos.forEach(function (tr) { if (ab.e + 8 <= tr[0] || ab.s - 8 >= tr[1]) { out.push(tr); return; } if (ab.s - 8 > tr[0]) out.push([tr[0], ab.s - 8]); if (ab.e + 8 < tr[1]) out.push([ab.e + 8, tr[1]]); }); trechos = out; });
@@ -686,6 +795,7 @@ function TRES_ENGINE(THREE, M){
         }
       }
       pc.caixas.forEach(function (c) {
+        if (ehVitrine) return;
         var len = (c.q - c.p) * CM, alt = (c.z1 - c.z0) * CM, mid = (c.p + c.q) / 2 * CM, y0 = c.z0 * CM;
         var m = pc.o === 'h' ? caixa(G.paredes, len, alt, ESP * CM, mat, mid, y0, pc.c * CM) : caixa(G.paredes, ESP * CM, alt, len, mat, pc.c * CM, y0, mid);
         m.userData.pronto = mat; m.userData.cru = Mt.cruParede;
@@ -698,8 +808,10 @@ function TRES_ENGINE(THREE, M){
       }
       /* esquadrias, vidros e portas */
       pc.ab.forEach(function (ab) {
+        if (ehVitrine && ab.tipo === 'janela') return;   /* a vitrine já é o vidro */
         var len = (ab.e - ab.s) * CM, alt = (ab.z1 - ab.z0) * CM, mid = (ab.s + ab.e) / 2 * CM, y0 = ab.z0 * CM;
         var horiz = pc.o === 'h', cx = horiz ? mid : pc.c * CM, cz = horiz ? pc.c * CM : mid;
+        if (ab.tipo === 'entrada' && horiz && pc.c === frenteCm) entradaInfo = {cx:cx, cz:cz, len:len, p2:pc.p2 * CM, q2:pc.q2 * CM};
         function peça(w, h, d, mat, dx, dy, dz, sombra){ return horiz ? caixa(G.acabamento, w, h, d, mat, cx + dx, y0 + dy, cz + dz, sombra) : caixa(G.acabamento, d, h, w, mat, cx + dz, y0 + dy, cz + dx, sombra); }
         if (ab.tipo === 'janela') {
           var vid = peça(len, alt, .02, Mt.vidro, 0, 0, 0, false); vid.userData.janela = true;
@@ -717,6 +829,12 @@ function TRES_ENGINE(THREE, M){
             var ladoX = cx - len / 2 - .35;
             caixa(G.acabamento, .35, H + (F.cobertura === 'platibanda' ? .75 : .1), .3, matDest, ladoX, 0, cz - .08);
             if (F.marquise) caixa(G.acabamento, len + 1.2, .12, 1.1, matDest, cx + .1, 2.25, cz - .55);
+            if (F.pergolado) {   /* pergolado de madeira sobre a entrada */
+              var pw2 = Math.max(2.4, len + 1.6), pd2 = 1.6;
+              caixa(G.acabamento, .12, 2.5, .12, Mt.esqMadeira, cx - pw2 / 2 + .06, 0, cz - pd2 + .06); caixa(G.acabamento, .12, 2.5, .12, Mt.esqMadeira, cx + pw2 / 2 - .06, 0, cz - pd2 + .06);
+              caixa(G.acabamento, pw2, .12, .12, Mt.esqMadeira, cx, 2.5, cz - pd2 + .06); caixa(G.acabamento, pw2, .12, .12, Mt.esqMadeira, cx, 2.5, cz - .1);
+              for (var pi2 = 0; pi2 <= Math.round(pw2 / .3); pi2++) caixa(G.acabamento, .05, .1, pd2, Mt.esqMadeira, cx - pw2 / 2 + pi2 * (pw2 / Math.round(pw2 / .3)), 2.62, cz - pd2 / 2);
+            }
             if (F.numero) { var np2 = plano(G.acabamento, .34, .34, numeroMat(F.numero, F.esquadria === 'preto' ? '#1B1F24' : '#F4F4F1', F.esquadria === 'preto' ? '#F4F4F1' : '#1B1F24'), ladoX, 1.55, cz, false); np2.rotation.set(0, Math.PI, 0); np2.position.set(ladoX, 1.55, cz - .08 - .156); }
             luzes.push({tipo:'ponto', x:cx, y:2.15, z:cz - .5, cor:'#FFD9A0', int:8, dist:6});
           }
@@ -761,6 +879,28 @@ function TRES_ENGINE(THREE, M){
       /* forro do beiral + calha */
       var fb = caixa(G.cobertura, W, .08, D, corMat(F.corParede), (X0 + X1) / 2, y0 - .08, (Z0 + Z1) / 2, false); fb.userData.pronto = fb.material; fb.userData.cru = Mt.cruLaje;
     }
+    /* ---------- letreiro com o nome do estabelecimento + totem ---------- */
+    if (F.letreiro && an.ambs.length) {
+      var lz = frenteCm * CM - ESP * CM / 2, lh = F.cobertura === 'platibanda' ? .7 : .6, larguraFrente = casaX1 - casaX0;
+      var lwIdeal = Math.max(2.6, F.letreiro.length * .36), lw, lx;
+      var trechoEntrada = entradaInfo ? entradaInfo.q2 - entradaInfo.p2 : 0;
+      if (F.cobertura === 'platibanda' || !entradaInfo || trechoEntrada < lwIdeal + .4) {   /* platibanda corre a frente toda: centraliza na casa */
+        lw = Math.min(larguraFrente - .6, lwIdeal); lx = (casaX0 + casaX1) / 2;
+      } else { lw = Math.min(trechoEntrada - .3, lwIdeal); lx = Math.max(entradaInfo.p2 + lw / 2 + .1, Math.min(entradaInfo.q2 - lw / 2 - .1, entradaInfo.cx + .2)); }
+      var ly = F.letreiroPos === 'marquise' && (F.marquise || F.pergolado) ? 2.4 : (F.cobertura === 'platibanda' ? H + .1 : Math.min(H - lh - .05, 2.32));
+      var matL = letreiroMat(F.letreiro, F.letreiroEstilo, F.letreiroCor, lw, lh), prof = F.letreiroEstilo === 'caixa' ? .12 : .06;
+      var fundoL = caixa(G.acabamento, lw + .1, lh + .1, prof, F.letreiroEstilo === 'caixa' ? matDest : Mt.letreiroFundo, lx, ly - .05, lz - prof / 2 - .01);
+      var placa = plano(G.acabamento, lw, lh, matL, lx, ly + lh / 2, lz - prof - .012, false); placa.rotation.set(0, Math.PI, 0); placa.userData.letreiro = F.letreiroLuz;
+      if (F.letreiroLuz) luzes.push({tipo:'ponto', x:lx, y:ly + lh / 2, z:lz - .5, cor:F.letreiroCor, int:6, dist:4});
+      if (F.totem) {   /* totem ao lado do portão, virado para a rua */
+        var tx = Math.min(TL - .5, gx + gw / 2 + .55), tz = .55, th = 2.6;
+        caixa(G.terreno, .5, th, .25, matDest, tx, 0, tz);
+        var matT = letreiroMat(F.letreiro, F.letreiroEstilo, F.letreiroCor, .46, .7);
+        var pt = plano(G.terreno, .46, .7, matT, tx, th - .45, tz - .13, false); pt.rotation.set(0, Math.PI, 0); pt.userData.letreiro = F.letreiroLuz;
+        if (F.letreiroLuz) luzes.push({tipo:'ponto', x:tx, y:th - .4, z:tz - .5, cor:F.letreiroCor, int:4, dist:3});
+      }
+    }
+
     /* ---------- luzes da fachada (só acendem à noite) ---------- */
     luzes.push({tipo:'ponto', x:posteLuz.x, y:posteLuz.y, z:posteLuz.z, cor:'#FFE9C4', int:30, dist:14});
     if (F.iluminacao) {
@@ -935,7 +1075,10 @@ function TRES_ENGINE(THREE, M){
       if (!luzManual) { sol.intensity = noite ? .12 : 1.9; sol.color.set(noite ? '#9FB4D6' : '#FFF3DC'); hemi.intensity = noite ? .12 : .85; fill.intensity = noite ? .05 : .55; }
       grupoLuz.visible = noite && etapa >= 5;
       renderer.toneMappingExposure = noite ? 1.15 : .95;
-      if (cena) cena.raiz.traverse(function (o) { if (o.userData && o.userData.janela) o.material = noite && etapa >= 5 ? Mt.vidroNoite : Mt.vidro; });
+      if (cena) cena.raiz.traverse(function (o) {
+        if (o.userData && o.userData.janela) o.material = noite && etapa >= 5 ? Mt.vidroNoite : Mt.vidro;
+        if (o.userData && o.userData.letreiro !== undefined && o.material && o.material.userData) o.material.emissiveIntensity = noite && o.userData.letreiro && o.material.userData.acende ? 1.35 : 0;
+      });
       sujo = true;
     }
     function setNoite(v){ noite = !!v; aplicarNoite(); if (cb.noite) cb.noite(noite); }
@@ -1242,7 +1385,7 @@ function TRES_ENGINE(THREE, M){
     return {inst:inst, desmontar:function () { scroller.removeEventListener('scroll', tick); window.removeEventListener('resize', tick); inst.desmontar(); }};
   }
 
-  return {analise:analise, paradas:paradas, quadro:quadro, frase:frase, montar:montar, passeio:passeio, ETAPAS:ETAPAS, coberto:coberto, FACHADA_PRESETS:FACHADA_PRESETS, fachadaDe:fachadaDe};
+  return {analise:analise, paradas:paradas, quadro:quadro, frase:frase, montar:montar, passeio:passeio, ETAPAS:ETAPAS, coberto:coberto, FACHADA_PRESETS:FACHADA_PRESETS, FACHADA_EXTRA:FACHADA_EXTRA, fachadaDe:fachadaDe, fachadaPorPrompt:fachadaPorPrompt};
 }
 
 var TRES = (typeof THREE !== 'undefined' && typeof M !== 'undefined') ? TRES_ENGINE(THREE, M) : null;
