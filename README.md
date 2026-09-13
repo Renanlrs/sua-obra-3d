@@ -1,6 +1,8 @@
 # SUA OBRA 3D — do projeto à realidade
 
-App de planta de casas que roda direto no navegador: **duplo clique em `index.html`**. Sem instalação, sem `npm`, sem servidor, sem conta.
+**No ar: https://renanlrs.github.io/sua-obra-3d/**
+
+App de planta de casas que roda direto no navegador — pelo link acima ou com **duplo clique em `index.html`**. Sem instalação, sem `npm`, sem servidor, sem conta.
 Guia completo de uso, atalhos e arquitetura em [`LEIA-ME.md`](LEIA-ME.md). Verificação automática em [`test.html`](test.html) (93 checagens).
 
 ## O que o app faz — e de onde veio cada parte
