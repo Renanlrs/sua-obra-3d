@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SUA OBRA 3D — do projeto à realidade</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ====================== TELA INICIAL ====================== -->
+<div id="home" class="home">
+  <div class="home-in">
+    <header class="home-hd">
+      <div class="logo"><b>SUA OBRA 3D</b><span>DO PROJETO À REALIDADE</span></div>
+      <button class="btn ghost sm" id="btn-abrir-ultimo" hidden>Continuar de onde parei</button>
+    </header>
+
+    <h1>Desenhe sua planta<br>sem saber desenhar.</h1>
+    <p class="home-lead">Escolha o tipo, diga o tamanho do terreno e o app monta a primeira planta. Depois é só arrastar.</p>
+
+    <div class="tipos" id="tipos"></div>
+
+    <div class="terreno-row">
+      <label>LARGURA DO TERRENO<div class="num-wrap"><input id="t-larg" type="text" value="10,00" inputmode="decimal"><i>m</i></div></label>
+      <label>PROFUNDIDADE<div class="num-wrap"><input id="t-prof" type="text" value="25,00" inputmode="decimal"><i>m</i></div></label>
+      <button class="btn solid lg" id="btn-criar">CRIAR MINHA PLANTA</button>
+    </div>
+    <p class="home-hint" id="home-hint">Terreno de 250,00 m². Você muda tudo depois.</p>
+
+    <div class="recentes" id="recentes"></div>
+  </div>
+</div>
+
+<!-- ====================== APP ====================== -->
+<div id="app" class="app" hidden>
+
+  <!-- TOPO -->
+  <div class="topbar">
+    <button class="icon-btn" id="btn-home" title="Meus projetos (Esc)"><i data-icon="home"></i></button>
+    <div class="proj-name">
+      <b id="proj-nome" contenteditable="true" spellcheck="false">Minha casa</b>
+      <span id="save-state">Salvo</span>
+    </div>
+    <div class="topbar-mid">
+      <button class="icon-btn" id="btn-undo" title="Desfazer (Ctrl+Z)" disabled><i data-icon="undo"></i></button>
+      <button class="icon-btn" id="btn-redo" title="Refazer (Ctrl+Shift+Z)" disabled><i data-icon="redo"></i></button>
+    </div>
+    <button class="cmdk" id="btn-cmdk">Buscar ou executar<kbd>Ctrl K</kbd></button>
+    <button class="btn ghost sm" id="btn-ajuda" title="Atalhos (?)">?</button>
+    <button class="btn solid sm" id="btn-apresentar">APRESENTAR</button>
+  </div>
+
+  <div class="body">
+    <!-- SIDEBAR -->
+    <nav class="side" id="side">
+      <div class="side-grp"><h6>DESENHAR</h6>
+        <a data-view="planta" class="on"><i data-icon="plan"></i><span>Planta</span><kbd>P</kbd></a>
+        <a data-view="ambientes"><i data-icon="rooms"></i><span>Ambientes</span><kbd>A</kbd></a>
+        <a data-view="pavimentos"><i data-icon="layers"></i><span>Pavimentos</span></a>
+      </div>
+      <div class="side-grp"><h6>VER</h6>
+        <a data-view="tresd"><i data-icon="cube"></i><span>3D e passeio</span><kbd>3</kbd></a>
+        <a data-view="fachada"><i data-icon="facade"></i><span>Fachada</span></a>
+        <a data-view="corte"><i data-icon="cut"></i><span>Corte</span></a>
+      </div>
+      <div class="side-grp"><h6>DECIDIR</h6>
+        <a data-view="orcamento"><i data-icon="money"></i><span>Orçamento</span><kbd>O</kbd></a>
+        <a data-view="simulador"><i data-icon="slider"></i><span>Simulador</span><kbd>S</kbd></a>
+        <a data-view="exportar"><i data-icon="export"></i><span>Exportar</span></a>
+      </div>
+      <div class="side-foot">
+        <button class="collapse" id="btn-collapse" title="Recolher ( [ )"><i data-icon="chev"></i></button>
+      </div>
+    </nav>
+
+    <!-- CANVAS -->
+    <main class="canvas-wrap" id="canvas-wrap">
+      <div class="tools" id="tools">
+        <button data-tool="sel" class="on" title="Selecionar (V)"><i data-icon="cursor"></i></button>
+        <button data-tool="room" title="Novo ambiente (R)"><i data-icon="addroom"></i></button>
+        <button data-tool="pan" title="Mover a tela (Espaço)"><i data-icon="hand"></i></button>
+        <span class="sep"></span>
+        <button id="btn-fit" title="Enquadrar (Ctrl+0)"><i data-icon="fit"></i></button>
+        <button id="btn-grid" class="on" title="Grade (G)"><i data-icon="grid"></i></button>
+        <button id="btn-cotas" class="on" title="Cotas (C)"><i data-icon="dim"></i></button>
+        <span class="sep"></span>
+        <button id="btn-mob" title="Mobiliar — catálogo de móveis (M)"><i data-icon="sofa"></i></button>
+      </div>
+      <div class="pill23" id="pill23"><button data-v="planta" class="on">2D</button><button data-v="tresd">3D</button></div>
+      <aside class="catalogo" id="catalogo" hidden></aside>
+      <div class="radial" id="radial" hidden></div>
+      <div id="stage" class="stage"></div>
+      <div class="empty" id="empty" hidden>
+        <p>Nenhum ambiente ainda.</p>
+        <button class="btn solid" onclick="UI.addRoomDefault()">+ Adicionar ambiente</button>
+      </div>
+      <div class="hud" id="hud"></div>
+    </main>
+
+    <!-- INSPECTOR -->
+    <aside class="insp" id="insp"></aside>
+  </div>
+
+  <!-- RODAPÉ -->
+  <div class="statusbar">
+    <span id="st-zoom">100%</span>
+    <span id="st-coord">—</span>
+    <span class="grow"></span>
+    <span id="st-msg"></span>
+    <span class="disc">ESTUDO CONCEITUAL PRELIMINAR — não substitui projeto executivo, licenciamento ou ART/RRT.</span>
+  </div>
+</div>
+
+<!-- ====================== SOBREPOSIÇÕES ====================== -->
+<div id="cmdk" class="overlay" hidden><div class="cmdk-box">
+  <input id="cmdk-input" placeholder="O que você quer fazer?" autocomplete="off">
+  <div id="cmdk-list"></div>
+</div></div>
+
+<div id="ajuda" class="overlay" hidden><div class="sheet">
+  <h3>Atalhos</h3>
+  <div class="keys" id="keys"></div>
+  <button class="btn ghost" onclick="UI.closeOverlays()">Fechar</button>
+</div></div>
+
+<div id="apres" class="apres" hidden></div>
+
+<div id="coach" class="coach" hidden></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="icons.js"></script>
+<script src="moveis.js"></script>
+<script src="model.js"></script>
+<script src="three.min.js"></script>
+<script src="tres.js"></script>
+<script src="plan.js"></script>
+<script src="views.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>

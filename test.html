@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Teste — SUA OBRA 3D</title>
+<style>
+body{font:13px/1.6 ui-monospace,monospace;background:#0B0E11;color:#E8EDF2;padding:24px;margin:0}
+.ok{color:#2FA36B}.fail{color:#E5533D}
+h1{font-size:15px;margin:0 0 16px}
+.r{padding:2px 0}
+#resumo{margin:18px 0;padding:12px 16px;border-radius:8px;font-size:14px}
+</style></head><body>
+<h1>SUA OBRA 3D — verificação do modelo e das vistas</h1>
+<div id="out"></div>
+<div id="resumo"></div>
+<script src="icons.js"></script><script src="moveis.js"></script><script src="model.js"></script>
+<script src="views.js"></script>
+<script src="tres.js"></script>
+<script>
+var ok=0, bad=0, out=document.getElementById('out');
+function t(nome, cond, extra){
+  var p=!!cond; p?ok++:bad++;
+  out.insertAdjacentHTML('beforeend','<div class="r '+(p?'ok':'fail')+'">'+(p?'PASSA':'FALHA')+'  '+nome+(extra?'   → '+extra:'')+'</div>');
+}
+
+/* 1. criação + gerador determinístico */
+M.novo('casa-terrea', 1000, 2500);
+var p = M.proj, t0 = p.terreno;
+t('cria projeto com ambientes', p.ambientes.length > 0, p.ambientes.length + ' ambientes');
+t('nenhum ambiente fora do terreno',
+  p.ambientes.every(function(a){return a.x>=0 && a.y>=0 && a.x+a.w<=t0.largura && a.y+a.h<=t0.profundidade;}));
+t('nenhum ambiente menor que 0,90 m',
+  p.ambientes.every(function(a){return a.w>=90 && a.h>=90;}));
+var sob=0;
+for(var i=0;i<p.ambientes.length;i++)for(var j=i+1;j<p.ambientes.length;j++){
+  var A=p.ambientes[i],B=p.ambientes[j];
+  if(A.x<B.x+B.w&&B.x<A.x+A.w&&A.y<B.y+B.h&&B.y<A.y+A.h) sob++;
+}
+t('nenhuma sobreposição na planta gerada', sob===0, sob+' sobreposições');
+
+/* 2. derivadas */
+t('área do terreno = 250,00 m²', M.fmtM2(M.areaTerreno())==='250,00 m²', M.fmtM2(M.areaTerreno()));
+t('área construída > 0', M.areaConstruida()>0, M.fmtM2(M.areaConstruida()));
+t('ocupação coerente', M.ocupacao()>0 && M.ocupacao()<=100, M.fmtPct(M.ocupacao()));
+t('custo total > 0', M.custoTotal()>0, M.fmtBRL(M.custoTotal()));
+var soma = p.ambientes.reduce(function(s,a){return s+M.custoDe(a);},0);
+t('custo total = soma dos ambientes (nada duplicado)', soma===M.custoTotal());
+var a1 = p.ambientes[0], areaAntes = M.areaOf(a1), custoAntes = M.custoTotal();
+a1.w += 100;
+t('mudar largura muda a área derivada', M.areaOf(a1)!==areaAntes);
+t('mudar largura muda o custo total', M.custoTotal()!==custoAntes);
+a1.w -= 100;
+t('voltar a medida devolve o custo', M.custoTotal()===custoAntes);
+
+/* 3. formatação e leitura de número */
+t('fmtM2 com vírgula e 2 casas', M.fmtM2(150000)==='15,00 m²', M.fmtM2(150000));
+t('fmtBRL em reais', M.fmtBRL(176300000).indexOf('1.763.000,00')>0, M.fmtBRL(176300000));
+t('parseM aceita "3,60" → 360 cm', M.parseM('3,60')===360);
+t('parseM aceita "3.60" → 360 cm', M.parseM('3.60')===360);
+t('parseM aceita "360" → 360 cm', M.parseM('360')===360);
+t('parseM recusa texto', M.parseM('abc')===null);
+
+/* 4. histórico */
+var nome0 = p.ambientes[0].nome;
+M.commit('estado inicial');
+p.ambientes[0].nome = 'MUDADO';
+M.commit('Renomear ambiente');
+t('desfazer disponível', M.podeUndo());
+t('nome do passo aparece', M.proxUndo()==='Renomear ambiente', M.proxUndo());
+M.undo();
+t('primeiro undo já devolve o nome anterior', M.proj.ambientes[0].nome===nome0, M.proj.ambientes[0].nome);
+M.redo();
+t('redo refaz', M.proj.ambientes[0].nome==='MUDADO', M.proj.ambientes[0].nome);
+M.proj.ambientes[0].x += 40; M.commit('Mover ambiente'); var xDepois = M.proj.ambientes[0].x;
+M.undo();
+t('undo de mover devolve a posição', M.proj.ambientes[0].x === xDepois - 40);
+M.redo();
+
+/* 5. validação */
+M.proj.ambientes[0].x = -500;
+t('detecta ambiente fora do terreno', M.problemas().some(function(q){return q.tipo==='fora';}));
+M.proj.ambientes[0].x = 150;
+var b = JSON.parse(JSON.stringify(M.proj.ambientes[0])); b.id='dup'; b.x=M.proj.ambientes[0].x; b.y=M.proj.ambientes[0].y;
+M.proj.ambientes.push(b);
+t('detecta sobreposição', M.problemas().some(function(q){return q.tipo==='sobrepoe';}));
+M.proj.ambientes.pop();
+
+/* 6. vistas geram SVG válido e não vazio */
+['miniPlanta','iso','fachada','corte'].forEach(function(v){
+  var s = VIEWS[v]({labels:true});
+  t('vista ' + v + ' gera SVG', typeof s==='string' && s.indexOf('<svg')===0 && s.length>200, s.length + ' chars');
+});
+var ap = VIEWS.apresentacao();
+t('apresentação gera HTML', ap.indexOf('ap-hero')>0 && ap.length>2000, ap.length + ' chars');
+t('apresentação traz o aviso conceitual', ap.indexOf('ESTUDO CONCEITUAL PRELIMINAR')>0);
+t('apresentação usa área calculada', ap.indexOf(M.fmtM2(M.areaConstruida()))>0);
+
+/* 7. todos os programas geram planta válida */
+Object.keys(M.PROGRAMAS).forEach(function(k){
+  M.novo(k, 1200, 3000);
+  var okk = M.proj.ambientes.every(function(a){
+    return a.x>=0 && a.y>=0 && a.x+a.w<=1200 && a.y+a.h<=3000 && a.w>=90 && a.h>=90;
+  });
+  t('programa "'+k+'" cabe no terreno', okk, M.proj.ambientes.length+' ambientes');
+});
+
+/* 8. terreno pequeno não quebra */
+M.novo('casa-terrea', 400, 600);
+t('terreno mínimo não quebra', Array.isArray(M.proj.ambientes));
+
+/* 8. 3D — análise pura (paredes, portas, janelas, passeio), sem WebGL */
+var T3 = TRES_ENGINE({}, M);
+['casa-terrea','casa-compacta','sobrado','apartamento','loja','piscina'].forEach(function(k){
+  M.novo(k, 1000, 2500);
+  var an = T3.analise(M.proj), P = T3.paradas(M.proj, an);
+  var semPorta = an.ambs.filter(function(r){ return !an.portaDe[r.id]; });
+  var ent = 0, ruim = 0, over = 0, linhas = {};
+  an.pecas.forEach(function(pc){
+    pc.ab.forEach(function(a){ if (a.tipo === 'entrada') ent++; if (a.s < pc.p || a.e > pc.q) ruim++; });
+    pc.caixas.forEach(function(c){ if (c.q <= c.p || c.z1 <= c.z0) ruim++; });
+    var L = linhas[pc.o + '|' + pc.c] = linhas[pc.o + '|' + pc.c] || []; pc.caixas.forEach(function(c){ L.push(c); });
+  });
+  Object.keys(linhas).forEach(function(k2){ var cs = linhas[k2]; for (var i = 0; i < cs.length; i++) for (var j = i + 1; j < cs.length; j++) {
+    var a = cs[i], b = cs[j]; if (a.p < b.q - .01 && b.p < a.q - .01 && a.z0 < b.z1 - .01 && b.z0 < a.z1 - .01) over++; } });
+  t('3D ' + k + ': todo ambiente coberto tem porta', semPorta.length === 0, semPorta.map(function(r){ return r.nome; }).join(', '));
+  t('3D ' + k + ': exatamente uma porta de entrada', ent === 1, ent + ' entradas');
+  t('3D ' + k + ': nenhuma caixa de parede sobreposta (z-fight)', over === 0 && ruim === 0, over + ' sobrepostas, ' + ruim + ' inválidas');
+  t('3D ' + k + ': passeio = chegada + ambientes + conjunto', P.length === M.proj.ambientes.length + 2, P.length + ' paradas');
+});
+/* 9. móveis — catálogo, figurinhas, mobiliar automático, caixa envolvente */
+var itens = Object.keys(MOVEIS.ITENS), semSym = [], semDim = [];
+itens.forEach(function(k){ var d = MOVEIS.ITENS[k]; if (!MOVEIS.SYM[d.sym]) semSym.push(k); if (!(d.w > 0 && d.d > 0 && d.alt > 0)) semDim.push(k); if (!MOVEIS.CATS.some(function(c){ return c.k === d.cat; })) semDim.push(k + ':cat'); });
+t('catálogo: ' + itens.length + ' itens, todos com figurinha', semSym.length === 0, semSym.join(', '));
+t('catálogo: todos com medidas e categoria válidas', semDim.length === 0, semDim.join(', '));
+var thumbsRuins = itens.filter(function(k){ var th = MOVEIS.thumb(k, 64); return th.indexOf('<svg') !== 0 || th.indexOf('NaN') >= 0 || th.indexOf('undefined') >= 0; });
+t('catálogo: miniaturas sem NaN/undefined', thumbsRuins.length === 0, thumbsRuins.join(', '));
+t('catálogo: categorias com capa existente', MOVEIS.CATS.every(function(c){ return !!MOVEIS.ITENS[c.capa]; }));
+t('busca sem acento acha "Máquina de lavar"', MOVEIS.buscar('maquina').length === 1);
+
+M.novo('casa-terrea', 1000, 2500);
+var mvs = M.proj.moveis || [];
+t('projeto novo já nasce mobiliado', mvs.length > 8, mvs.length + ' móveis');
+var an9 = TRES_ENGINE({}, M).analise(M.proj);
+var foraDoAmb = mvs.filter(function(m){ var b = MOVEIS.aabb(m), r = M.ambienteDe(m); return !r || b.x < r.x - 1 || b.y < r.y - 1 || b.x + b.w > r.x + r.w + 1 || b.y + b.h > r.y + r.h + 1; });
+t('mobiliar automático: nenhum móvel sai do seu ambiente', foraDoAmb.length === 0, foraDoAmb.map(function(m){ return m.k; }).join(', '));
+var nanMv = mvs.filter(function(m){ return isNaN(m.x) || isNaN(m.y) || isNaN(m.rot); });
+t('mobiliar automático: sem NaN', nanMv.length === 0);
+var quartoCama = M.proj.ambientes.filter(function(a){ return a.tipo === 'intimo'; }).every(function(a){ return M.moveisDe(a.id).some(function(m){ return m.k.indexOf('cama') === 0; }); });
+t('todo quarto ganhou cama', quartoCama);
+var ids9 = {}; var dupId = mvs.some(function(m){ if (ids9[m.id]) return true; ids9[m.id] = 1; return false; });
+t('móveis têm id único', !dupId);
+/* caixa envolvente girada */
+var mvT = {k:'camaCasal', x:500, y:500, rot:90};
+var bb = MOVEIS.aabb(mvT);
+t('aabb girada 90° troca largura por profundidade', Math.abs(bb.w - 190) < .01 && Math.abs(bb.h - 140) < .01, bb.w + ' × ' + bb.h);
+t('aabb centrada no móvel', Math.abs(bb.x + bb.w / 2 - 500) < .01 && Math.abs(bb.y + bb.h / 2 - 500) < .01);
+/* medidas da instância sobrepõem o catálogo sem alterá-lo */
+var dmI = MOVEIS.dims({k:'sofa3', w:250});
+t('dims: largura da instância vale, resto do catálogo', dmI.w === 250 && dmI.d === 90 && MOVEIS.ITENS.sofa3.w === 220);
+/* quadro local → mundo é o inverso do quadro do 3D */
+var rQ = {x:100, y:200, w:300, h:400};
+['frente','fundo','esq','dir'].forEach(function(l){
+  var q = TRES_ENGINE({}, M).quadro(rQ, l), w3 = q.mundo(1.0, 0.5), w2 = MOVEIS.mundo(rQ, l, 100, 50);
+  t('quadro ' + l + ': MOVEIS.mundo bate com TRES.quadro', Math.abs(w3.x * 100 - w2.x) < .01 && Math.abs(w3.z * 100 - w2.y) < .01, w2.x + ',' + w2.y + ' vs ' + (w3.x*100) + ',' + (w3.z*100));
+});
+/* add / ambienteDe / undo */
+var antes = M.proj.moveis.length, sala = M.proj.ambientes.filter(function(a){ return a.nome === 'Sala de estar'; })[0];
+M.commit('base');
+var novo9 = M.addMovel('poltrona', sala.x + sala.w / 2, sala.y + sala.h / 2, 45);
+M.commit('Adicionar poltrona');
+t('addMovel entra na lista com ambiente', M.proj.moveis.length === antes + 1 && novo9.amb === sala.id);
+M.undo();
+t('undo remove o móvel', M.proj.moveis.length === antes);
+/* export embute o catálogo (o passeio precisa das medidas) */
+t('MOVEIS_LIB serializa (export)', MOVEIS_LIB.toString().length > 5000 && typeof MOVEIS_LIB === 'function');
+M.novo('casa-terrea', 1000, 2500);
+
+var r=document.getElementById('resumo');
+r.textContent = ok+' passaram · '+bad+' falharam';
+r.style.background = bad? '#2A1512':'#0F2A1E';
+r.style.color = bad? '#FF9583':'#7FE0B4';
+document.title = (bad? 'FALHOU ':'OK ') + ok + '/' + (ok+bad);
+</script></body></html>
