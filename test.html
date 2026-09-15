@@ -196,6 +196,15 @@ t('prompt: rústico mantém 2 águas do preset; cerâmica, pedra, bege, jardim, 
 var pp3 = TF.fachadaPorPrompt('placa com o nome Padaria Central em neon vermelho, sem jardim');
 t('prompt: nome sem aspas vira letreiro; neon; sem jardim', pp3.fachada.letreiro === 'PADARIA CENTRAL' && pp3.fachada.letreiroEstilo === 'neon' && pp3.fachada.jardim === false && pp3.lidos.length >= 4, JSON.stringify(pp3.fachada));
 t('prompt vazio não entende nada', TF.fachadaPorPrompt('bom dia').lidos.length === 0);
+var pp4 = TF.fachadaPorPrompt('janelas guilhotina com vidro fumê e moldura, porta pivotante azul, garagem de enrolar, arandelas, vasos, deck na frente, muro cinza, portão preto, brise').fachada;
+t('prompt: janela, vidro, moldura, porta+cor, garagem, arandelas, vasos, piso, muro e portão', pp4.janela === 'guilhotina' && pp4.vidro === 'fume' && pp4.moldura === true && pp4.porta === 'pivotante' && pp4.portaCor === '#2F5D8A' && pp4.garagem === 'enrolar' && pp4.arandelas === true && pp4.vasos === true && pp4.pisoFrente === 'deck' && pp4.muroCor === '#D9D9D4' && pp4.portaoCor === '#1F2326' && pp4.brise === true, JSON.stringify(pp4));
+t('prompt: "portão preto" não pinta a porta', !TF.fachadaPorPrompt('portão preto').fachada.portaCor);
+var fd = TF.fachadaDe({fachada:{estilo:'classico'}});
+t('fachadaDe traz os padrões do detalhe fino (correr, incolor, madeira, basculante, concreto)', fd.janela === 'correr' && fd.vidro === 'incolor' && fd.porta === 'madeira' && fd.garagem === 'basculante' && fd.pisoFrente === 'concreto' && fd.esquadriaCor === '');
+M.proj.fachada = {estilo:'moderno', janela:'veneziana', vidro:'espelhado', porta:'pivotante', garagem:'vidro', gradeJanela:true, arandelas:true, pisoFrente:'deck'};
+var cf2 = M.custoFachadaItens().map(function(i){ return i.rot; }).join('|');
+t('custo lista janelas veneziana, vidro espelhado, grade, porta pivotante, garagem de vidro, arandelas e deck', /Janelas veneziana/.test(cf2) && /Vidro espelhado/.test(cf2) && /Grade/.test(cf2) && /Porta pivotante/.test(cf2) && /garagem de vidro/.test(cf2) && /Arandelas/.test(cf2) && /deck/.test(cf2), cf2);
+t('detalhe fino soma no custo da fachada', M.custoFachada() > (function(){ var f = M.proj.fachada; M.proj.fachada = {estilo:'moderno'}; var c = M.custoFachada(); M.proj.fachada = f; return c; })());
 M.proj.fachada = {estilo:'moderno', letreiro:'ACQUA BELO', letreiroEstilo:'led', vitrine:true, totem:true};
 var cf = M.custoFachadaItens().map(function(i){ return i.rot; }).join('|');
 t('custo da fachada lista letreiro, totem e vitrine', cf.indexOf('Letreiro LED') >= 0 && cf.indexOf('Totem') >= 0 && cf.indexOf('Vitrine') >= 0, cf);

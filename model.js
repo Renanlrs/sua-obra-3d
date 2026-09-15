@@ -219,11 +219,19 @@ var M = (function () {
     jardim:180000, marquise:320000, iluminacao:240000,
     letreiro:{placa:120000, caixa:380000, led:650000, neon:550000, backlight:480000}, totem:450000,
     vitrine:95000,                                                                        /* por m² de frente envidraçada */
-    pergolado:320000
+    pergolado:320000,
+    /* detalhe fino (por unidade, exceto onde indicado) */
+    janela:{correr:0, fixa:-4000, guilhotina:6000, basculante:3000, veneziana:9000, quadriculada:7000},   /* por janela */
+    vidro:{incolor:0, fume:3500, verde:3000, espelhado:5500},                                          /* por janela */
+    moldura:2800, gradeJanela:4500, brise:12000,                                                       /* por janela */
+    porta:{madeira:0, pivotante:520000, vidro:380000, dupla:290000, ripada:260000, aco:180000},
+    garagem:{basculante:0, enrolar:180000, ripado:420000, vidro:650000},
+    arandelas:38000, vasos:26000,
+    pisoFrente:{concreto:0, pedra:18000, deck:26000, intertravado:9000, grama:-6000}                   /* por m² do caminho */
   };
   function fachadaCfg(){
     if (window.TRES) return TRES.fachadaDe(proj);
-    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem};
+    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem, janela:f.janela || 'correr', vidro:f.vidro || 'incolor', moldura:!!f.moldura, gradeJanela:!!f.gradeJanela, brise:!!f.brise, porta:f.porta || 'madeira', garagem:f.garagem || 'basculante', arandelas:!!f.arandelas, vasos:!!f.vasos, pisoFrente:f.pisoFrente || 'concreto'};
   }
   function testada(){   /* largura da frente construída, em cm */
     var cob = ambientesCobertos(); if (!cob.length) return 0;
@@ -245,6 +253,19 @@ var M = (function () {
     if (f.iluminacao) add('Iluminação de fachada', P.iluminacao);
     if (f.vitrine) add('Vitrine (' + num(tf) + ' m² de vidro)', tf * P.vitrine);
     if (f.pergolado) add('Pergolado da entrada', P.pergolado);
+    /* janelas: uma por ambiente coberto com parede externa (aproximação honesta: o motor decide as janelas) */
+    var nJ = proj.ambientes.filter(function (a) { return ['externo', 'agua', 'circulacao', 'garagem'].indexOf(a.tipo) < 0; }).length;
+    var ROT_J = {correr:'de correr', fixa:'vidro fixo', guilhotina:'guilhotina', basculante:'basculante', veneziana:'veneziana', quadriculada:'quadriculada'};
+    if (f.janela && f.janela !== 'correr') add('Janelas ' + (ROT_J[f.janela] || f.janela) + ' (' + nJ + ')', nJ * (P.janela[f.janela] || 0));
+    if (f.vidro && f.vidro !== 'incolor') add('Vidro ' + ({fume:'fumê', verde:'verde', espelhado:'espelhado'}[f.vidro] || f.vidro) + ' (' + nJ + ')', nJ * (P.vidro[f.vidro] || 0));
+    if (f.moldura) add('Moldura nas janelas (' + nJ + ')', nJ * P.moldura);
+    if (f.gradeJanela) add('Grade de proteção (' + nJ + ')', nJ * P.gradeJanela);
+    if (f.brise) add('Brise na frente', Math.max(1, Math.round(nJ / 3)) * P.brise);
+    if (f.porta && f.porta !== 'madeira') add('Porta ' + ({pivotante:'pivotante', vidro:'de vidro', dupla:'dupla', ripada:'ripada', aco:'de aço'}[f.porta] || f.porta), P.porta[f.porta] || 0);
+    if (f.garagem && f.garagem !== 'basculante') add('Porta da garagem ' + ({enrolar:'de enrolar', ripado:'ripada', vidro:'de vidro'}[f.garagem] || f.garagem), P.garagem[f.garagem] || 0);
+    if (f.arandelas) add('Arandelas da entrada', P.arandelas);
+    if (f.vasos) add('Vasos na entrada', P.vasos);
+    if (f.pisoFrente && f.pisoFrente !== 'concreto') add('Piso da frente ' + f.pisoFrente, Math.max(1, proj.terreno.recuoFrontal / 100 * 3) * (P.pisoFrente[f.pisoFrente] || 0));
     if (f.letreiro) add('Letreiro ' + ({placa:'placa', caixa:'letra caixa', led:'LED', neon:'neon', backlight:'backlight'}[f.letreiroEstilo] || f.letreiroEstilo), P.letreiro[f.letreiroEstilo] || P.letreiro.placa);
     if (f.letreiro && f.totem) add('Totem', P.totem);
     return itens;

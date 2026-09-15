@@ -94,7 +94,7 @@ var UI = (function () {
         if (mvq) { var ambq = M.ambienteDe(mvq); if (ambq && viewAtual === 'planta') PLAN.enquadrarAmb(ambq); selecionarMovel(mvq.id); }
       }
       if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'fachada') { fachPanel(); t3.verFachada(true); } }
-      if (q.get('fprompt') && viewAtual === 'fachada') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); }
+      if (q.get('fprompt') && viewAtual === 'fachada') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true); }
       if (q.has('noite') && t3) t3.setNoite(true);
       if (q.has('estilos4')) setTimeout(compararEstilos, 100);
       if (q.has('htmlpasseio')) { location.href = URL.createObjectURL(new Blob([htmlPasseio()], {type:'text/html'})) + (q.get('scroll') ? '#s=' + q.get('scroll') : ''); return; }   /* testa o export in loco */
@@ -948,8 +948,11 @@ var UI = (function () {
   }
 
   /* ================= FACHADA (designer) ================= */
-  var CORES_PAREDE = ['#F2EFE8', '#F6F1E4', '#D9D9D4', '#EFE3CF', '#C9D3D9', '#B9C4B0', '#F0D9C2', '#8E9BA6'];
-  var CORES_DEST = ['#2B2F33', '#8B5E3C', '#1F2326', '#B7B0A3', '#2F5D8A', '#6B7885', '#C4553B', '#1E7E96'];
+  var CORES_PAREDE = ['#F2EFE8', '#F6F1E4', '#D9D9D4', '#EFE3CF', '#C9D3D9', '#B9C4B0', '#F0D9C2', '#8E9BA6', '#E8D7B5', '#D6C7B0', '#A9B7A2', '#9FB4C4', '#DCC5C0', '#6B7885', '#3D4A56', '#2B2F33'];
+  var CORES_DEST = ['#2B2F33', '#8B5E3C', '#1F2326', '#B7B0A3', '#2F5D8A', '#6B7885', '#C4553B', '#1E7E96', '#4E9A5D', '#D9722B', '#E0B44C', '#6B4E9E', '#C9A227', '#F4F4F1', '#D96AA0', '#22B8D6'];
+  var CORES_ESQ = ['#2B2F33', '#F4F4F1', '#7A5230', '#5B6169', '#8C6A3F', '#1E7E96', '#2F5D8A', '#C4553B'];
+  var CORES_PORTA = ['#7A5230', '#2B2F33', '#F4F4F1', '#C4553B', '#2F5D8A', '#4E9A5D', '#E0B44C', '#1E7E96', '#6B4E9E', '#D96AA0'];
+  var CORES_MURO = ['#DDD8CC', '#F2EFE8', '#D9D9D4', '#B7B0A3', '#8B5E3C', '#6B7885', '#2B2F33', '#4E9A5D'];
   var ROT = {cobertura:{platibanda:'Platibanda', telhado2:'2 águas', telhado4:'4 águas'}, telha:{ceramica:'Cerâmica', concreto:'Concreto', metalica:'Metálica'},
     revestimento:{nenhum:'Nenhum', ripado:'Ripado', pedra:'Pedra', tijolo:'Tijolinho', cimento:'Cimento'}, esquadria:{preto:'Preto', branco:'Branco', madeira:'Madeira'},
     portao:{grade:'Grade', ripado:'Ripado', chapa:'Chapa'}, muro:{baixo:'Baixo', alto:'Alto', vidro:'Vidro'}};
@@ -987,10 +990,23 @@ var UI = (function () {
     });
     h += '</div></section>';
     h += '<section><h6>COBERTURA</h6>' + chips('cobertura', ROT.cobertura) + (F.cobertura !== 'platibanda' ? '<h6 style="margin-top:10px">TELHA</h6>' + chips('telha', ROT.telha) : '') + '</section>';
-    h += '<section><h6>COR DA PAREDE</h6>' + cores('corParede', CORES_PAREDE) + '<h6 style="margin-top:10px">COR DE DESTAQUE</h6>' + cores('corDestaque', CORES_DEST) + '</section>';
+    h += '<section><h6>COR DA PAREDE</h6>' + corLivre('corParede', CORES_PAREDE, F.corParede) + '<h6 style="margin-top:10px">COR DE DESTAQUE</h6>' + corLivre('corDestaque', CORES_DEST, F.corDestaque) + '</section>';
     h += '<section><h6>REVESTIMENTO DA FRENTE</h6>' + chips('revestimento', ROT.revestimento) + '</section>';
-    h += '<section><h6>ESQUADRIAS</h6>' + chips('esquadria', ROT.esquadria) + '</section>';
-    h += '<section><h6>PORTÃO</h6>' + chips('portao', ROT.portao) + '<h6 style="margin-top:10px">MURO</h6>' + chips('muro', ROT.muro) + '</section>';
+    /* cor livre: paleta + seletor de qualquer cor (o chip "Outra" abre o seletor nativo) */
+    function corLivre(k, lista, atual){
+      var custom = atual && lista.indexOf(String(atual).toUpperCase()) < 0;
+      return '<div class="swatches">' + lista.map(function (c) { return '<button class="sw-btn' + (String(atual || '').toUpperCase() === c ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + c + '" style="background:' + c + '" title="' + c + '"></button>'; }).join('') +
+        '<label class="sw-btn sw-custom' + (custom ? ' on' : '') + '" title="Qualquer cor" style="background:' + (custom ? atual : 'conic-gradient(#E4574F,#F2C14E,#4E9A5D,#22B8D6,#6B4E9E,#E4574F)') + '"><input type="color" data-fc="' + k + '" value="' + (atual || '#888888') + '"></label></div>';
+    }
+    h += '<section><h6>ESQUADRIAS</h6>' + chips('esquadria', ROT.esquadria) + '<h6 style="margin-top:10px">COR DA ESQUADRIA</h6>' + corLivre('esquadriaCor', CORES_ESQ, F.esquadriaCor) + '</section>';
+    h += '<section><h6>JANELAS</h6>' + chips('janela', TRES.JANELAS) + '<h6 style="margin-top:10px">VIDRO</h6>' + chips('vidro', TRES.VIDROS) +
+      '<div class="chips" style="margin-top:10px">' + tg('moldura', 'Moldura de destaque') + tg('gradeJanela', 'Grade de proteção') + tg('brise', 'Brise na frente') + '</div></section>';
+    h += '<section><h6>PORTA DE ENTRADA</h6>' + chips('porta', TRES.PORTAS) + '<h6 style="margin-top:10px">COR DA PORTA</h6>' + corLivre('portaCor', CORES_PORTA, F.portaCor) +
+      '<div class="chips" style="margin-top:10px">' + tg('arandelas', 'Arandelas') + tg('vasos', 'Vasos') + '</div>' +
+      '<h6 style="margin-top:10px">PISO DA FRENTE</h6>' + chips('pisoFrente', TRES.PISOS_FRENTE) + '</section>';
+    h += '<section><h6>PORTÃO DO MURO</h6>' + chips('portao', ROT.portao) + '<h6 style="margin-top:10px">COR DO PORTÃO</h6>' + corLivre('portaoCor', CORES_PORTA, F.portaoCor) +
+      '<h6 style="margin-top:10px">PORTA DA GARAGEM</h6>' + chips('garagem', TRES.GARAGENS) +
+      '<h6 style="margin-top:10px">MURO</h6>' + chips('muro', ROT.muro) + '<h6 style="margin-top:10px">COR DO MURO</h6>' + corLivre('muroCor', CORES_MURO, F.muroCor) + '</section>';
     h += '<section><h6>EXTRAS</h6><div class="chips">' + tg('jardim', 'Jardim') + tg('marquise', 'Marquise') + tg('pergolado', 'Pergolado') + tg('iluminacao', 'Iluminação') + tg('vitrine', 'Vitrine') + '</div>' +
       '<div class="f" style="margin-top:10px"><label>NÚMERO DA CASA</label><div class="inp"><input id="fach-num" value="' + esc(F.numero) + '" placeholder="ex.: 128" maxlength="5"></div></div></section>';
     /* letreiro comercial */
@@ -1008,9 +1024,15 @@ var UI = (function () {
     el.querySelectorAll('[data-fk]').forEach(function (b) {
       b.onclick = function () {
         var k = b.getAttribute('data-fk'), v = b.getAttribute('data-fv');
-        if (['jardim', 'marquise', 'iluminacao', 'pergolado', 'vitrine', 'letreiroLuz', 'totem'].indexOf(k) >= 0) v = v === '1';
+        if (['jardim', 'marquise', 'iluminacao', 'pergolado', 'vitrine', 'letreiroLuz', 'totem', 'moldura', 'gradeJanela', 'brise', 'arandelas', 'vasos'].indexOf(k) >= 0) v = v === '1';
+        if (k === 'esquadria') { M.proj.fachada = M.proj.fachada || {}; M.proj.fachada.esquadriaCor = ''; }   /* chip de esquadria volta à cor padrão */
         setFachada(k, v);
       };
+    });
+    /* seletor nativo de cor (qualquer cor): aplica ao soltar */
+    el.querySelectorAll('input[data-fc]').forEach(function (inp) {
+      inp.onchange = function () { setFachada(inp.getAttribute('data-fc'), inp.value.toUpperCase()); };
+      inp.onclick = function (e) { e.stopPropagation(); };
     });
     var num = el.querySelector('#fach-num');
     num.onchange = function () { setFachada('numero', this.value.trim()); };

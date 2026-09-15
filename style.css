@@ -425,6 +425,8 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 .sw-btn{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:0 0 0 1px var(--line) inset}
 .sw-btn:hover{transform:scale(1.08)}
 .sw-btn.on{border-color:var(--ok);box-shadow:0 0 0 2px var(--bg-1) inset}
+.sw-custom{position:relative;overflow:hidden;display:inline-block}
+.sw-custom input{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);opacity:0;cursor:pointer;border:none;padding:0}
 /* comparação dos 4 estilos */
 .estilos-box{width:min(1180px,94vw);max-height:92vh;overflow:auto;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh);padding:22px 24px 24px}
 .estilos-hd{display:flex;align-items:flex-start;gap:14px;margin-bottom:16px}
