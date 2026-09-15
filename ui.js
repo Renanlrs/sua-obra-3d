@@ -94,7 +94,7 @@ var UI = (function () {
         if (mvq) { var ambq = M.ambienteDe(mvq); if (ambq && viewAtual === 'planta') PLAN.enquadrarAmb(ambq); selecionarMovel(mvq.id); }
       }
       if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'fachada') { fachPanel(); t3.verFachada(true); } }
-      if (q.get('fprompt') && viewAtual === 'fachada') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true); }
+      if (q.get('fprompt') && viewAtual === 'fachada') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true, +q.get('fz') || 1); }
       if (q.has('noite') && t3) t3.setNoite(true);
       if (q.has('estilos4')) setTimeout(compararEstilos, 100);
       if (q.has('htmlpasseio')) { location.href = URL.createObjectURL(new Blob([htmlPasseio()], {type:'text/html'})) + (q.get('scroll') ? '#s=' + q.get('scroll') : ''); return; }   /* testa o export in loco */
@@ -1001,7 +1001,10 @@ var UI = (function () {
     h += '<section><h6>ESQUADRIAS</h6>' + chips('esquadria', ROT.esquadria) + '<h6 style="margin-top:10px">COR DA ESQUADRIA</h6>' + corLivre('esquadriaCor', CORES_ESQ, F.esquadriaCor) + '</section>';
     h += '<section><h6>JANELAS</h6>' + chips('janela', TRES.JANELAS) + '<h6 style="margin-top:10px">VIDRO</h6>' + chips('vidro', TRES.VIDROS) +
       '<div class="chips" style="margin-top:10px">' + tg('moldura', 'Moldura de destaque') + tg('gradeJanela', 'Grade de proteção') + tg('brise', 'Brise na frente') + '</div></section>';
-    h += '<section><h6>PORTA DE ENTRADA</h6>' + chips('porta', TRES.PORTAS) + '<h6 style="margin-top:10px">COR DA PORTA</h6>' + corLivre('portaCor', CORES_PORTA, F.portaCor) +
+    h += '<section><h6>PORTA DE ENTRADA · CASA</h6>' + chips('porta', TRES.PORTAS) + '<h6 style="margin-top:10px">PORTA DE ENTRADA · LOJA</h6>' + chips('porta', TRES.PORTAS_LOJA) +
+      '<div class="f-row" style="margin-top:10px">' + campo('fach-pl', 'LARGURA DA PORTA', F.portaLargura ? M.fmtMs(F.portaLargura * 100) : '', 'm') + campo('fach-pa', 'ALTURA', F.portaAltura ? M.fmtMs(F.portaAltura * 100) : '', 'm') + '</div>' +
+      '<div class="ins-empty" style="margin-top:-2px">Vazio = 0,90 × 2,10. Loja costuma ter 2,00 a 4,00 m.' + (function () { try { var an = TRES.analise(M.proj); if (an.entrada) { var L = an.entrada.pc.len, r = an.entrada.r; return ' A entrada está na parede de <b>' + esc(r.nome) + '</b> (' + M.fmtMs(L) + ' m) → porta de até <b>' + M.fmtMs(L - 40) + ' m</b>; para mais, alargue esse ambiente na planta.'; } } catch (e) {} return ''; })() + '</div>' +
+      '<h6 style="margin-top:10px">COR DA PORTA</h6>' + corLivre('portaCor', CORES_PORTA, F.portaCor) +
       '<div class="chips" style="margin-top:10px">' + tg('arandelas', 'Arandelas') + tg('vasos', 'Vasos') + '</div>' +
       '<h6 style="margin-top:10px">PISO DA FRENTE</h6>' + chips('pisoFrente', TRES.PISOS_FRENTE) + '</section>';
     h += '<section><h6>PORTÃO DO MURO</h6>' + chips('portao', ROT.portao) + '<h6 style="margin-top:10px">COR DO PORTÃO</h6>' + corLivre('portaoCor', CORES_PORTA, F.portaoCor) +
@@ -1012,8 +1015,15 @@ var UI = (function () {
     /* letreiro comercial */
     h += '<section><h6>LETREIRO · NOME DO ESTABELECIMENTO</h6>' +
       '<div class="f"><div class="inp"><input id="fach-let" value="' + esc(F.letreiro) + '" placeholder="ex.: ACQUA BELO" maxlength="40"></div></div>' +
-      (F.letreiro ? '<h6 style="margin-top:10px">TIPO</h6>' + chips('letreiroEstilo', {placa:'Placa', caixa:'Letra caixa', led:'LED', neon:'Neon', backlight:'Backlight'}) +
-      '<h6 style="margin-top:10px">COR</h6>' + cores('letreiroCor', ['#22B8D6', '#2F5D8A', '#C4553B', '#E0B44C', '#4E9A5D', '#D96AA0', '#F4F4F1', '#1F2326']) +
+      (F.letreiro ? '<div class="f" style="margin-top:8px"><label>SUBTÍTULO (2ª LINHA)</label><div class="inp"><input id="fach-sub" value="' + esc(F.letreiroSub) + '" placeholder="ex.: Escola de Natação" maxlength="50"></div></div>' +
+      '<h6 style="margin-top:10px">TIPO</h6>' + chips('letreiroEstilo', {placa:'Placa', caixa:'Letra caixa', led:'LED', neon:'Neon', backlight:'Backlight'}) +
+      '<h6 style="margin-top:10px">FORMATO</h6>' + chips('letreiroFormato', TRES.LETREIRO_FORMATOS) +
+      '<h6 style="margin-top:10px">TAMANHO</h6><div class="chips">' + Object.keys(TRES.LETREIRO_TAMS).map(function (v) { return '<button class="chip' + (F.letreiroTam === v && !F.letreiroLargura ? ' on' : '') + '" data-fk="letreiroTam" data-fv="' + v + '">' + TRES.LETREIRO_TAMS[v] + '</button>'; }).join('') + '</div>' +
+      '<div class="f-row" style="margin-top:8px">' + campo('fach-ll', 'LARGURA', F.letreiroLargura ? M.fmtMs(F.letreiroLargura * 100) : '', 'm') + campo('fach-la', 'ALTURA', F.letreiroAltura ? M.fmtMs(F.letreiroAltura * 100) : '', 'm') + '</div>' +
+      '<div class="ins-empty" style="margin-top:-2px">Vazio = automático pelo tamanho P/M/G/GG.</div>' +
+      '<h6 style="margin-top:10px">FONTE</h6>' + chips('letreiroFonte', TRES.LETREIRO_FONTES) +
+      '<h6 style="margin-top:10px">COR DAS LETRAS</h6>' + corLivre('letreiroCor', ['#22B8D6', '#2F5D8A', '#C4553B', '#E0B44C', '#4E9A5D', '#D96AA0', '#F4F4F1', '#1F2326', '#D9722B', '#6B4E9E', '#C9A227', '#1E7E96'], F.letreiroCor) +
+      (F.letreiroEstilo !== 'caixa' && F.letreiroEstilo !== 'neon' ? '<h6 style="margin-top:10px">COR DO FUNDO</h6>' + corLivre('letreiroFundoCor', ['#14171B', '#FFFFFF', '#F4F4F1', '#2F5D8A', '#C4553B', '#4E9A5D', '#E0B44C', '#1E7E96'], F.letreiroFundoCor) : '') +
       '<div class="chips" style="margin-top:10px">' + tg('letreiroLuz', 'Acende à noite') + tg('totem', 'Totem no portão') +
       '<button class="chip' + (F.letreiroPos === 'marquise' ? ' on' : '') + '" data-fk="letreiroPos" data-fv="' + (F.letreiroPos === 'marquise' ? 'parede' : 'marquise') + '">Sobre a marquise</button></div>' : '<div class="ins-empty">Digite o nome para a placa aparecer na frente.</div>') + '</section>';
     var itens = M.custoFachadaItens();
@@ -1026,6 +1036,7 @@ var UI = (function () {
         var k = b.getAttribute('data-fk'), v = b.getAttribute('data-fv');
         if (['jardim', 'marquise', 'iluminacao', 'pergolado', 'vitrine', 'letreiroLuz', 'totem', 'moldura', 'gradeJanela', 'brise', 'arandelas', 'vasos'].indexOf(k) >= 0) v = v === '1';
         if (k === 'esquadria') { M.proj.fachada = M.proj.fachada || {}; M.proj.fachada.esquadriaCor = ''; }   /* chip de esquadria volta à cor padrão */
+        if (k === 'letreiroTam') { M.proj.fachada = M.proj.fachada || {}; M.proj.fachada.letreiroLargura = 0; M.proj.fachada.letreiroAltura = 0; }   /* P/M/G/GG volta ao automático */
         setFachada(k, v);
       };
     });
@@ -1037,6 +1048,14 @@ var UI = (function () {
     var num = el.querySelector('#fach-num');
     num.onchange = function () { setFachada('numero', this.value.trim()); };
     num.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); };
+    /* medidas em metros (vazio = automático) */
+    [['fach-pl', 'portaLargura', .7, 6], ['fach-pa', 'portaAltura', 2, 4], ['fach-ll', 'letreiroLargura', .4, 30], ['fach-la', 'letreiroAltura', .2, 4]].forEach(function (d) {
+      var inp = el.querySelector('#' + d[0]); if (!inp) return;
+      inp.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); };
+      inp.onchange = function () { var v = M.parseM(this.value); setFachada(d[1], v === null || !this.value.trim() ? 0 : Math.max(d[2], Math.min(d[3], v / 100))); };
+    });
+    var sub = el.querySelector('#fach-sub');
+    if (sub) { sub.onchange = function () { setFachada('letreiroSub', this.value.trim()); }; sub.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); }; }
     var let2 = el.querySelector('#fach-let');
     let2.onchange = function () { setFachada('letreiro', this.value.trim().toUpperCase()); };
     let2.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); };
