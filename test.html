@@ -109,7 +109,8 @@ t('terreno mínimo não quebra', Array.isArray(M.proj.ambientes));
 var T3 = TRES_ENGINE({}, M);
 ['casa-terrea','casa-compacta','sobrado','apartamento','loja','piscina'].forEach(function(k){
   M.novo(k, 1000, 2500);
-  var an = T3.analise(M.proj), P = T3.paradas(M.proj, an);
+  var andaresT = []; for (var ip = 1; ip < M.nPavs(); ip++) andaresT.push({pav:ip, an:T3.analise(M.proj, ip), yb:ip * (M.proj.peDireito + 15) / 100});
+  var an = T3.analise(M.proj), P = T3.paradas(M.proj, an, andaresT);
   var semPorta = an.ambs.filter(function(r){ return !an.portaDe[r.id]; });
   var ent = 0, ruim = 0, over = 0, linhas = {};
   an.pecas.forEach(function(pc){
@@ -226,6 +227,25 @@ t('custo da fachada lista letreiro, totem e vitrine', cf.indexOf('Letreiro LED')
 var svL = VIEWS.fachada();
 t('elevação desenha o letreiro com o nome', svL.indexOf('ACQUA BELO') > 0);
 M.proj.fachada = null;
+/* ---- pavimentos ---- */
+M.novo('sobrado', 1000, 2500);
+t('sobrado nasce com 2 pavimentos e quartos em cima', M.nPavs() === 2 && M.ambsPav(1).filter(function (a) { return a.tipo === 'intimo'; }).length >= 2 && M.ambsPav(0).filter(function (a) { return a.tipo === 'intimo'; }).length === 0, M.ambsPav(1).map(function (a) { return a.nome; }).join(','));
+t('área construída soma os dois andares; ocupação é só a projeção do térreo', M.areaConstruida() > M.projecao() && Math.abs(M.ocupacao() - M.projecao() / M.areaTerreno() * 100) < 1e-9);
+t('nenhuma sobreposição no mesmo andar e nada em balanço no sobrado gerado', M.problemas().filter(function (q) { return q.tipo === 'sobrepoe' || q.tipo === 'balanco'; }).length === 0, M.problemas().map(function (q) { return q.msg; }).join('|'));
+t('andar de cima 100% apoiado no térreo', M.ambsPav(1).every(function (a) { return M.apoio(a) >= .99; }), M.ambsPav(1).map(function (a) { return a.nome + ':' + Math.round(M.apoio(a) * 100); }).join(','));
+var escT = M.escada();
+t('escada derivada: no térreo, 1,00 × 3,00 m, dentro do ambiente escolhido', !!escT && escT.w === 100 && escT.h === 300 && escT.x >= escT.amb.x && escT.y + escT.h <= escT.amb.y + escT.amb.h, JSON.stringify(escT));
+var an1 = TF.analise(M.proj, 1), an0 = TF.analise(M.proj, 0);
+t('análise do 1º andar: só ambientes de cima, sem porta da rua nem portão', an1.ambs.every(function (r) { return r.pav === 1; }) && !an1.entrada && !an1.garagem && an1.pecas.every(function (pc) { return pc.ab.every(function (ab) { return ab.tipo !== 'entrada' && ab.tipo !== 'portao'; }); }));
+t('análise do térreo continua com entrada e só ambientes do térreo', !!an0.entrada && an0.ambs.every(function (r) { return !r.pav; }));
+var nAntes = M.nPavs(); M.addPavimento(true);
+t('adicionar andar copiando: 3 pavimentos, o novo tem os ambientes do de baixo (sem garagem)', M.nPavs() === nAntes + 1 && M.pav === 2 && M.ambsPav(2).length === M.ambsPav(1).length && M.ambsPav(2).every(function (a) { return a.tipo !== 'garagem'; }));
+M.removerPavimento(2);
+t('remover andar volta a 2 e ajusta o andar atual', M.nPavs() === 2 && M.pav === 1);
+var svF = VIEWS.fachada(), svC = VIEWS.corte();
+t('elevação e corte desenham o 2º andar (laje a ' + (M.proj.peDireito + 15) + ' cm)', svF.indexOf('y="' + (-(M.proj.peDireito + 15)) + '"') > 0 && svC.indexOf('y="' + (-(M.proj.peDireito + 15)) + '"') > 0);
+M.novo('casa-terrea', 1000, 2500);
+t('casa térrea: 1 pavimento, sem escada', M.nPavs() === 1 && M.escada() === null);
 M.novo('casa-terrea', 1000, 2500);
 
 var r=document.getElementById('resumo');

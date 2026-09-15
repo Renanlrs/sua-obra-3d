@@ -75,11 +75,18 @@ var PLAN = (function () {
     s += '<rect x="' + t.recuoLateral + '" y="' + t.recuoFrontal + '" width="' + (t.largura - t.recuoLateral * 2) +
          '" height="' + (t.profundidade - t.recuoFrontal - t.recuoFundo) + '" fill="none" stroke="#22B8D6" stroke-opacity=".45" stroke-width="' + (1.2 * esc) + '" stroke-dasharray="' + (10 * esc) + ' ' + (8 * esc) + '"/>';
 
+    /* andar de baixo em fantasma (para alinhar o andar de cima) */
+    var pav = M.pav;
+    if (pav > 0) {
+      M.ambsPav(pav - 1).forEach(function (b) {
+        s += '<rect x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" fill="#8FA3B1" fill-opacity=".08" stroke="#8FA3B1" stroke-width="' + (1.4 * esc) + '" stroke-dasharray="' + (8 * esc) + ' ' + (6 * esc) + '" style="pointer-events:none"/>';
+      });
+    }
     /* ambientes */
     var probs = M.problemas(), ruins = {};
     probs.forEach(function (q) { if (q.id) ruins[q.id] = true; });
 
-    p.ambientes.forEach(function (a) {
+    M.ambsPav(pav).forEach(function (a) {
       var ti = M.TIPOS[a.tipo] || M.TIPOS.social;
       var ruim = ruins[a.id], on = sel === a.id;
       s += '<g class="amb" data-id="' + a.id + '">';
@@ -114,6 +121,15 @@ var PLAN = (function () {
       }
       s += '</g>';
     });
+    /* escada (derivada de M.escada): degraus no térreo, vão no andar de cima */
+    var esc2 = M.escada();
+    if (esc2 && (pav === 0 || pav === 1)) {
+      s += '<g style="pointer-events:none"><rect x="' + esc2.x + '" y="' + esc2.y + '" width="' + esc2.w + '" height="' + esc2.h + '" fill="' + (pav === 0 ? '#FFFFFF' : '#F4F6F8') + '" fill-opacity=".9" stroke="#1B2229" stroke-width="' + (1.6 * esc) + '"' + (pav === 1 ? ' stroke-dasharray="' + (6 * esc) + ' ' + (4 * esc) + '"' : '') + '/>';
+      if (pav === 0) { var dg = esc2.degraus, passo = esc2.h / dg; for (var di = 1; di < dg; di++) s += '<line x1="' + esc2.x + '" y1="' + (esc2.y + di * passo) + '" x2="' + (esc2.x + esc2.w) + '" y2="' + (esc2.y + di * passo) + '" stroke="#1B2229" stroke-width="' + (1 * esc) + '"/>';
+        s += '<line x1="' + (esc2.x + esc2.w / 2) + '" y1="' + (esc2.y + esc2.h - 10) + '" x2="' + (esc2.x + esc2.w / 2) + '" y2="' + (esc2.y + 14) + '" stroke="#22B8D6" stroke-width="' + (1.6 * esc) + '"/><path d="M' + (esc2.x + esc2.w / 2 - 8) + ' ' + (esc2.y + 26) + ' l8 -14 l8 14" fill="none" stroke="#22B8D6" stroke-width="' + (1.6 * esc) + '"/>'; }
+      else s += '<line x1="' + esc2.x + '" y1="' + esc2.y + '" x2="' + (esc2.x + esc2.w) + '" y2="' + (esc2.y + esc2.h) + '" stroke="#8FA3B1" stroke-width="' + (1 * esc) + '"/>';
+      s += '</g>';
+    }
 
     s += moveisSvg(esc);
     if (showCotas) s += cotas(esc);
@@ -131,7 +147,7 @@ var PLAN = (function () {
   /* ---------- móveis: figurinhas de cima, giradas no lugar ---------- */
   function moveisSvg(esc){
     if (!window.MOVEIS || !M.proj.moveis) return '';
-    var s = '', lista = M.proj.moveis.slice().sort(function (a, b) { return MOVEIS.dims(a).alt - MOVEIS.dims(b).alt; });   /* tapete embaixo de tudo */
+    var s = '', lista = M.proj.moveis.filter(function (m) { return (m.pav || 0) === M.pav; }).sort(function (a, b) { return MOVEIS.dims(a).alt - MOVEIS.dims(b).alt; });   /* tapete embaixo de tudo */
     lista.forEach(function (mv) {
       var m = MOVEIS.dims(mv), on = selTipo === 'mov' && sel === mv.id;
       var sym = MOVEIS.symDe(mv).replace(/stroke-width="([\d.]+)"/g, function (_, v) { return 'stroke-width="' + (parseFloat(v) * esc * .85) + '"'; });
@@ -182,7 +198,7 @@ var PLAN = (function () {
     var ax = [], ay = [];
     if (r) { ax.push(r.x + PAREDE / 2 + hw, r.x + r.w - PAREDE / 2 - hw); ay.push(r.y + PAREDE / 2 + hh, r.y + r.h - PAREDE / 2 - hh); }
     (M.proj.moveis || []).forEach(function (o) {
-      if (o.id === mv.id) return;
+      if (o.id === mv.id || (o.pav || 0) !== (mv.pav || 0)) return;
       var ob = MOVEIS.aabb(o);
       ax.push(ob.x - hw, ob.x + ob.w + hw, ob.x + ob.w / 2); ay.push(ob.y - hh, ob.y + ob.h + hh, ob.y + ob.h / 2);
     });
@@ -456,7 +472,8 @@ var PLAN = (function () {
     var d = drag; drag = null; guias = []; UI.hud(null);
     if (!d.mudou && d.modo !== 'novo' && d.modo !== 'pan') UI.selTap();
     if (d.modo === 'novo' && d.novo && d.novo.w >= 90 && d.novo.h >= 90) {
-      var a = {id:M.uid(), nome:'Ambiente', tipo:'social', x:d.novo.x, y:d.novo.y, w:d.novo.w, h:d.novo.h};
+      var a = {id:M.uid(), nome:'Ambiente', tipo:M.pav > 0 ? 'intimo' : 'social', x:d.novo.x, y:d.novo.y, w:d.novo.w, h:d.novo.h};
+      if (M.pav > 0) a.pav = M.pav;
       M.proj.ambientes.push(a);
       M.commit('Criar ambiente');
       selecionar(a.id); UI.setTool('sel');
@@ -497,7 +514,9 @@ var PLAN = (function () {
     var gs = [], t = M.proj.terreno;
     var alvosX = [0, t.largura, t.recuoLateral, t.largura - t.recuoLateral];
     var alvosY = [0, t.profundidade, t.recuoFrontal, t.profundidade - t.recuoFundo];
-    M.proj.ambientes.forEach(function (o) {
+    /* vizinhos do mesmo andar + paredes do andar de baixo (o de cima gruda no de baixo) */
+    var pa = M.pavDe(a), alvos = M.ambsPav(pa).concat(pa > 0 ? M.ambsPav(pa - 1) : []);
+    alvos.forEach(function (o) {
       if (o.id === a.id) return;
       alvosX.push(o.x, o.x + o.w, o.x - a.w, o.x + o.w - a.w);
       alvosY.push(o.y, o.y + o.h, o.y - a.h, o.y + o.h - a.h);

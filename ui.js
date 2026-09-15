@@ -78,6 +78,7 @@ var UI = (function () {
       M.novo(M.PROGRAMAS[k] ? k : 'casa-terrea', M.parseM(q.get('l') || '10') , M.parseM(q.get('p') || '25'));
       localStorage.setItem('suaobra3d.coach', '1');
       entrarApp();
+      if (q.get('pav')) M.setPav(+q.get('pav'));   /* &pav=1 abre o 1º andar */
       if (q.get('v')) irPara(q.get('v'));
       if (t3) {   /* &t3=tour&i=3&teto=0&etapa=2 — para conferência e print */
         if (q.get('teto') === '0') t3.setTeto(false);
@@ -180,6 +181,7 @@ var UI = (function () {
     $('#tools').hidden = v !== 'planta';
     $('#empty').hidden = true;
     $('#pill23').hidden = v !== 'planta' && v !== 'tresd';
+    var ps = $('#pavsel'); if (ps) ps.hidden = v !== 'planta';
     $('#app').setAttribute('data-view', v);
     document.querySelectorAll('#pill23 button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
     if (v !== 'planta' && v !== 'tresd') { $('#catalogo').hidden = true; $('#btn-mob').classList.remove('on'); }
@@ -188,7 +190,7 @@ var UI = (function () {
     if (v === 'planta') {
       stage.hidden = false;
       var old = canvasWrap.querySelector('.view-pad'); if (old) old.remove();
-      PLAN.montar(stage); PLAN.enquadrar(); PLAN.render();
+      PLAN.montar(stage); PLAN.enquadrar(); PLAN.render(); pavSel();
       $('#empty').hidden = M.proj.ambientes.length > 0;
     } else {
       stage.hidden = true;
@@ -200,19 +202,36 @@ var UI = (function () {
     inspector();
   }
 
+  /* seletor de pavimento (Térreo · 1º andar · +) — só na planta */
+  function pavSel(){
+    var el = $('#pavsel'); if (!el) return;
+    var n = M.nPavs(), h = '';
+    for (var i = 0; i < n; i++) h += '<button data-pav="' + i + '"' + (M.pav === i ? ' class="on"' : '') + '>' + M.nomePav(i) + '</button>';
+    if (n < 4) h += '<button data-pav="+" title="Adicionar andar em cima">+</button>';
+    el.innerHTML = h; el.hidden = viewAtual !== 'planta';
+    el.querySelectorAll('button').forEach(function (b) {
+      b.onclick = function () {
+        var v = b.getAttribute('data-pav');
+        if (v === '+') { M.addPavimento(true); M.commit('Adicionar ' + M.nomePav(M.pav)); toast(M.nomePav(M.pav) + ' criado copiando o andar de baixo. Ajuste os ambientes.'); }
+        else M.setPav(+v);
+        PLAN.selecionar(null); PLAN.render(); pavSel(); inspector(); refreshTop();
+      };
+    });
+  }
   function conteudoView(v){
     var p = M.proj;
     if (v === 'ambientes') {
       var h = '<h2>Ambientes</h2><p class="vsub">' + p.ambientes.length + ' ambientes · ' + M.fmtM2(M.areaTotalAmbientes()) + ' no total. Clique para selecionar na planta.</p>';
-      h += '<table class="tbl"><tr><th>AMBIENTE</th><th>TIPO</th><th class="n">LARGURA</th><th class="n">PROFUND.</th><th class="n">ÁREA</th><th class="n">CUSTO</th><th></th></tr>';
-      p.ambientes.forEach(function (a) {
+      var multi = M.nPavs() > 1;
+      h += '<table class="tbl"><tr><th>AMBIENTE</th><th>TIPO</th>' + (multi ? '<th>ANDAR</th>' : '') + '<th class="n">LARGURA</th><th class="n">PROFUND.</th><th class="n">ÁREA</th><th class="n">CUSTO</th><th></th></tr>';
+      p.ambientes.slice().sort(function (a, b) { return M.pavDe(a) - M.pavDe(b); }).forEach(function (a) {
         var ti = M.TIPOS[a.tipo] || M.TIPOS.social;
         h += '<tr data-id="' + a.id + '"><td><span class="sw" style="background:' + ti.cor + '"></span>' + esc(a.nome) + '</td>' +
-          '<td>' + ti.rot + '</td><td class="n">' + M.fmtM(a.w) + '</td><td class="n">' + M.fmtM(a.h) + '</td>' +
+          '<td>' + ti.rot + '</td>' + (multi ? '<td>' + M.nomePav(M.pavDe(a)) + '</td>' : '') + '<td class="n">' + M.fmtM(a.w) + '</td><td class="n">' + M.fmtM(a.h) + '</td>' +
           '<td class="n">' + M.fmtM2(M.areaOf(a)) + '</td><td class="n">' + M.fmtBRL(M.custoDe(a)) + '</td>' +
           '<td class="n"><button data-del="' + a.id + '" title="Excluir">✕</button></td></tr>';
       });
-      h += '<tr class="tot"><td colspan="4">TOTAL</td><td class="n">' + M.fmtM2(M.areaTotalAmbientes()) + '</td><td class="n">' + M.fmtBRL(M.custoTotal()) + '</td><td></td></tr></table>';
+      h += '<tr class="tot"><td colspan="' + (multi ? 5 : 4) + '">TOTAL</td><td class="n">' + M.fmtM2(M.areaTotalAmbientes()) + '</td><td class="n">' + M.fmtBRL(M.custoTotal()) + '</td><td></td></tr></table>';
       h += '<h2 style="margin-top:32px;font-size:15px">Adicionar da biblioteca</h2><div class="lib">';
       M.LIB.forEach(function (l, i) {
         var ti = M.TIPOS[l.tipo];
@@ -221,10 +240,21 @@ var UI = (function () {
       return h + '</div>';
     }
     if (v === 'pavimentos') {
-      return '<h2>Pavimentos</h2><p class="vsub">Esta versão trabalha com um pavimento. O terreno e o pé-direito estão no inspector, à direita.</p>' +
-        '<div class="cards">' +
-        card(M.fmtM2(M.areaTerreno()), 'TERRENO') + card(M.fmtM2(M.areaConstruida()), 'ÁREA CONSTRUÍDA') +
-        card(M.fmtPct(M.ocupacao()), 'TAXA DE OCUPAÇÃO') + card(M.fmtM(p.peDireito), 'PÉ-DIREITO') + '</div>';
+      var n = M.nPavs(), hp = '<h2>Pavimentos</h2><p class="vsub">' + n + (n > 1 ? ' pavimentos' : ' pavimento') + ' · ' + M.fmtM2(M.areaConstruida()) + ' construídos · projeção de ' + M.fmtM2(M.projecao()) + ' no terreno. Cada ambiente pertence a um andar; o de cima gruda nas paredes do de baixo.</p>';
+      hp += '<div class="cards">' + card(M.fmtM2(M.areaTerreno()), 'TERRENO') + card(M.fmtM2(M.areaConstruida()), 'ÁREA CONSTRUÍDA') + card(M.fmtPct(M.ocupacao()), 'TAXA DE OCUPAÇÃO (PROJEÇÃO)') + card(M.fmtM(p.peDireito), 'PÉ-DIREITO') + '</div>';
+      hp += '<table class="tbl"><tr><th>PAVIMENTO</th><th class="n">AMBIENTES</th><th class="n">ÁREA</th><th class="n">CUSTO</th><th>APOIO</th><th></th></tr>';
+      for (var pi = n - 1; pi >= 0; pi--) {
+        var ambsP = M.ambsPav(pi), areaP = ambsP.reduce(function (s2, a) { return s2 + M.areaOf(a); }, 0), custoP = ambsP.reduce(function (s2, a) { return s2 + M.custoDe(a); }, 0);
+        var bal = ambsP.filter(function (a) { return M.apoio(a) < .5; });
+        hp += '<tr><td><b>' + M.nomePav(pi) + '</b></td><td class="n">' + ambsP.length + '</td><td class="n">' + M.fmtM2(areaP) + '</td><td class="n">' + M.fmtBRL(custoP) + '</td>' +
+          '<td>' + (pi === 0 ? 'no terreno' : (bal.length ? '<span style="color:#B4432F">' + bal.length + ' em balanço</span>' : 'apoiado')) + '</td>' +
+          '<td class="n"><button data-pav-ir="' + pi + '" title="Editar na planta">✎ planta</button>' + (pi > 0 ? '<button data-pav-del="' + pi + '" title="Remover este andar">✕</button>' : '') + '</td></tr>';
+      }
+      hp += '</table>';
+      var esc3 = M.escada();
+      hp += '<p class="vsub" style="margin-top:14px">' + (n > 1 ? (esc3 ? 'Escada em <b>' + esc(esc3.amb.nome) + '</b> (' + M.fmtMs(esc3.w) + ' × ' + M.fmtMs(esc3.h) + ' m, ' + esc3.degraus + ' degraus), encostada na parede esquerda, no fundo. Ela nasce do maior ambiente de circulação do térreo — crie um "Hall" ou "Corredor" para escolher onde.' : 'Nenhum ambiente do térreo tem 3,00 m de fundo para a escada — aumente um corredor ou a sala.') : 'Casa térrea. Adicione um andar para virar sobrado.') + '</p>';
+      hp += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' + (n < 4 ? '<button class="btn solid" data-pav-add="copia">+ Adicionar andar copiando o de baixo</button><button class="btn" data-pav-add="vazio">+ Adicionar andar vazio</button>' : '') + '</div>';
+      return hp;
     }
     if (v === 'tresd') {
       if (!window.TRES) return '<h2>3D</h2><p class="vsub">O motor 3D não carregou (three.min.js ausente).</p><div style="height:60%">' + VIEWS.iso() + '</div>';
@@ -324,11 +354,19 @@ var UI = (function () {
   function ligarView(v, pad){
     if (v === 'tresd' && window.TRES) { ligar3D(pad); return; }
     if (v === 'fachada' && window.TRES) { ligarFachada(pad); return; }
+    if (v === 'pavimentos') {
+      pad.querySelectorAll('[data-pav-add]').forEach(function (b) { b.onclick = function () { M.addPavimento(b.getAttribute('data-pav-add') === 'copia'); M.commit('Adicionar ' + M.nomePav(M.pav)); irPara('planta'); toast(M.nomePav(M.pav) + ' criado. Ajuste os ambientes na planta.'); }; });
+      pad.querySelectorAll('[data-pav-ir]').forEach(function (b) { b.onclick = function () { M.setPav(+b.getAttribute('data-pav-ir')); irPara('planta'); }; });
+      pad.querySelectorAll('[data-pav-del]').forEach(function (b) { b.onclick = function () { var n2 = +b.getAttribute('data-pav-del'); M.removerPavimento(n2); M.commit('Remover ' + M.nomePav(n2)); irPara('pavimentos'); toast(M.nomePav(n2) + ' removido.', function () { fazerUndo(); }); }; });
+      return;
+    }
     if (v === 'ambientes') {
       pad.querySelectorAll('tr[data-id]').forEach(function (tr) {
         tr.onclick = function (e) {
           if (e.target.getAttribute('data-del')) return;
-          PLAN.selecionar(tr.getAttribute('data-id')); irPara('planta');
+          var idA = tr.getAttribute('data-id'), amb2 = M.proj.ambientes.filter(function (x) { return x.id === idA; })[0];
+          if (amb2) M.setPav(M.pavDe(amb2));
+          irPara('planta'); PLAN.selecionar(idA);
         };
       });
       pad.querySelectorAll('[data-del]').forEach(function (b) {
@@ -411,6 +449,11 @@ var UI = (function () {
         '<div class="kv derived" title="' + M.fmtM(a.w) + ' × ' + M.fmtM(a.h) + '"><span>Área</span><b>' + M.fmtM2(M.areaOf(a)) + '</b></div>' +
         '<div class="kv derived" title="' + M.fmtM2(M.areaOf(a)) + ' × ' + M.fmtBRL(ti.custo[p.padrao] * 100) + '/m²"><span>Custo estimado</span><b>' + M.fmtBRL(M.custoDe(a)) + '</b></div>' +
         '</section>';
+      if (M.nPavs() > 1 || M.pavDe(a) > 0) {
+        h += '<section><h6>PAVIMENTO</h6><div class="chips">';
+        for (var pv2 = 0; pv2 < M.nPavs(); pv2++) h += '<button class="chip' + (M.pavDe(a) === pv2 ? ' on' : '') + '" data-pav-amb="' + pv2 + '">' + M.nomePav(pv2) + '</button>';
+        h += '</div>' + (M.pavDe(a) > 0 ? '<div class="kv derived" title="área sobre ambientes cobertos do andar de baixo"><span>Apoio no andar de baixo</span><b>' + M.fmtPct(M.apoio(a) * 100) + '</b></div>' : '') + '</section>';
+      }
       h += '<section><h6>TIPO</h6><div class="chips">' +
         Object.keys(M.TIPOS).map(function (k) {
           return '<button class="chip' + (a.tipo === k ? ' on' : '') + '" data-tipo="' + k + '">' + M.TIPOS[k].rot + '</button>';
@@ -475,6 +518,13 @@ var UI = (function () {
       bind('i-y', function (v) { var n = M.parseM(v); if (n !== null) { a.y = n; M.commit('Mover ambiente'); PLAN.render(); inspector(); } });
       insp.querySelectorAll('[data-tipo]').forEach(function (b) {
         b.onclick = function () { a.tipo = b.getAttribute('data-tipo'); M.commit('Mudar tipo'); PLAN.render(); inspector(); };
+      });
+      insp.querySelectorAll('[data-pav-amb]').forEach(function (b) {
+        b.onclick = function () {
+          var n3 = +b.getAttribute('data-pav-amb'); if (n3) a.pav = n3; else delete a.pav;
+          (M.proj.moveis || []).forEach(function (m) { if (m.amb === a.id) { if (n3) m.pav = n3; else delete m.pav; } });
+          M.commit('Mover para ' + M.nomePav(n3)); M.setPav(n3); PLAN.render(); pavSel(); inspector();
+        };
       });
       insp.querySelectorAll('[data-act]').forEach(function (b) {
         b.onclick = function () {
@@ -660,9 +710,10 @@ var UI = (function () {
     var t = M.proj.terreno;
     var a = {id:M.uid(), nome:l.nome, tipo:l.tipo, w:l.w, h:l.h,
              x:Math.round((t.largura - l.w) / 2), y:Math.round(t.recuoFrontal + 20)};
-    /* empurra para baixo até não sobrepor ninguém */
+    if (M.pav > 0) a.pav = M.pav;
+    /* empurra para baixo até não sobrepor ninguém do mesmo andar */
     var tent = 0;
-    while (tent++ < 200 && M.proj.ambientes.some(function (o) {
+    while (tent++ < 200 && M.ambsPav(M.pav).some(function (o) {
       return a.x < o.x + o.w && o.x < a.x + a.w && a.y < o.y + o.h && o.y < a.y + a.h;
     })) a.y += 25;
     M.proj.ambientes.push(a);
@@ -1124,6 +1175,7 @@ var UI = (function () {
       '@media(prefers-reduced-motion:reduce){*{transition:none!important}}';
     var shim = 'var M={proj:' + JSON.stringify(p) + ',TIPOS:' + JSON.stringify(M.TIPOS) + ',' +
       'movelDe:function(id){return (M.proj.moveis||[]).filter(function(m){return m.id===id})[0]||null},' +
+      'escada:function(){return ' + JSON.stringify(M.escada()) + '},' +
       'areaOf:function(a){return a.w*a.h},num:function(n){return Number(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})},' +
       'fmtM:function(cm){return M.num(cm/100)+" m"},fmtM2:function(c){return M.num(c/10000)+" m²"},fmtPct:function(n){return M.num(n)+"%"},' +
       'areaConstruida:function(){return M.proj.ambientes.filter(function(a){return a.tipo!=="externo"&&a.tipo!=="agua"}).reduce(function(s,a){return s+a.w*a.h},0)},' +

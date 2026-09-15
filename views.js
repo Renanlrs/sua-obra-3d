@@ -88,7 +88,11 @@ var VIEWS = (function () {
     var frente = p.ambientes.filter(function (a) { return a.tipo !== 'externo' && a.tipo !== 'agua'; })
       .sort(function (a, b) { return a.y - b.y; });
     var yMin = frente.length ? frente[0].y : t.recuoFrontal;
-    var naFrente = frente.filter(function (a) { return a.y <= yMin + 60; });
+    var naFrente = frente.filter(function (a) { return a.y <= yMin + 60 && !M.pavDe(a); });
+    /* andares de cima: cada um sobe H + laje (15 cm); telhado e platibanda vão no último */
+    var nP = M.nPavs(), LJ = 15, altTotal = H * nP + LJ * (nP - 1);
+    var andares = []; for (var ip = 1; ip < nP; ip++) { var rs = M.ambsPav(ip).filter(function (a) { return a.tipo !== 'externo' && a.tipo !== 'agua'; }); if (!rs.length) continue; var ym = Math.min.apply(null, rs.map(function (a) { return a.y; })); andares.push({pav:ip, yb:ip * (H + LJ), rooms:rs.filter(function (a) { return a.y <= ym + 60; })}); }
+    var topo = andares.length ? andares[andares.length - 1].rooms : naFrente;
     var esq = F.esquadria === 'branco' ? '#F4F4F1' : (F.esquadria === 'madeira' ? '#7A5230' : '#1B2229');
     var telha = F.telha === 'ceramica' ? '#B5533A' : (F.telha === 'metalica' ? '#3F4448' : '#6F6E6B');
     var rev = {ripado:'#A87B4F', pedra:'#9C968A', tijolo:'#A0523F', cimento:'#9C9A94'}[F.revestimento];
@@ -101,16 +105,17 @@ var VIEWS = (function () {
       var x1 = Math.min.apply(null, naFrente.map(function (a) { return a.x; }));
       var x2 = Math.max.apply(null, naFrente.map(function (a) { return a.x + a.w; }));
       var cx = (x1 + x2) / 2;
+      var x1T = Math.min.apply(null, topo.map(function (a) { return a.x; })), x2T = Math.max.apply(null, topo.map(function (a) { return a.x + a.w; })), cxT = (x1T + x2T) / 2;
       /* cobertura */
       if (F.cobertura === 'platibanda') {
-        s += '<rect x="' + x1 + '" y="' + (-H - telhado) + '" width="' + (x2 - x1) + '" height="' + telhado + '" fill="' + F.corParede + '" stroke="#1B2229" stroke-width="7"/>';
+        s += '<rect x="' + x1T + '" y="' + (-altTotal - telhado) + '" width="' + (x2T - x1T) + '" height="' + telhado + '" fill="' + F.corParede + '" stroke="#1B2229" stroke-width="7"/>';
       } else if (F.cobertura === 'telhado2') {
-        s += '<polygon points="' + (x1 - 50) + ',' + (-H) + ' ' + cx + ',' + (-H - telhado) + ' ' + (x2 + 50) + ',' + (-H) + '" fill="' + telha + '" stroke="#1B2229" stroke-width="7"/>';
-        for (var i = 1; i < 6; i++) { var yy = -H - telhado * i / 6, dx = (x2 - x1 + 100) / 2 * (1 - i / 6); s += '<line x1="' + (cx - dx) + '" y1="' + yy + '" x2="' + (cx + dx) + '" y2="' + yy + '" stroke="#1B2229" stroke-opacity=".35" stroke-width="2"/>'; }
+        s += '<polygon points="' + (x1T - 50) + ',' + (-altTotal) + ' ' + cxT + ',' + (-altTotal - telhado) + ' ' + (x2T + 50) + ',' + (-altTotal) + '" fill="' + telha + '" stroke="#1B2229" stroke-width="7"/>';
+        for (var i = 1; i < 6; i++) { var yy = -altTotal - telhado * i / 6, dx = (x2T - x1T + 100) / 2 * (1 - i / 6); s += '<line x1T="' + (cxT - dx) + '" y1="' + yy + '" x2T="' + (cxT + dx) + '" y2="' + yy + '" stroke="#1B2229" stroke-opacity=".35" stroke-width="2"/>'; }
       } else {
-        var rec = Math.min((x2 - x1) * .3, 260);
-        s += '<polygon points="' + (x1 - 50) + ',' + (-H) + ' ' + (x1 + rec) + ',' + (-H - telhado) + ' ' + (x2 - rec) + ',' + (-H - telhado) + ' ' + (x2 + 50) + ',' + (-H) + '" fill="' + telha + '" stroke="#1B2229" stroke-width="7"/>';
-        for (var j = 1; j < 5; j++) { var y2 = -H - telhado * j / 5, dx2 = 50 - (50 + rec) * j / 5; s += '<line x1="' + (x1 - dx2) + '" y1="' + y2 + '" x2="' + (x2 + dx2) + '" y2="' + y2 + '" stroke="#1B2229" stroke-opacity=".35" stroke-width="2"/>'; }
+        var rec = Math.min((x2T - x1T) * .3, 260);
+        s += '<polygon points="' + (x1T - 50) + ',' + (-altTotal) + ' ' + (x1T + rec) + ',' + (-altTotal - telhado) + ' ' + (x2T - rec) + ',' + (-altTotal - telhado) + ' ' + (x2T + 50) + ',' + (-altTotal) + '" fill="' + telha + '" stroke="#1B2229" stroke-width="7"/>';
+        for (var j = 1; j < 5; j++) { var y2 = -altTotal - telhado * j / 5, dx2T = 50 - (50 + rec) * j / 5; s += '<line x1T="' + (x1T - dx2T) + '" y1="' + y2 + '" x2T="' + (x2T + dx2T) + '" y2="' + y2 + '" stroke="#1B2229" stroke-opacity=".35" stroke-width="2"/>'; }
       }
       /* parede */
       s += '<rect x="' + x1 + '" y="' + (-H) + '" width="' + (x2 - x1) + '" height="' + H + '" fill="' + F.corParede + '" stroke="#1B2229" stroke-width="7"/>';
@@ -140,9 +145,22 @@ var VIEWS = (function () {
           s += '<line x1="' + ax + '" y1="' + (-H + 70) + '" x2="' + ax + '" y2="' + (-H + 180) + '" stroke="' + esq + '" stroke-width="4"/>';
         }
       });
+      /* andares de cima: parede, laje e janelas (sem porta nem garagem) */
+      andares.forEach(function (d) {
+        var xa = Math.min.apply(null, d.rooms.map(function (a) { return a.x; })), xb = Math.max.apply(null, d.rooms.map(function (a) { return a.x + a.w; })), yb = d.yb;
+        s += '<rect x="' + xa + '" y="' + (-yb - H) + '" width="' + (xb - xa) + '" height="' + (H + LJ) + '" fill="' + F.corParede + '" stroke="#1B2229" stroke-width="7"/>';
+        s += '<rect x="' + xa + '" y="' + (-yb) + '" width="' + (xb - xa) + '" height="' + LJ + '" fill="#D6D2C8" stroke="#1B2229" stroke-width="3"/>';
+        d.rooms.forEach(function (a) {
+          var ax = a.x + a.w / 2;
+          if (rev) { var fill2 = F.revestimento === 'ripado' ? 'url(#ripas)' : (F.revestimento === 'pedra' ? 'url(#pedra)' : (F.revestimento === 'tijolo' ? 'url(#tijolo)' : rev)); s += '<rect x="' + (a.x + 4) + '" y="' + (-yb - H + 4) + '" width="' + (a.w - 8) + '" height="' + (H - 8) + '" fill="' + fill2 + '"/>'; }
+          var jw = Math.min(a.w * .5, 180);
+          s += '<rect x="' + (ax - jw / 2) + '" y="' + (-yb - H + 70) + '" width="' + jw + '" height="110" fill="#7FD6E8" fill-opacity=".55" stroke="' + esq + '" stroke-width="6"/>';
+          s += '<line x1="' + ax + '" y1="' + (-yb - H + 70) + '" x2="' + ax + '" y2="' + (-yb - H + 180) + '" stroke="' + esq + '" stroke-width="4"/>';
+        });
+      });
       /* letreiro: centralizado na frente construída (na platibanda ou acima da porta) */
       if (F.letreiro) {
-        var lw = Math.min(x2 - x1 - 60, Math.max(260, F.letreiro.length * 34)), ly = F.cobertura === 'platibanda' ? -H - telhado + 6 : -H + 10, lh = 54;
+        var lw = Math.min(x2 - x1 - 60, Math.max(260, F.letreiro.length * 34)), ly = F.cobertura === 'platibanda' ? -altTotal - telhado + 6 : -H + 10, lh = 54;
         var fundoL = F.letreiroEstilo === 'placa' ? F.letreiroCor : (F.letreiroEstilo === 'caixa' ? '#F4F4F1' : (F.letreiroEstilo === 'backlight' ? '#FFFFFF' : '#14171B'));
         var tintaL = F.letreiroEstilo === 'placa' ? '#FFFFFF' : (F.letreiroEstilo === 'backlight' ? '#1B1F24' : F.letreiroCor);
         s += '<rect x="' + (cx - lw / 2) + '" y="' + ly + '" width="' + lw + '" height="' + lh + '" rx="4" fill="' + fundoL + '" stroke="#1B2229" stroke-width="4"/>';
@@ -164,7 +182,7 @@ var VIEWS = (function () {
       if (F.jardim) { for (var fx = 20; fx < t.largura - 20; fx += 34) { if (Math.abs(fx - gx) < gwid / 2 + 20) continue; s += '<circle cx="' + fx + '" cy="' + (-muroH - 14) + '" r="18" fill="#4E9A5D"/>'; } }
       s += '<text x="' + cx + '" y="60" text-anchor="middle" font-family="ui-monospace,monospace" font-size="34" fill="#6B7885">' + M.fmtM(x2 - x1) + ' de testada · ' + (window.TRES ? TRES.FACHADA_PRESETS[F.estilo].rot : F.estilo) + '</text>';
     }
-    return '<svg viewBox="' + (-140) + ' ' + (-H - telhado - 120) + ' ' + (t.largura + 280) + ' ' + (H + telhado + 240) +
+    return '<svg viewBox="' + (-140) + ' ' + (-altTotal - telhado - 120) + ' ' + (t.largura + 280) + ' ' + (altTotal + telhado + 240) +
       '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">' + s + '</svg>';
   }
 
@@ -178,27 +196,29 @@ var VIEWS = (function () {
     s += '<line x1="-100" y1="0" x2="' + (t.profundidade + 100) + '" y2="0" stroke="#8A9199" stroke-width="6"/>';
     if (!cortados.length)
       s += '<text x="' + (t.profundidade / 2) + '" y="-100" text-anchor="middle" font-family="Inter,sans-serif" font-size="46" fill="#8A9199">Nenhum ambiente na linha de corte</text>';
+    var nPc = M.nPavs(), altTotalC = H * nPc + 15 * (nPc - 1);
     cortados.forEach(function (a) {
-      var alt = a.tipo === 'agua' ? -140 : (a.tipo === 'externo' ? 0 : H);
+      var alt = a.tipo === 'agua' ? -140 : (a.tipo === 'externo' ? 0 : H), yb = M.pavDe(a) * (H + 15);
       if (a.tipo === 'agua') {
         s += '<rect x="' + a.y + '" y="0" width="' + a.h + '" height="140" fill="#7FD6E8" fill-opacity=".6" stroke="#1B2229" stroke-width="6"/>';
         s += '<text x="' + (a.y + a.h / 2) + '" y="95" text-anchor="middle" font-family="ui-monospace,monospace" font-size="30" fill="#0B3B49">' + esc(a.nome) + '</text>';
       } else if (alt > 0) {
-        s += '<rect x="' + a.y + '" y="' + (-alt) + '" width="' + a.h + '" height="' + alt + '" fill="#F4F6F8" stroke="#1B2229" stroke-width="7"/>';
+        s += '<rect x="' + a.y + '" y="' + (-yb - alt) + '" width="' + a.h + '" height="' + alt + '" fill="#F4F6F8" stroke="#1B2229" stroke-width="7"/>';
+        if (yb) s += '<rect x="' + a.y + '" y="' + (-yb) + '" width="' + a.h + '" height="15" fill="#D6D2C8" stroke="#1B2229" stroke-width="3"/>';
         if (a.h > 200) {
-          s += '<text x="' + (a.y + a.h / 2) + '" y="' + (-alt / 2) + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="34" fill="#3B4854">' + esc(a.nome) + '</text>';
-          s += '<text x="' + (a.y + a.h / 2) + '" y="' + (-alt / 2 + 44) + '" text-anchor="middle" font-family="ui-monospace,monospace" font-size="28" fill="#6B7885">' + M.fmtM(a.h) + '</text>';
+          s += '<text x="' + (a.y + a.h / 2) + '" y="' + (-yb - alt / 2) + '" text-anchor="middle" font-family="Inter,sans-serif" font-size="34" fill="#3B4854">' + esc(a.nome) + '</text>';
+          s += '<text x="' + (a.y + a.h / 2) + '" y="' + (-yb - alt / 2 + 44) + '" text-anchor="middle" font-family="ui-monospace,monospace" font-size="28" fill="#6B7885">' + M.fmtM(a.h) + '</text>';
         }
       }
     });
     if (cortados.length) {
       var y0 = Math.min.apply(null, cortados.map(function (a) { return a.y; }));
       var y1 = Math.max.apply(null, cortados.map(function (a) { return a.y + a.h; }));
-      s += '<line x1="' + y0 + '" y1="' + (-H - 60) + '" x2="' + y1 + '" y2="' + (-H - 60) + '" stroke="#6B7885" stroke-width="4"/>';
-      s += '<text x="' + ((y0 + y1) / 2) + '" y="' + (-H - 78) + '" text-anchor="middle" font-family="ui-monospace,monospace" font-size="32" fill="#6B7885">' + M.fmtM(y1 - y0) + '</text>';
+      s += '<line x1="' + y0 + '" y1="' + (-altTotalC - 60) + '" x2="' + y1 + '" y2="' + (-altTotalC - 60) + '" stroke="#6B7885" stroke-width="4"/>';
+      s += '<text x="' + ((y0 + y1) / 2) + '" y="' + (-altTotalC - 78) + '" text-anchor="middle" font-family="ui-monospace,monospace" font-size="32" fill="#6B7885">' + M.fmtM(y1 - y0) + '</text>';
       s += '<text x="' + ((y0 + y1) / 2) + '" y="70" text-anchor="middle" font-family="ui-monospace,monospace" font-size="30" fill="#6B7885">PÉ-DIREITO ' + M.fmtM(H) + '</text>';
     }
-    return '<svg viewBox="' + (-140) + ' ' + (-H - 200) + ' ' + (t.profundidade + 280) + ' ' + (H + 400) +
+    return '<svg viewBox="' + (-140) + ' ' + (-altTotalC - 200) + ' ' + (t.profundidade + 280) + ' ' + (altTotalC + 400) +
       '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">' + s + '</svg>';
   }
 

@@ -20,8 +20,9 @@ function TRES_ENGINE(THREE, M){
   /* Paredes: cada aresta de ambiente vira segmento numa "linha" (h: y=c, v: x=c).
      A linha é quebrada em PEÇAS elementares nos pontos de todas as arestas;
      cada peça sabe quem está de cada lado → é interna (divisória) ou externa. */
-  function analise(proj){
-    var ambs = proj.ambientes.filter(coberto), H = proj.peDireito, t = proj.terreno;
+  function analise(proj, pav){
+    pav = pav || 0;
+    var ambs = proj.ambientes.filter(function (r) { return coberto(r) && (r.pav || 0) === pav; }), H = proj.peDireito, t = proj.terreno;
     var linhas = {};
     function add(o, c, a, b, r){ var k = o + '|' + c; (linhas[k] = linhas[k] || {o:o, c:c, segs:[], pecas:[]}).segs.push({a:a, b:b, r:r}); }
     ambs.forEach(function (r) {
@@ -124,6 +125,7 @@ function TRES_ENGINE(THREE, M){
       var r = pc.A || pc.B, lado = ladoDe(pc, r);
       if (r.tipo === 'garagem' && lado === 'frente' && pc.len >= 200 && (!garagem || pc.len > garagem.len)) garagem = pc;
     });
+    if (pav > 0) { entrada = null; garagem = null; }   /* andar de cima: sem porta da rua nem portão — chega-se pela escada */
     externas.forEach(function (pc) {
       var r = pc.A || pc.B, lado = ladoDe(pc, r), L = pc.len, jan = null;
       if (garagem === pc) { var gw = Math.min(L - 40, 280); pc.ab.push({s:(pc.p + pc.q) / 2 - gw / 2, e:(pc.p + pc.q) / 2 + gw / 2, z0:0, z1:Math.min(220, H - 20), tipo:'portao'}); return; }
@@ -150,7 +152,9 @@ function TRES_ENGINE(THREE, M){
       var cand = externas.filter(function (pc) { return (pc.A || pc.B) === r && pc.len >= 100; }).sort(function (a, b) { return b.len - a.len; })[0];
       if (!cand) return;
       cand.ab = cand.ab.filter(function (ab) { return ab.tipo !== 'janela'; });
-      var m = (cand.p + cand.q) / 2; cand.ab.push({s:m - 40, e:m + 40, z0:0, z1:210, tipo:'entrada'});
+      var m = (cand.p + cand.q) / 2;
+      if (pav > 0) cand.ab.push({s:m - 60, e:m + 60, z0:100, z1:Math.min(230, H - 40), tipo:'janela'});   /* em cima, ambiente isolado ganha janela */
+      else cand.ab.push({s:m - 40, e:m + 40, z0:0, z1:210, tipo:'entrada'});
       portaDe[r.id] = {pc:cand, pref:0};
     });
     if (entrada) portaDe[entrada.r.id] = portaDe[entrada.r.id] || {pc:entrada.pc, pref:0};
@@ -183,7 +187,7 @@ function TRES_ENGINE(THREE, M){
     Object.keys(portas).forEach(function (k) {
       var pc = pares[k]; (viz[pc.A.id] = viz[pc.A.id] || []).push(pc.B); (viz[pc.B.id] = viz[pc.B.id] || []).push(pc.A);
     });
-    var inicio = entrada ? entrada.r : (garagem ? (garagem.A || garagem.B) : ambs[0]);
+    var inicio = entrada ? entrada.r : (garagem ? (garagem.A || garagem.B) : (ambs.filter(function (r) { return r.tipo === 'circulacao'; }).sort(function (a, b) { return b.w * b.h - a.w * a.h; })[0] || ambs[0]));
     var ordem = [], visto = {};
     if (inicio) {
       var fila = [inicio]; visto[inicio.id] = true;
@@ -195,7 +199,7 @@ function TRES_ENGINE(THREE, M){
     }
     ambs.slice().sort(function (a, b) { return a.y - b.y || a.x - b.x; }).forEach(function (r) { if (!visto[r.id]) { visto[r.id] = true; ordem.push(r); } });
 
-    return {ambs:ambs, pecas:pecas, externas:externas, entrada:entrada, garagem:garagem, portaDe:portaDe, lado:lado, ordem:ordem, H:H, terreno:t};
+    return {ambs:ambs, pecas:pecas, externas:externas, entrada:entrada, garagem:garagem, portaDe:portaDe, lado:lado, ordem:ordem, H:H, terreno:t, pav:pav};
   }
 
   /* ---- frase por ambiente (o texto que aparece no passeio) ---- */
@@ -245,7 +249,7 @@ function TRES_ENGINE(THREE, M){
   }
 
   /* ---- paradas do passeio (posição + alvo da câmera + legenda) ---- */
-  function paradas(proj, an){
+  function paradas(proj, an, andares){
     var t = proj.terreno, out = [];
     var cob = an.ambs;
     var bx = cob.length ? Math.min.apply(null, cob.map(function (a) { return a.x; })) : 0;
@@ -264,6 +268,16 @@ function TRES_ENGINE(THREE, M){
       var p = q.mundo(u, v0), a = q.mundo(ua, alvoV);
       out.push({id:r.id, titulo:r.nome, sub:M.fmtM2(M.areaOf(r)) + ' · ' + M.fmtM(r.w) + ' × ' + M.fmtM(r.h),
         frase:frase(r), pos:[p.x, 1.55, p.z], alvo:[a.x, 1.25, a.z], interno:true});
+    });
+    (andares || []).forEach(function (d) {   /* andar de cima: mesmos enquadramentos, subindo a laje */
+      d.an.ordem.forEach(function (r) {
+        var q = quadro(r, d.an.lado[r.id]), largo = q.W > 1.5 * q.D;
+        var u = largo ? q.W * 0.14 : q.W / 2, ua = largo ? q.W * 0.62 : q.W / 2;
+        var pequeno = q.W < 1.9 || q.D < 2.3, v0 = pequeno ? -0.35 : Math.min(0.55, q.D * 0.18), alvoV = Math.max(v0 + 1, q.D * 0.85);
+        var p = q.mundo(u, v0), a = q.mundo(ua, alvoV);
+        out.push({id:r.id, titulo:r.nome, sub:(d.pav === 1 ? '1º andar' : d.pav + 'º andar') + ' · ' + M.fmtM2(M.areaOf(r)) + ' · ' + M.fmtM(r.w) + ' × ' + M.fmtM(r.h),
+          frase:frase(r), pos:[p.x, 1.55 + d.yb, p.z], alvo:[a.x, 1.25 + d.yb, a.z], interno:true, pav:d.pav});
+      });
     });
     proj.ambientes.filter(function (a) { return !coberto(a); }).forEach(function (r) {
       /* área externa: câmera no lado mais próximo da casa, olhando para o fundo dela */
@@ -741,7 +755,7 @@ function TRES_ENGINE(THREE, M){
   }
   /* põe o móvel no mundo: centro (x, y) em cm, giro horário da planta, espelho, elevação */
   function posicionar(g, mv){
-    g.position.set(mv.x * CM, (mv.elev || 0) * CM, mv.y * CM);
+    g.position.set(mv.x * CM, (mv.elev || 0) * CM + (mv.pav || 0) * (g.userData.andarH || 0), mv.y * CM);
     g.rotation.y = -(mv.rot || 0) * Math.PI / 180;
     g.scale.x = mv.esp ? -1 : 1;
   }
@@ -807,6 +821,14 @@ function TRES_ENGINE(THREE, M){
     var matVidro = vidroMat(F.vidro), matPortao = F.portaoCor ? corMat(F.portaoCor, {roughness:.45, metalness:.4}) : Mt.portao, matMuroBase = F.muroCor ? corMat(F.muroCor) : Mt.muro;
     var matPorta = F.portaCor ? corMat(F.portaCor, {roughness:.55}) : (F.porta === 'aco' ? Mt.esquadria : (['enrolar', 'subir', 'articulada', 'gradeLoja'].indexOf(F.porta) >= 0 ? Mt.portao : (F.porta === 'madeira' && F.esquadria === 'preto' ? Mt.esquadria : Mt.porta)));
     var matPisoFrente = {concreto:Mt.concreto, pedra:Mt.pedra, deck:Mt.deck, intertravado:Mt.calcada}[F.pisoFrente] || null;
+    /* pavimentos: o térreo é `an`; cada andar de cima tem a própria análise e sobe uma laje */
+    var nP = 1; proj.ambientes.forEach(function (a) { nP = Math.max(nP, (a.pav || 0) + 1); });
+    var LAJE = .15, andarH = H + LAJE, altTotal = H * nP + LAJE * (nP - 1), luzes = [];
+    var andares = []; for (var ip = 1; ip < nP; ip++) andares.push({pav:ip, an:analise(proj, ip), yb:ip * andarH});
+    function cobertoAcima(pav, x, y){   /* ponto (cm) sob algum ambiente do andar de cima (bordas inclusive) */
+      var d = andares.filter(function (q) { return q.pav === pav + 1; })[0]; if (!d) return false;
+      return d.an.ambs.some(function (r) { return x >= r.x - 1 && x <= r.x + r.w + 1 && y >= r.y - 1 && y <= r.y + r.h + 1; });
+    }
     var matRev = {ripado:Mt.ripado, pedra:Mt.pedra, tijolo:Mt.tijolo, cimento:Mt.cimento}[F.revestimento] || null;
     var matTelha = F.telha === 'ceramica' ? Mt.telhaCeramica : (F.telha === 'metalica' ? Mt.telhaMetal : Mt.telhaConcreto);
     var raiz = new THREE.Group();
@@ -871,6 +893,8 @@ function TRES_ENGINE(THREE, M){
     caixa(G.terreno, .12, 4.2, .12, Mt.poste, Math.min(TL - .8, gx + gw / 2 + 2.2), 0, -1.9); caixa(G.terreno, .6, .12, .3, Mt.poste, Math.min(TL - .8, gx + gw / 2 + 2.2) - .24, 4.1, -1.9);
     var posteLuz = {x: Math.min(TL - .8, gx + gw / 2 + 2.2) - .48, y: 4.0, z: -1.9};
 
+    /* ---------- um andar: pisos, tetos, laje e paredes (G aponta para os grupos do andar) ---------- */
+    function montarAndar(an, ehTerreo, ehTopo, G){
     /* ---------- pisos, tetos, laje ---------- */
     an.ambs.forEach(function (r) {
       var x = r.x * CM, z = r.y * CM, w = r.w * CM, d = r.h * CM;
@@ -882,14 +906,14 @@ function TRES_ENGINE(THREE, M){
       var laje = caixa(G.cobertura, w, .15, d, Mt.laje, x + w / 2, H, z + d / 2); laje.userData.pronto = Mt.laje; laje.userData.cru = Mt.cruLaje;
     });
     /* ---------- paredes ---------- */
-    var frenteCm = an.ambs.length ? Math.min.apply(null, an.ambs.map(function (a) { return a.y; })) : 0, luzes = [];
+    var frenteCm = an.ambs.length ? Math.min.apply(null, an.ambs.map(function (a) { return a.y; })) : 0;
     var casaX0 = an.ambs.length ? Math.min.apply(null, an.ambs.map(function (a) { return a.x; })) * CM : 0, casaX1 = an.ambs.length ? Math.max.apply(null, an.ambs.map(function (a) { return a.x + a.w; })) * CM : TL;
     var entradaInfo = null;
     an.pecas.forEach(function (pc) {
       var mat = pc.ext ? matExt : Mt.parede;
       var naFrente = pc.ext && pc.o === 'h' && pc.c === frenteCm, salaF = naFrente ? (pc.A || pc.B) : null;
       /* vitrine: a parede da frente dos ambientes sociais vira vidro do piso ao teto (loja, recepção, sala) */
-      var ehVitrine = F.vitrine && naFrente && salaF && salaF.tipo === 'social';
+      var ehVitrine = F.vitrine && ehTerreo && naFrente && salaF && salaF.tipo === 'social';
       if (ehVitrine) {
         var lenV = (pc.q2 - pc.p2) * CM, midV = (pc.p2 + pc.q2) / 2 * CM, zV = pc.c * CM;
         var vid2 = caixa(G.paredes, lenV, H - .1, .04, Mt.vidro, midV, .1, zV, false); vid2.userData.janela = true; vid2.userData.pronto = Mt.vidro; vid2.userData.cru = Mt.cruParede;
@@ -918,7 +942,7 @@ function TRES_ENGINE(THREE, M){
         m.userData.pronto = mat; m.userData.cru = Mt.cruParede;
       });
       /* platibanda nas peças externas (só quando a cobertura é platibanda) */
-      if (pc.ext && F.cobertura === 'platibanda') {
+      if (pc.ext && F.cobertura === 'platibanda' && (ehTopo || !cobertoAcima(an.pav, pc.o === 'h' ? (pc.p2 + pc.q2) / 2 : pc.c, pc.o === 'h' ? pc.c : (pc.p2 + pc.q2) / 2))) {
         var len2 = (pc.q2 - pc.p2) * CM, mid2 = (pc.p2 + pc.q2) / 2 * CM;
         var pl = pc.o === 'h' ? caixa(G.cobertura, len2, .6, ESP * CM, matExt, mid2, H + .15, pc.c * CM) : caixa(G.cobertura, ESP * CM, .6, len2, matExt, pc.c * CM, H + .15, mid2);
         pl.userData.pronto = matExt; pl.userData.cru = Mt.cruParede;
@@ -994,7 +1018,7 @@ function TRES_ENGINE(THREE, M){
           }
           if (horiz && pc.c === frenteCm) {   /* fachada: volume de destaque, marquise, número e luz da entrada */
             var ladoX = cx - len / 2 - .35;
-            caixa(G.acabamento, .35, H + (F.cobertura === 'platibanda' ? .75 : .1), .3, matDest, ladoX, 0, cz - .08);
+            caixa(G.acabamento, .35, altTotal + (F.cobertura === 'platibanda' ? .75 : .1), .3, matDest, ladoX, 0, cz - .08);
             if (F.marquise) caixa(G.acabamento, len + 1.2, .12, 1.1, matDest, cx + .1, 2.25, cz - .55);
             if (F.pergolado) {   /* pergolado de madeira sobre a entrada */
               var pw2 = Math.max(2.4, len + 1.6), pd2 = 1.6;
@@ -1015,10 +1039,32 @@ function TRES_ENGINE(THREE, M){
         }
       });
     });
+    return {frenteCm:frenteCm, casaX0:casaX0, casaX1:casaX1, entradaInfo:entradaInfo};
+    }
+    var r0 = montarAndar(an, true, nP === 1, G);
+    var frenteCm = r0.frenteCm, casaX0 = r0.casaX0, casaX1 = r0.casaX1, entradaInfo = r0.entradaInfo;
+    andares.forEach(function (d) {
+      var Gp = {terreno:G.terreno, estrutura:G.estrutura, moveis:G.moveis};
+      ['pisos', 'paredes', 'cobertura', 'acabamento'].forEach(function (k) { var g = new THREE.Group(); g.position.y = d.yb; g.name = k + d.pav; G[k].add(g); Gp[k] = g; });
+      d.res = montarAndar(d.an, false, d.pav === nP - 1, Gp);
+    });
+    var anTopo = nP > 1 ? andares[nP - 2].an : an, yTopo = (nP - 1) * andarH;
+    var frenteTopo = anTopo.ambs.length ? Math.min.apply(null, anTopo.ambs.map(function (a) { return a.y; })) : frenteCm;
+    var topoX0 = anTopo.ambs.length ? Math.min.apply(null, anTopo.ambs.map(function (a) { return a.x; })) * CM : casaX0, topoX1 = anTopo.ambs.length ? Math.max.apply(null, anTopo.ambs.map(function (a) { return a.x + a.w; })) * CM : casaX1;
+    /* ---------- escada (derivada de M.escada): degraus maciços do térreo até a laje + guarda-corpo do vão ---------- */
+    var escd = nP > 1 && M.escada ? M.escada() : null;
+    if (escd) {
+      var nd = escd.degraus, rise = andarH / nd, run = escd.h * CM / nd, ex = escd.x * CM, ez = escd.y * CM, ew = escd.w * CM, eh = escd.h * CM;
+      for (var si = 0; si < nd; si++) caixa(G.acabamento, ew - .04, rise * (si + 1), run, Mt.madeira, ex + ew / 2, 0, ez + eh - run * (si + .5));
+      caixa(G.acabamento, .04, .95, eh, matEsq, ex + ew - .02, andarH, ez + eh / 2);            /* guarda-corpo do vão, lado aberto */
+      caixa(G.acabamento, ew, .95, .04, matEsq, ex + ew / 2, andarH, ez + eh + .02);           /* fechamento no pé do vão */
+      for (var bi2 = 0; bi2 <= Math.round(eh / .12); bi2++) caixa(G.acabamento, .02, .9, .02, matEsq, ex + ew - .02, andarH, ez + bi2 * (eh / Math.round(eh / .12)), false);
+      caixa(G.acabamento, .04, .9, eh, matEsq, ex + ew + .01, 0, ez + eh / 2).rotation.x = 0;   /* corrimão simplificado ao longo da escada */
+    }
     /* ---------- telhado (2 ou 4 águas) sobre a caixa da casa ---------- */
-    if (F.cobertura !== 'platibanda' && an.ambs.length) {
-      var bz0 = frenteCm * CM, bz1 = Math.max.apply(null, an.ambs.map(function (a) { return a.y + a.h; })) * CM, e = .5;
-      var X0 = casaX0 - e, X1 = casaX1 + e, Z0 = bz0 - e, Z1 = bz1 + e, W = X1 - X0, D = Z1 - Z0, y0 = H + .15, alongX = W >= D;
+    if (F.cobertura !== 'platibanda' && anTopo.ambs.length) {
+      var bz0 = frenteTopo * CM, bz1 = Math.max.apply(null, anTopo.ambs.map(function (a) { return a.y + a.h; })) * CM, e = .5;
+      var X0 = topoX0 - e, X1 = topoX1 + e, Z0 = bz0 - e, Z1 = bz1 + e, W = X1 - X0, D = Z1 - Z0, y0 = yTopo + H + .15, alongX = W >= D;
       var meia = (alongX ? D : W) / 2, rise = meia * .42, y1 = y0 + rise, tri = [];
       function q(a, b, c, d){ tri.push(a, b, c, a, c, d); }
       if (F.cobertura === 'telhado2') {
@@ -1060,8 +1106,8 @@ function TRES_ENGINE(THREE, M){
       if (F.letreiroLargura > 0) lw = Math.min(larguraFrente - .2, F.letreiroLargura);   /* medida digitada manda */
       if (F.letreiroAltura > 0) lh = F.letreiroAltura;
       if (fmt === 'redondo') lh = lw;   /* círculo de verdade */
-      var ly = F.letreiroPos === 'marquise' && (F.marquise || F.pergolado) ? 2.4 : (F.cobertura === 'platibanda' ? Math.min(H + .75 - lh, H + .1) : Math.min(H - lh - .05, 2.32));
-      if (F.letreiroPos === 'marquise' && (F.marquise || F.pergolado)) ly = Math.min(2.4, H + .75 - lh);
+      var ly = F.letreiroPos === 'marquise' && (F.marquise || F.pergolado) ? 2.4 : (F.cobertura === 'platibanda' ? Math.min(altTotal + .75 - lh, altTotal + .1) : Math.min(H - lh - .05, 2.32));
+      if (F.letreiroPos === 'marquise' && (F.marquise || F.pergolado)) ly = Math.min(2.4, altTotal + .75 - lh);
       var semFundo = F.letreiroEstilo === 'caixa' || F.letreiroEstilo === 'neon';
       var matL = letreiroMat(F.letreiro, F.letreiroEstilo, F.letreiroCor, lw, lh, {formato:fmt, fonte:F.letreiroFonte, sub:F.letreiroSub, fundoCor:F.letreiroFundoCor}), prof = F.letreiroEstilo === 'caixa' ? .12 : .06;
       if (!semFundo && (fmt === 'retangular' || fmt === 'faixa')) caixa(G.acabamento, lw + .1, lh + .1, prof, Mt.letreiroFundo, lx, ly - .05, lz - prof / 2 - .01);
@@ -1081,7 +1127,7 @@ function TRES_ENGINE(THREE, M){
     luzes.push({tipo:'ponto', x:posteLuz.x, y:posteLuz.y, z:posteLuz.z, cor:'#FFE9C4', int:30, dist:14});
     if (F.iluminacao) {
       var nUp = Math.max(2, Math.min(5, Math.round((casaX1 - casaX0) / 2.2)));
-      for (var ui = 0; ui < nUp; ui++) luzes.push({tipo:'spot', x: casaX0 + (casaX1 - casaX0) * (ui + .5) / nUp, y:.12, z: frenteCm * CM - .55, cor:'#FFE2B0', int:14, dist:5, alvoY:H});
+      for (var ui = 0; ui < nUp; ui++) luzes.push({tipo:'spot', x: casaX0 + (casaX1 - casaX0) * (ui + .5) / nUp, y:.12, z: frenteCm * CM - .55, cor:'#FFE2B0', int:14, dist:5, alvoY:altTotal});
       if (an.garagem) { var gaL = an.garagem.A || an.garagem.B; luzes.push({tipo:'ponto', x:(gaL.x + gaL.w / 2) * CM, y:H - .3, z:gaL.y * CM - .4, cor:'#FFF1D6', int:6, dist:5}); }
     }
 
@@ -1115,10 +1161,17 @@ function TRES_ENGINE(THREE, M){
       var viga = pc.o === 'h' ? caixa(G.estrutura, len, .3, .2, Mt.concretoEstr, mid, H - .3, pc.c * CM) : caixa(G.estrutura, .2, .3, len, Mt.concretoEstr, pc.c * CM, H - .3, mid);
       bald.receiveShadow = viga.receiveShadow = false;
     });
+    andares.forEach(function (d) {   /* vigas de cada andar de cima */
+      d.an.pecas.forEach(function (pc) {
+        var len = pc.len * CM, mid = (pc.p + pc.q) / 2 * CM;
+        var vg = pc.o === 'h' ? caixa(G.estrutura, len, .3, .2, Mt.concretoEstr, mid, d.yb + H - .3, pc.c * CM) : caixa(G.estrutura, .2, .3, len, Mt.concretoEstr, pc.c * CM, d.yb + H - .3, mid);
+        vg.receiveShadow = false;
+      });
+    });
     Object.keys(nos).forEach(function (k) {
       var x = nos[k][0] * CM, z = nos[k][1] * CM;
       caixa(G.estrutura, .9, .35, .9, Mt.concretoEstr, x, -.75, z, false);           /* sapata */
-      caixa(G.estrutura, .2, H + .5, .2, Mt.concretoEstr, x, -.45, z);                /* pilar */
+      caixa(G.estrutura, .2, altTotal + .5, .2, Mt.concretoEstr, x, -.45, z);         /* pilar até o último andar */
       [[-.05, -.05], [.05, -.05], [-.05, .05], [.05, .05]].forEach(function (o) {  /* arranques de ferro */
         var f = cil(G.estrutura, .008, .6, Mt.ferro, x + o[0], H + .05, z + o[1], 5); f.userData.ferro = true; f.castShadow = false;
       });
@@ -1126,12 +1179,12 @@ function TRES_ENGINE(THREE, M){
     /* ---------- móveis: cada item de proj.moveis, com as medidas do catálogo ---------- */
     var moveis = {}, movMeshes = [];
     (proj.moveis || []).forEach(function (mv) {
-      var g = movel3d(mv); posicionar(g, mv);
+      var g = movel3d(mv); g.userData.andarH = andarH; posicionar(g, mv);
       G.moveis.add(g); moveis[mv.id] = g;
       g.traverse(function (o) { if (o.isMesh) movMeshes.push(o); });
     });
 
-    return {raiz:raiz, G:G, pisos:pisos, moveis:moveis, movMeshes:movMeshes, an:an, paradas:paradas(proj, an), H:H, TL:TL, TP:TP, portaoX:gx, luzes:luzes, frenteZ:frenteCm * CM, casaX0:casaX0, casaX1:casaX1, entradaX:entradaInfo ? entradaInfo.cx : null, fachada:F};
+    return {raiz:raiz, G:G, pisos:pisos, moveis:moveis, movMeshes:movMeshes, an:an, paradas:paradas(proj, an, andares), H:H, altTotal:altTotal, nPavs:nP, andarH:andarH, TL:TL, TP:TP, portaoX:gx, luzes:luzes, frenteZ:frenteCm * CM, casaX0:casaX0, casaX1:casaX1, entradaX:entradaInfo ? entradaInfo.cx : null, fachada:F};
   }
 
   /* ============================ INSTÂNCIA ============================ */

@@ -83,7 +83,8 @@ var M = (function () {
       ambientes: [],
       moveis: []
     };
-    if (pr.itens.length) { gerar(pr.itens); mobiliarAuto(); }
+    if (pr.itens.length) { gerar(pr.itens); if (tipoKey === 'sobrado') subirIntimos(); mobiliarAuto(); }
+    pavAtual = 0;
     hist = []; fut = []; base = snap();
     return proj;
   }
@@ -97,7 +98,7 @@ var M = (function () {
   function mobiliarAuto(){
     if (!window.MOVEIS) return [];
     var novos = MOVEIS.auto(proj, lados());
-    novos.forEach(function (m) { m.id = uid(); });
+    novos.forEach(function (m) { m.id = uid(); var r = m.amb && proj.ambientes.filter(function (a) { return a.id === m.amb; })[0]; if (r && pavDe(r)) m.pav = pavDe(r); });
     proj.moveis = novos;
     return novos;
   }
@@ -107,8 +108,9 @@ var M = (function () {
   }
   function addMovel(k, x, y, rot, extra){
     if (!proj.moveis) proj.moveis = [];
-    var m = {id:uid(), k:k, x:Math.round(x), y:Math.round(y), rot:((rot || 0) + 360) % 360};
+    var m = {id:uid(), k:k, x:Math.round(x), y:Math.round(y), rot:((rot || 0) + 360) % 360, pav:pavAtual};
     if (extra) for (var p in extra) m[p] = extra[p];
+    if (!m.pav) delete m.pav;
     var a = ambienteDe(m); if (a) m.amb = a.id;
     proj.moveis.push(m);
     return m;
@@ -117,6 +119,7 @@ var M = (function () {
   function ambienteDe(m){
     for (var i = 0; i < proj.ambientes.length; i++) {
       var r = proj.ambientes[i];
+      if (pavDe(r) !== (m.pav || 0)) continue;
       if (m.x >= r.x && m.x <= r.x + r.w && m.y >= r.y && m.y <= r.y + r.h) return r;
     }
     return null;
@@ -186,6 +189,75 @@ var M = (function () {
   }
 
   /* ---------- derivadas (funções puras) ---------- */
+  /* ---------- pavimentos: cada ambiente tem `pav` (0 = térreo); a lista de ambientes continua única ----------
+     pavAtual é estado de tela (não é dado do projeto). */
+  var pavAtual = 0;
+  function pavDe(a){ return a.pav || 0; }
+  function nPavs(){ return proj.ambientes.reduce(function (m, a) { return Math.max(m, pavDe(a) + 1); }, 1); }
+  function ambsPav(n){ return proj.ambientes.filter(function (a) { return pavDe(a) === n; }); }
+  function nomePav(n){ return n === 0 ? 'Térreo' : n + 'º andar'; }
+  function setPav(n){ pavAtual = Math.max(0, Math.min(nPavs() - 1, n | 0)); return pavAtual; }
+  function cobertoAmb(a){ return a.tipo !== 'externo' && a.tipo !== 'agua'; }
+  /* fração (0..1) do ambiente apoiada em ambientes cobertos do andar de baixo */
+  function apoio(a){
+    if (!pavDe(a)) return 1;
+    var tot = 0; ambsPav(pavDe(a) - 1).filter(cobertoAmb).forEach(function (b) {
+      var w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      if (w > 0 && h > 0) tot += w * h;
+    });
+    return areaOf(a) ? Math.min(1, tot / areaOf(a)) : 1;
+  }
+  /* novo andar em cima: copia os cobertos do andar de baixo (sem garagem) ou cria um ambiente sobre o maior */
+  function addPavimento(copiar){
+    var n = nPavs(); if (n >= 4) return n - 1;
+    var baixo = ambsPav(n - 1).filter(function (a) { return cobertoAmb(a) && a.tipo !== 'garagem'; });
+    if (copiar && baixo.length) {
+      baixo.forEach(function (a) { proj.ambientes.push({id:uid(), nome:a.nome, tipo:a.tipo, x:a.x, y:a.y, w:a.w, h:a.h, pav:n}); });
+    } else {
+      var maior = baixo.sort(function (a, b) { return areaOf(b) - areaOf(a); })[0] || {x:proj.terreno.recuoLateral, y:proj.terreno.recuoFrontal, w:400, h:400};
+      proj.ambientes.push({id:uid(), nome:'Ambiente', tipo:'intimo', x:maior.x, y:maior.y, w:maior.w, h:maior.h, pav:n});
+    }
+    pavAtual = n; return n;
+  }
+  function removerPavimento(n){
+    if (n <= 0 || n >= nPavs()) return;
+    proj.ambientes = proj.ambientes.filter(function (a) { return pavDe(a) !== n; });
+    proj.ambientes.forEach(function (a) { if (pavDe(a) > n) a.pav = pavDe(a) - 1; });
+    proj.moveis = (proj.moveis || []).filter(function (m) { return (m.pav || 0) !== n; });
+    proj.moveis.forEach(function (m) { if ((m.pav || 0) > n) m.pav = m.pav - 1; });
+    proj.ambientes.forEach(function (a) { if (!a.pav) delete a.pav; }); proj.moveis.forEach(function (m) { if (!m.pav) delete m.pav; });
+    pavAtual = Math.min(pavAtual, nPavs() - 1);
+  }
+  /* sobrado gerado: quartos/suíte/banheiro sobem e são empilhados sobre o bloco social, com um hall */
+  function subirIntimos(){
+    var sobem = proj.ambientes.filter(function (a) { return a.tipo === 'intimo' || (a.tipo === 'molhado' && /banheiro/i.test(a.nome)); });
+    if (sobem.length < 2) return;
+    sobem.forEach(function (a) { a.pav = 1; });
+    proj.ambientes = proj.ambientes.filter(function (a) { return pavDe(a) === 0 || sobem.indexOf(a) >= 0; });
+    var fica = ambsPav(0).filter(cobertoAmb);
+    if (!fica.length) return;
+    var bx = Math.min.apply(null, fica.map(function (a) { return a.x; })), by = Math.min.apply(null, fica.map(function (a) { return a.y; }));
+    var bw = Math.max.apply(null, fica.map(function (a) { return a.x + a.w; })) - bx;
+    var hall = {id:uid(), nome:'Hall', tipo:'circulacao', x:bx, y:by, w:Math.min(200, bw), h:200, pav:1};
+    proj.ambientes.push(hall);
+    var x = bx + hall.w, y = by, alt = hall.h;
+    sobem.forEach(function (a) {
+      if (a.w > bw) a.w = bw;
+      if (x + a.w > bx + bw + 1) { x = bx; y += alt; alt = 0; }
+      a.x = x; a.y = y; x += a.w; alt = Math.max(alt, a.h);
+    });
+  }
+  /* escada (derivada): no maior ambiente de circulação do térreo, senão no maior social; encostada na parede esquerda, no fundo */
+  function escada(){
+    if (nPavs() < 2) return null;
+    var cands = ambsPav(0).filter(function (a) { return a.tipo === 'circulacao' && a.w >= 100 && a.h >= 300; });
+    if (!cands.length) cands = ambsPav(0).filter(function (a) { return a.tipo === 'social' && a.w >= 200 && a.h >= 300; });
+    if (!cands.length) cands = ambsPav(0).filter(function (a) { return cobertoAmb(a) && a.tipo !== 'garagem' && a.h >= 300; });
+    if (!cands.length) return null;
+    var r = cands.sort(function (a, b) { return areaOf(b) - areaOf(a); })[0];
+    var w = Math.min(100, r.w), h = Math.min(300, r.h - 20);
+    return {amb:r, x:r.x, y:r.y + r.h - h, w:w, h:h, degraus:Math.max(10, Math.round(proj.peDireito / 18))};
+  }
   function areaOf(a){ return a.w * a.h; }                        // cm²
   function areaTerreno(){ return proj.terreno.largura * proj.terreno.profundidade; }
   function ambientesCobertos(){
@@ -197,7 +269,9 @@ var M = (function () {
   function areaTotalAmbientes(){
     return proj.ambientes.reduce(function (s, a) { return s + areaOf(a); }, 0);
   }
-  function ocupacao(){ return areaTerreno() ? areaConstruida() / areaTerreno() * 100 : 0; }
+  /* projeção = só o térreo (andar de cima não ocupa terreno) */
+  function projecao(){ return ambsPav(0).filter(cobertoAmb).reduce(function (s, a) { return s + areaOf(a); }, 0); }
+  function ocupacao(){ return areaTerreno() ? projecao() / areaTerreno() * 100 : 0; }
   function espelhoAgua(){
     return proj.ambientes.filter(function (a) { return a.tipo === 'agua'; })
       .reduce(function (s, a) { return s + areaOf(a); }, 0);
@@ -298,9 +372,11 @@ var M = (function () {
     for (var i = 0; i < proj.ambientes.length; i++)
       for (var j = i + 1; j < proj.ambientes.length; j++) {
         var A = proj.ambientes[i], B = proj.ambientes[j];
+        if (pavDe(A) !== pavDe(B)) continue;
         var ov = A.x < B.x + B.w && B.x < A.x + A.w && A.y < B.y + B.h && B.y < A.y + A.h;
         if (ov) p.push({id:A.id, tipo:'sobrepoe', msg: A.nome + ' está sobrepondo ' + B.nome});
       }
+    proj.ambientes.forEach(function (a) { var ap = apoio(a); if (pavDe(a) && cobertoAmb(a) && ap < .5) p.push({id:a.id, tipo:'balanco', msg: a.nome + ' está em balanço — só ' + fmtPct(ap * 100) + ' apoiado no andar de baixo'}); });
     if (ocupacao() > 70)
       p.push({id:null, tipo:'ocupacao', msg:'Taxa de ocupação em ' + fmtPct(ocupacao()) + ' — a maioria dos municípios limita em 50% a 70%'});
     return p;
@@ -407,7 +483,8 @@ var M = (function () {
     uid:uid, novo:novo, gerar:gerar,
     mobiliarAuto:mobiliarAuto, movelDe:movelDe, addMovel:addMovel, ambienteDe:ambienteDe, moveisDe:moveisDe,
     areaOf:areaOf, areaTerreno:areaTerreno, areaConstruida:areaConstruida,
-    areaTotalAmbientes:areaTotalAmbientes, ocupacao:ocupacao, espelhoAgua:espelhoAgua,
+    areaTotalAmbientes:areaTotalAmbientes, ocupacao:ocupacao, projecao:projecao, espelhoAgua:espelhoAgua,
+    get pav(){ return pavAtual; }, setPav:setPav, pavDe:pavDe, nPavs:nPavs, ambsPav:ambsPav, nomePav:nomePav, apoio:apoio, addPavimento:addPavimento, removerPavimento:removerPavimento, escada:escada,
     custoDe:custoDe, custoTotal:custoTotal, custoPorM2:custoPorM2, custoFachada:custoFachada, custoFachadaItens:custoFachadaItens, custoGeral:custoGeral, fachadaCfg:fachadaCfg, testada:testada, PRECO_FACHADA:PRECO_FACHADA, bbox:bbox, problemas:problemas,
     fmtM:fmtM, fmtMs:fmtMs, fmtM2:fmtM2, fmtPct:fmtPct, fmtBRL:fmtBRL, num:num, parseM:parseM,
     commit:commit, undo:undo, redo:redo, podeUndo:podeUndo, podeRedo:podeRedo, proxUndo:proxUndo,
