@@ -10,6 +10,7 @@ var PLAN = (function () {
   var VERDE = '#2FA36B';
   var showGrid = true, showCotas = true;
   var drag = null, guias = [], PAREDE = 15, SNAP = 5, IMA = 12;
+  var ptrs = {}, pinch = null;   /* dedos na tela; dois dedos = pinça (zoom + pan) no celular */
 
   /* ---------- montagem ---------- */
   function montar(hostEl){
@@ -297,6 +298,16 @@ var PLAN = (function () {
   /* ---------- interação ---------- */
   function onDown(e){
     if (e.button === 2) return;
+    ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+    if (Object.keys(ptrs).length === 2) {
+      if (drag) cancelarDrag();          /* segundo dedo cancela o arrasto que tinha começado */
+      var ks = Object.keys(ptrs), pa = ptrs[ks[0]], pb = ptrs[ks[1]];
+      pinch = {d0:Math.max(1, Math.hypot(pa.x - pb.x, pa.y - pb.y)),
+               c0:toModel({clientX:(pa.x + pb.x) / 2, clientY:(pa.y + pb.y) / 2}),
+               v0:{x:view.x, y:view.y, w:view.w, h:view.h}};
+      svg.setPointerCapture(e.pointerId); return;
+    }
+    if (pinch) return;
     var p = toModel(e);
 
     /* cota → edição no lugar */
@@ -315,8 +326,8 @@ var PLAN = (function () {
     if (gm && tool === 'sel' && !UI.espaco) {
       var mid = gm.getAttribute('data-id'), mv = M.movelDe(mid);
       if (mv) {
-        selecionarMovel(mid); UI.radial(null);
         drag = {modo:'movmove', id:mid, ini:{x:mv.x, y:mv.y}, off:{x:p.x - mv.x, y:p.y - mv.y}, mudou:false};
+        selecionarMovel(mid); UI.radial(null);
         svg.setPointerCapture(e.pointerId); return;
       }
     }
@@ -345,8 +356,8 @@ var PLAN = (function () {
     if (g) {
       var id = g.getAttribute('data-id');
       var a = M.proj.ambientes.filter(function (x) { return x.id === id; })[0];
-      selecionar(id);
       drag = {modo:'move', id:id, ini:{x:a.x, y:a.y}, off:{x:p.x - a.x, y:p.y - a.y}, mudou:false};
+      selecionar(id);
       svg.setPointerCapture(e.pointerId);
     } else {
       selecionar(null);
@@ -354,6 +365,16 @@ var PLAN = (function () {
   }
 
   function onHover(e){
+    if (ptrs[e.pointerId]) ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+    if (pinch) {
+      var ks = Object.keys(ptrs); if (ks.length < 2) return;
+      var pa = ptrs[ks[0]], pb = ptrs[ks[1]];
+      var f = pinch.d0 / Math.max(1, Math.hypot(pa.x - pb.x, pa.y - pb.y));
+      setView(pinch.v0.x, pinch.v0.y, pinch.v0.w * f, pinch.v0.h * f);
+      var pm = toModel({clientX:(pa.x + pb.x) / 2, clientY:(pa.y + pb.y) / 2});
+      setView(view.x + (pinch.c0.x - pm.x), view.y + (pinch.c0.y - pm.y), view.w, view.h);
+      render(); UI.radial(movAtual()); return;
+    }
     var p = toModel(e);
     UI.coord(p.x, p.y);
     if (!drag) return;
@@ -416,9 +437,24 @@ var PLAN = (function () {
     render(); UI.inspector();
   }
 
+  /* desfaz o arrasto em andamento sem gravar (segundo dedo encostou) */
+  function cancelarDrag(){
+    var d = drag; drag = null; guias = []; UI.hud(null);
+    if (d.modo === 'move' || d.modo === 'resize') {
+      var a = M.proj.ambientes.filter(function (x) { return x.id === d.id; })[0];
+      if (a) { a.x = d.ini.x; a.y = d.ini.y; if (d.ini.w) { a.w = d.ini.w; a.h = d.ini.h; } }
+    }
+    if (d.modo === 'movmove') { var mv = M.movelDe(d.id); if (mv) { mv.x = d.ini.x; mv.y = d.ini.y; } }
+    if (d.modo === 'movrot') { var mv2 = M.movelDe(d.id); if (mv2) mv2.rot = d.rot0; }
+    render();
+  }
+
   function onUp(e){
+    if (e && e.pointerId !== undefined) delete ptrs[e.pointerId];
+    if (pinch) { if (Object.keys(ptrs).length < 2) pinch = null; return; }
     if (!drag) return;
     var d = drag; drag = null; guias = []; UI.hud(null);
+    if (!d.mudou && d.modo !== 'novo' && d.modo !== 'pan') UI.selTap();
     if (d.modo === 'novo' && d.novo && d.novo.w >= 90 && d.novo.h >= 90) {
       var a = {id:M.uid(), nome:'Ambiente', tipo:'social', x:d.novo.x, y:d.novo.y, w:d.novo.w, h:d.novo.h};
       M.proj.ambientes.push(a);

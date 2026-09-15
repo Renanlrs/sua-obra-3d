@@ -23,7 +23,8 @@ var ICONS = {
   trash:   '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/>',
   copy:    '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>',
   rotate:  '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
-  close:   '<path d="M6 6l12 12M18 6 6 18"/>'
+  close:   '<path d="M6 6l12 12M18 6 6 18"/>',
+  search:  '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'
 };
 function icon(name){
   return '<svg class="ic" viewBox="0 0 24 24">' + (ICONS[name] || '') + '</svg>';

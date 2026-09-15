@@ -301,13 +301,6 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 .apres .disc2 p{font-size:12px;line-height:1.7;color:#8FA3B1}
 
 @media (max-width:1180px){ .insp{width:250px} }
-@media (max-width:900px){
-  .side{position:absolute;z-index:30;height:100%;box-shadow:var(--sh)}
-  .insp{display:none}
-  .ap-gal{grid-template-columns:1fr;grid-template-rows:none}
-  .ap-gal figure{height:240px}
-  .ap-gal figure:first-child{grid-row:auto}
-}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ============ 3D ============ */
@@ -454,3 +447,81 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 .fach-prompt textarea:focus{border-color:var(--acento);outline:none}
 .fach-prompt-acts{display:flex;align-items:center;gap:10px;margin-top:8px}
 .fach-prompt-acts span{font-size:11px;color:var(--ok);line-height:1.35}
+
+.only-mobile{display:none!important}
+/* ============ CELULAR / TABLET EM PÉ ============
+   A mesma tela, reorganizada: menu vira barra inferior, inspector vira folha
+   que sobe de baixo, catálogo idem. Nada de dado ou lógica muda. */
+@media (max-width:900px){
+  :root{--tab:58px}
+  .only-mobile{display:grid!important}
+  .topbar{gap:4px;padding:0 6px}
+  .topbar-mid{margin-left:0}
+  .proj-name{flex:1}
+  .proj-name b{max-width:100%}
+  .cmdk{margin-left:0;min-width:0;width:30px;padding:0;justify-content:center;background:transparent;border-color:transparent;color:var(--txt-2)}
+  .cmdk span,.cmdk kbd{display:none}
+  #btn-ajuda{display:none}
+  #btn-apresentar{padding:0 10px;font-size:11px;letter-spacing:.04em}
+  .body{padding-bottom:var(--tab)}
+  /* menu → barra inferior rolável */
+  .side{position:fixed;left:0;right:0;bottom:0;height:var(--tab);width:auto;flex-direction:row;align-items:stretch;
+    padding:0 4px;border-right:none;border-top:1px solid var(--line);overflow-x:auto;overflow-y:hidden;z-index:40;
+    box-shadow:none;scrollbar-width:none;transition:none;padding-bottom:env(safe-area-inset-bottom)}
+  .side::-webkit-scrollbar{display:none}
+  .side-grp{display:flex;margin:0;flex:none}
+  .side-grp h6{display:none}
+  .side a{flex-direction:column;justify-content:center;gap:3px;height:100%;width:62px;padding:0;border-radius:0}
+  .side a span{flex:none;font-size:10px;white-space:nowrap}
+  .side a kbd{display:none}
+  .side a.on{background:transparent;color:var(--acento)}
+  .side a.on::before{left:14px;right:14px;top:0;bottom:auto;width:auto;height:2px;border-radius:0 0 2px 2px}
+  .side-foot{display:none}
+  .app.side-off .side{width:auto}
+  .app.side-off .side a span{display:block}
+  .app.side-off .side a{justify-content:center}
+  .statusbar{display:none}
+  /* inspector → folha que sobe de baixo (abre ao tocar num ambiente/móvel ou no botão de ajustes) */
+  .insp{position:fixed;left:0;right:0;bottom:var(--tab);width:auto;max-height:44vh;display:none;z-index:35;
+    border-left:none;border-top:1px solid var(--line-forte);border-radius:14px 14px 0 0;padding-top:24px;
+    box-shadow:0 -16px 34px -14px rgba(0,0,0,.85)}
+  .insp::before{content:'';position:absolute;top:8px;left:50%;width:38px;height:4px;margin-left:-19px;border-radius:2px;background:var(--line-forte)}
+  .insp-close{position:absolute;top:6px;right:6px;width:30px;height:30px}
+  .app.insp-on .insp{display:block}
+  /* ferramentas descem para o polegar; o 2D/3D fica em cima */
+  .tools{top:auto;bottom:12px;left:50%;transform:translateX(-50%);padding:3px;max-width:calc(100vw - 16px)}
+  .tools button{width:36px;height:36px}
+  .hud{top:56px;bottom:auto;left:8px;right:8px;text-align:center}
+  .app:has(#catalogo:not([hidden])) .tools{display:none}
+  .pill23{top:10px;left:auto;right:8px;transform:none}
+  .app[data-view=tresd] .pill23{top:52px}
+  .catalogo{top:auto;left:0;right:0;bottom:var(--tab);width:auto;height:52vh;border-radius:14px 14px 0 0;border-left:none;border-right:none;border-bottom:none}
+  .app[data-view=tresd] .catalogo{top:auto}
+  .cat-grid{grid-template-columns:repeat(3,1fr)}
+  .view-pad{padding:16px 14px 28px}
+  .view-pad h2{font-size:18px}
+  .cards{grid-template-columns:1fr 1fr}
+  .toast{bottom:calc(var(--tab) + 14px);max-width:92vw}
+  .coach{display:flex;flex-direction:column;justify-content:center;gap:10px;padding:22px 18px 90px;background:rgba(6,9,12,.7);pointer-events:auto}
+  .coach .tip{position:static!important;max-width:none}
+  .coach .close{position:static;transform:none;align-self:center;margin-top:8px}
+  /* 3D */
+  .t3-bar{overflow-x:auto;gap:6px;padding:0 8px;scrollbar-width:none}
+  .t3-bar::-webkit-scrollbar{display:none}
+  .t3-bar .etapa b{min-width:0}
+  .t3-bar .etapa input{width:84px}
+  .t3-cap{left:10px;right:10px;bottom:64px;max-width:none;padding:12px 14px}
+  .t3-cap h3{font-size:17px}
+  .t3-cap p{font-size:12.5px}
+  .t3-nav{right:10px;bottom:10px}
+  /* tela inicial */
+  .home-in{padding:26px 18px 60px}
+  .home-hd{margin-bottom:36px}
+  .home-lead{margin-bottom:26px}
+  .terreno-row label{flex:1 1 40%}
+  .num-wrap input{width:100%}
+  .terreno-row .btn.lg{width:100%}
+  .ap-gal{grid-template-columns:1fr;grid-template-rows:none}
+  .ap-gal figure{height:240px}
+  .ap-gal figure:first-child{grid-row:auto}
+}

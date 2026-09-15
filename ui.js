@@ -23,6 +23,7 @@ var UI = (function () {
     $('#btn-cmdk').onclick = abrirCmdk;
     $('#btn-ajuda').onclick = abrirAjuda;
     $('#btn-apresentar').onclick = abrirApres;
+    $('#btn-insp').onclick = function () { setInsp(!inspAberto, false); };
     $('#btn-collapse').onclick = function () { document.getElementById('app').classList.toggle('side-off'); PLAN.render(); };
     $('#btn-fit').onclick = function () { PLAN.enquadrar(); PLAN.render(); };
     $('#btn-grid').onclick = function () { this.classList.toggle('on', PLAN.toggleGrid()); };
@@ -86,6 +87,7 @@ var UI = (function () {
         else if (q.get('t3')) t3.setModo(q.get('t3'));
       }
       /* &cat=1 abre o catálogo · &selmov=N seleciona o N-ésimo móvel e enquadra o ambiente dele · &catk=quarto abre uma categoria */
+      if (q.has('insp')) setInsp(true, q.get('insp') === 'sel');   /* &insp=1 abre a folha do inspector (celular) */
       if (q.has('cat')) { toggleCatalogo(true); if (q.get('catk')) { catCat = q.get('catk'); catalogo(); } }
       if (q.has('selmov')) {
         var mvq = M.proj.moveis[+q.get('selmov') || 0];
@@ -359,8 +361,23 @@ var UI = (function () {
   }
 
   /* ================= INSPECTOR ================= */
+  /* ---- celular: o inspector é uma folha que sobe de baixo ----
+     abre ao TOCAR (sem arrastar) num ambiente/móvel ou pelo botão de ajustes;
+     fecha ao tocar fora, no ✕, ou quando a seleção some (se foi aberta por seleção). */
+  var inspAberto = false, inspPorSel = false;
+  function isMobile(){ return window.matchMedia && window.matchMedia('(max-width:900px)').matches; }
+  function setInsp(on, porSel){
+    inspAberto = !!on; inspPorSel = !!on && !!porSel;
+    document.getElementById('app').classList.toggle('insp-on', inspAberto);
+  }
+  function selTap(){ if (isMobile() && (PLAN.atual() || PLAN.movAtual())) setInsp(true, true); }
+
   function inspector(){
     var a = PLAN.atual(), p = M.proj, h = '', mv = PLAN.movAtual();
+    if (isMobile()) {
+      if (!a && !mv && inspPorSel) setInsp(false);
+      h += '<button class="icon-btn insp-close" onclick="UI.fecharInsp()" title="Fechar">' + icon('close') + '</button>';
+    }
     if (mv && window.MOVEIS) {
       var d = MOVEIS.def(mv.k) || {nome:'Móvel', cat:''}, dm = MOVEIS.dims(mv), amb = M.ambienteDe(mv);
       var cat = MOVEIS.CATS.filter(function (c) { return c.k === d.cat; })[0];
@@ -1177,6 +1194,7 @@ var UI = (function () {
     boot:boot, irPara:irPara, inspector:inspector, refreshTop:refreshTop, setTool:setTool,
     editarCota:editarCota, renomearInline:renomearInline, addRoomDefault:addRoomDefault,
     radial:radial, addMovel:addMovel, acaoMovel:acaoMovel, toggleCatalogo:toggleCatalogo, htmlPasseio:htmlPasseio,
+    selTap:selTap, fecharInsp:function(){ setInsp(false); },
     toast:toast, saveState:saveState, zoomLabel:zoomLabel, coord:coord, hud:hud, msg:msg,
     closeOverlays:closeOverlays, fecharApres:fecharApres, abrirApres:abrirApres, exportar:exportar,
     get shift(){ return shift; }, get alt(){ return alt; }, get espaco(){ return espaco; }
