@@ -488,6 +488,8 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 .pis{margin:22px 0 0;padding:18px 20px;border:1px solid #DFE6EC;border-radius:10px;background:#fff}
 .pis h3{margin:0 0 10px;font-size:15px}.pis h3 small{font-weight:400;color:#7B8794;font-size:12px;margin-left:6px}
 .pis-f{flex-wrap:wrap}.pis-f .f{min-width:130px}
+/* campos dentro das abas claras (Piscina): fundo branco, texto escuro — o .f herda o visual do inspector escuro */
+.view-pad .f .inp{background:#fff;border-color:#CFD8E0}.view-pad .f input{color:#1B2229}.view-pad .f .un{color:#7B8794}.view-pad .f label{color:#5F6B76}
 .praias{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:#3C4A57;padding:9px 12px;background:#EEF7FA;border-radius:6px;margin:8px 0}
 .praias>b{font-size:11px;letter-spacing:.06em;color:#0F5E72}.praias span b{font-family:ui-monospace,monospace}
 .rend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}

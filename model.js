@@ -316,7 +316,12 @@ var M = (function () {
     var w = Math.min(100, r.w), h = Math.min(300, r.h - 20);
     return {amb:r, x:r.x, y:r.y + r.h - h, w:w, h:h, degraus:Math.max(10, Math.round(proj.peDireito / 18))};
   }
-  function areaOf(a){ return a.w * a.h; }                        // cm²
+  /* área do ambiente em cm²; um salão desconta a lâmina d'água da piscina que está dentro dele (o piso é só a praia) */
+  function areaOf(a){
+    var s2 = a.w * a.h;
+    if (proj && a.tipo !== 'agua' && a.tipo !== 'externo') proj.ambientes.forEach(function (p) { if (p !== a && p.tipo === 'agua' && pavDe(p) === pavDe(a) && contem(a, p)) s2 -= p.w * p.h; });
+    return s2;
+  }
   function areaTerreno(){ return proj.terreno.largura * proj.terreno.profundidade; }
   function ambientesCobertos(){
     return proj.ambientes.filter(function (a) { return a.tipo !== 'externo' && a.tipo !== 'agua'; });
