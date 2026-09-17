@@ -27,6 +27,7 @@
       <button class="btn solid lg" id="btn-criar">CRIAR MINHA PLANTA</button>
     </div>
     <p class="home-hint" id="home-hint">Terreno de 250,00 m². Você muda tudo depois.</p>
+    <p class="home-hint"><label class="link-foto" for="home-foto-in">📷 Ou mande a foto de uma planta e o app copia os ambientes</label><input id="home-foto-in" type="file" accept="image/*" hidden></p>
 
     <div class="recentes" id="recentes"></div>
   </div>
@@ -92,7 +93,10 @@
         <button id="btn-cotas" class="on" title="Cotas (C)"><i data-icon="dim"></i></button>
         <span class="sep"></span>
         <button id="btn-mob" title="Mobiliar — catálogo de móveis (M)"><i data-icon="sofa"></i></button>
+        <span class="sep"></span>
+        <button id="btn-foto" title="Copiar planta de uma foto"><i data-icon="photo"></i></button>
       </div>
+      <input id="foto-in" type="file" accept="image/*" hidden>
       <div class="pill23" id="pill23"><button data-v="planta" class="on">2D</button><button data-v="tresd">3D</button></div>
       <div class="pavsel" id="pavsel" hidden></div>
       <aside class="catalogo" id="catalogo" hidden></aside>
@@ -101,6 +105,7 @@
       <div class="empty" id="empty" hidden>
         <p>Nenhum ambiente ainda.</p>
         <button class="btn solid" onclick="UI.addRoomDefault()">+ Adicionar ambiente</button>
+        <button class="btn" onclick="document.getElementById('foto-in').click()">📷 Copiar de uma foto</button>
       </div>
       <div class="hud" id="hud"></div>
     </main>
@@ -132,6 +137,7 @@
 </div></div>
 
 <div id="estilos" class="overlay" hidden></div>
+<div id="visao" class="overlay" hidden></div>
 
 <div id="apres" class="apres" hidden></div>
 
@@ -141,6 +147,7 @@
 <script src="icons.js"></script>
 <script src="moveis.js"></script>
 <script src="model.js"></script>
+<script src="visao.js"></script>
 <script src="three.min.js"></script>
 <script src="tres.js"></script>
 <script src="plan.js"></script>

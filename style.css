@@ -533,6 +533,11 @@ label.btn{cursor:pointer}
 .ctx-lib .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .amb.bloq{cursor:not-allowed}
 
+.link-foto{cursor:pointer;color:#22B8D6;text-decoration:underline dotted;text-underline-offset:3px}.link-foto:hover{color:#5FD6EA}
+#visao .sheet a{color:#22B8D6}#visao .f .inp{background:#0F1418;border-color:#2A313A}#visao .f input{color:#E8EDF2;font-family:ui-monospace,monospace}
+#visao ol li{margin:2px 0}
+.fach-prompt-acts label.btn{display:inline-flex;align-items:center}
+
 @media (max-width:900px){
   :root{--tab:58px}
   .only-mobile{display:grid!important}

@@ -50,6 +50,11 @@ As funções do app da escola de natação passaram a viver no mesmo editor, len
 - **Simulador de cenários**: cada linha mostra o Δ R$ (acabamento econômico, piscina 11/12,5/15 m, sem 2º andar, sem o menor ambiente…) e aplica com um clique, com desfazer.
 - **Camadas** (visível/bloqueada), **Cotas** (todas as medidas, editáveis; cotas livres), **Relatório técnico** com alertas inteligentes, **Renders** (botão **+ Render** no 3D e na fachada, ou envio de imagem; entram na apresentação), **Versões do estudo** e exportação em CSV/TXT.
 
+### 8. Copiar de uma FOTO (em vez de descrever)
+- **Planta**: botão 📷 na barra da planta (ou na tela inicial, na aba Ambientes, no botão direito) → mande a foto/print de uma planta baixa e o app desenha os ambientes no seu terreno (nome, tipo, medidas; os recuos cedem para a planta caber; móveis automáticos). Substitui o andar atual, com desfazer.
+- **Fachada**: 📷 *Copiar de uma foto* ao lado de "Criar fachada" → a foto de uma casa ou loja vira as escolhas (telhado, cores, revestimento, esquadrias, janelas, porta, portão, muro, jardim, letreiro).
+- Usa o **Gemini** com uma chave sua (grátis em aistudio.google.com/apikey), guardada só no navegador. Arquivo `visao.js`: a IA devolve JSON; o app normaliza (frações → cm, snap 5 cm, mínimo 0,90 m, divisas encostadas, só valores válidos) — nada é desenhado pela IA.
+
 ### 7. Prático: clique no item para trocar · botão direito para agir
 - Na **Fachada** (e no 3D), passe o mouse: janela, porta, telhado, parede, revestimento, muro, portão, piso da frente, letreiro… viram clicáveis. **Clique** → aparece só o que dá para trocar naquele item; cada escolha aplica na hora e o popover fica aberto para comparar. "Todas as opções" leva ao painel completo.
 - Na **Planta**, **arraste no vazio** para laçar: tudo que ficar dentro (ambientes + os móveis deles, móveis avulsos) vira um grupo — arraste qualquer item e todos vão juntos; ⇧ clique adiciona/retira; Ctrl+A seleciona o andar; Del/Ctrl+D/setas agem no grupo; dá para mandar o grupo para outro andar. Mover um ambiente sozinho também leva os móveis dele.
@@ -62,6 +67,7 @@ index.html?demo=escola-natacao&l=15&p=20&v=piscina
 index.html?demo=escola-natacao&l=15&p=20&v=tresd&t3=tour&i=6
 index.html?demo=casa-terrea&l=10&p=25&v=planta&ctx=amb
 index.html?demo=loja&l=12&p=25&v=fachada&fpop=janela
+index.html?demo=zero&l=15&p=20&v=planta&chave=AIza…&foto=minha-planta.png   (foto servida na mesma origem)
 index.html?demo=casa-terrea&l=10&p=25&v=planta&cat=1&catk=quarto&selmov=20
 index.html?demo=casa-terrea&l=10&p=25&v=tresd&teto=0
 index.html?demo=casa-terrea&l=10&p=25&v=tresd&etapa=2

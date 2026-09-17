@@ -2,3 +2,5 @@ node_modules/
 _shots/
 *.png
 !README*
+_foto.png
+_fach.png

@@ -29,6 +29,13 @@ var UI = (function () {
     $('#btn-grid').onclick = function () { this.classList.toggle('on', PLAN.toggleGrid()); };
     $('#btn-cotas').onclick = function () { this.classList.toggle('on', PLAN.toggleCotas()); };
     $('#btn-mob').onclick = function () { toggleCatalogo(); };
+    $('#btn-foto').onclick = function () { $('#foto-in').click(); };
+    $('#foto-in').onchange = function () { if (this.files[0]) copiarDeFoto('planta', this.files[0]); this.value = ''; };
+    $('#home-foto-in').onchange = function () {   /* na tela inicial: cria o projeto vazio no terreno digitado e copia a foto */
+      var file = this.files[0]; this.value = ''; if (!file) return;
+      var l = M.parseM($('#t-larg').value) || 1000, p = M.parseM($('#t-prof').value) || 2500;
+      M.novo('zero', l, p, 'Planta da foto'); entrarApp(); copiarDeFoto('planta', file);
+    };
     document.querySelectorAll('#pill23 button').forEach(function (b) { b.onclick = function () { irPara(b.getAttribute('data-v')); }; });
     document.addEventListener('pointerdown', function (e) {
       var fp = document.getElementById('fpop'), cx2 = document.getElementById('ctx');
@@ -102,6 +109,8 @@ var UI = (function () {
       if (q.has('noite') && t3) t3.setNoite(true);
       /* &fpop=janela abre o popover de troca · &ctx=amb|mov|vazio abre o menu de contexto — conferência e print */
       if (q.get('fpop')) setTimeout(function () { popFachada(q.get('fpop'), 520, 220); }, 200);
+      if (q.has('chave')) { if ((q.get('chave') || '').length > 10) VISAO.setChave(q.get('chave')); else setTimeout(function () { pedirChave(null); }, 200); }   /* &chave=1 abre o diálogo · &chave=AIza… grava (conferência) */
+      if (q.get('foto')) fetch(q.get('foto')).then(function (r) { return r.blob(); }).then(function (b) { copiarDeFoto(q.get('modo') || 'planta', new File([b], 'foto.png', {type:b.type || 'image/png'})); });   /* &foto=url&modo=planta|fachada */
       if (q.has('laco') && viewAtual === 'planta') setTimeout(function () { var tudo = M.ambsPav(M.pav).slice(0, +q.get('laco') || 3).map(function (a) { return {t:'amb', id:a.id}; }); PLAN.setMulti(tudo); }, 150);   /* &laco=N seleciona N ambientes como grupo */
       if (q.get('ctx') && viewAtual === 'planta') setTimeout(function () {
         var alvo = q.get('ctx') === 'amb' ? PLAN.svgEl.querySelector('.amb rect') : q.get('ctx') === 'mov' ? PLAN.svgEl.querySelector('.mov') : PLAN.svgEl;
@@ -247,6 +256,7 @@ var UI = (function () {
           '<td class="n"><button data-del="' + a.id + '" title="Excluir">✕</button></td></tr>';
       });
       h += '<tr class="tot"><td colspan="' + (multi ? 5 : 4) + '">TOTAL</td><td class="n">' + M.fmtM2(M.areaTotalAmbientes()) + '</td><td class="n">' + M.fmtBRL(M.custoTotal()) + '</td><td></td></tr></table>';
+      h += '<div style="margin-top:14px"><button class="btn" onclick="document.getElementById(\'foto-in\').click()">📷 Copiar planta de uma foto</button></div>';
       h += '<h2 style="margin-top:32px;font-size:15px">Adicionar da biblioteca</h2><div class="lib">';
       M.LIB.forEach(function (l, i) {
         var ti = M.TIPOS[l.tipo];
@@ -1093,6 +1103,9 @@ var UI = (function () {
     {n:'Fachada',             g:'F',      f:function(){ irPara('fachada'); }},
     {n:'Fachada à noite',     g:'',       f:function(){ irPara('fachada'); if (t3) t3.setNoite(true); }},
     {n:'Criar fachada por prompt', g:'',  f:function(){ irPara('fachada'); setTimeout(function(){ var p = document.querySelector('#fach-prompt'); if (p) p.focus(); }, 60); }},
+    {n:'Copiar planta de uma foto', g:'', f:function(){ irPara('planta'); $('#foto-in').click(); }},
+    {n:'Copiar fachada de uma foto', g:'', f:function(){ irPara('fachada'); setTimeout(function(){ var i = document.querySelector('#fach-foto-in'); if (i) i.click(); }, 60); }},
+    {n:'Chave do Gemini (copiar de fotos)', g:'', f:function(){ pedirChave(null, ''); }},
     {n:'Ver a casa nos 4 estilos de fachada', g:'', f:function(){ irPara('fachada'); setTimeout(compararEstilos, 60); }},
     {n:'Corte',               g:'',       f:function(){ irPara('corte'); }},
     {n:'Piscina (raias, profundidade, praias)', g:'', f:function(){ irPara('piscina'); }},
@@ -1159,7 +1172,8 @@ var UI = (function () {
     $('#keys').innerHTML = pares.map(function (p) { return '<div><span>' + p[1] + '</span><kbd>' + p[0] + '</kbd></div>'; }).join('');
     $('#ajuda').hidden = false;
   }
-  function closeOverlays(){ $('#cmdk').hidden = true; $('#ajuda').hidden = true; $('#estilos').hidden = true; }
+  function closeOverlays(){
+    var vo = document.getElementById('visao'); if (vo) vo.hidden = true; $('#cmdk').hidden = true; $('#ajuda').hidden = true; $('#estilos').hidden = true; }
 
   function ligarAtalhos(){
     document.addEventListener('keydown', function (e) {
@@ -1330,7 +1344,7 @@ var UI = (function () {
     function tg(k, rot){ return '<button class="chip' + (F[k] ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + (F[k] ? '0' : '1') + '">' + rot + '</button>'; }
     /* criar por prompt: descreve em português, o app entende as escolhas */
     h += '<section class="fach-prompt"><h6>CRIAR POR PROMPT</h6><div class="inp"><textarea id="fach-prompt" rows="2" placeholder="ex.: loja moderna com vitrine, ripado, letreiro &quot;Acqua Belo&quot; em LED azul, totem, número 128"></textarea></div>' +
-      '<div class="fach-prompt-acts"><button class="btn solid sm" id="fach-prompt-ok">✨ Criar fachada</button><span id="fach-prompt-msg"></span></div></section>';
+      '<div class="fach-prompt-acts"><button class="btn solid sm" id="fach-prompt-ok">✨ Criar fachada</button><label class="btn sm" for="fach-foto-in" title="Mande a foto de uma casa ou loja: o app copia telhado, cores, revestimento, janelas, porta, muro e portão">📷 Copiar de uma foto</label><input id="fach-foto-in" type="file" accept="image/*" hidden><span id="fach-prompt-msg"></span></div></section>';
     h += '<section><h6>ESTILO</h6><div class="estilos">';
     Object.keys(TRES.FACHADA_PRESETS).forEach(function (k) {
       var pr = TRES.FACHADA_PRESETS[k], telha = pr.cobertura === 'platibanda' ? pr.corParede : (pr.telha === 'ceramica' ? '#B5533A' : '#6F6E6B');
@@ -1393,6 +1407,8 @@ var UI = (function () {
       inp.onchange = function () { setFachada(inp.getAttribute('data-fc'), inp.value.toUpperCase()); };
       inp.onclick = function (e) { e.stopPropagation(); };
     });
+    var fin = el.querySelector('#fach-foto-in');
+    if (fin) fin.onchange = function () { if (this.files[0]) copiarDeFoto('fachada', this.files[0]); this.value = ''; };
     var num = el.querySelector('#fach-num');
     num.onchange = function () { setFachada('numero', this.value.trim()); };
     num.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); };
@@ -1427,6 +1443,64 @@ var UI = (function () {
     var e = document.querySelector('#fach-elev-pad'); if (e && !e.hidden) e.innerHTML = VIEWS.fachada();
     if (t3 && r.fachada.letreiroLuz && r.fachada.letreiro) t3.setNoite(true);   /* pediu letreiro aceso: mostra à noite */
   }
+  /* ================= COPIAR DE UMA FOTO (visão) =================
+     Planta: a foto de uma planta baixa vira os ambientes do andar atual (substitui o que havia nele, com desfazer).
+     Fachada: a foto de uma casa/loja vira as escolhas da aba Fachada. A chave do Gemini é do usuário e fica só no navegador. */
+  function copiarDeFoto(modo, file){
+    if (!window.VISAO) return;
+    if (!VISAO.chave()) { pedirChave(function () { copiarDeFoto(modo, file); }); return; }
+    var msg = document.querySelector('#fach-prompt-msg'); if (msg) msg.textContent = 'Lendo a foto…';
+    toast(modo === 'planta' ? 'Lendo a planta da foto… (uns segundos)' : 'Lendo a fachada da foto… (uns segundos)');
+    hud('📷 lendo a foto…');
+    VISAO.analisar(file, modo).then(function (r) {
+      hud(null);
+      if (modo === 'planta') {
+        /* a planta da foto manda no tamanho: os recuos cedem para ela caber (nunca abaixo de zero) */
+        var t = M.proj.terreno, Lm = +r.bruto.largura_m || 0, Pm = +r.bruto.profundidade_m || 0;
+        if (/esquerda|direita/.test(String(r.bruto.frente || ''))) { var tmp = Lm; Lm = Pm; Pm = tmp; }
+        if (Lm > 0 && Lm * 100 > t.largura - t.recuoLateral * 2) t.recuoLateral = Math.max(0, Math.floor((t.largura - Lm * 100) / 2 / 5) * 5);
+        if (Pm > 0 && Pm * 100 > t.profundidade - t.recuoFrontal - t.recuoFundo) { t.recuoFundo = Math.max(0, Math.floor((t.profundidade - Pm * 100 - t.recuoFrontal) / 5) * 5); if (Pm * 100 > t.profundidade - t.recuoFrontal - t.recuoFundo) t.recuoFrontal = Math.max(0, Math.floor((t.profundidade - Pm * 100) / 5) * 5); }
+        var np = VISAO.normalizarPlanta(r.bruto, M.proj.terreno), pav = M.pav;
+        var antes = M.proj.ambientes.filter(function (a) { return M.pavDe(a) === pav; }).length;
+        M.proj.ambientes = M.proj.ambientes.filter(function (a) { return M.pavDe(a) !== pav; }).concat(np.ambientes.map(function (a) { a.id = M.uid(); if (pav) a.pav = pav; return a; }));
+        M.proj.moveis = (M.proj.moveis || []).filter(function (m) { return (m.pav || 0) !== pav; });
+        var outros = M.proj.moveis, novos = M.mobiliarAuto().filter(function (m) { return (m.pav || 0) === pav; }); M.proj.moveis = outros.concat(novos);
+        M.commit('Copiar planta da foto');
+        if (viewAtual !== 'planta') irPara('planta'); else { PLAN.enquadrar(); PLAN.render(); inspector(); }
+        toast('Copiei ' + np.ambientes.length + ' ambientes da foto' + (np.largura_m ? ' (' + M.num(np.largura_m) + ' × ' + M.num(np.profundidade_m) + ' m)' : '') + (antes ? ' — substituíram os ' + antes + ' que havia no ' + M.nomePav(pav).toLowerCase() : '') + '. Ajuste o que precisar.', function () { fazerUndo(); });
+      } else {
+        var nf = VISAO.normalizarFachada(r.bruto), atual = M.proj.fachada || {};
+        var f = nf.fachada; if (!f.numero && atual.numero) f.numero = atual.numero;
+        M.proj.fachada = f; M.commit('Copiar fachada da foto');
+        if (viewAtual !== 'fachada') irPara('fachada'); else { fachPanel(); if (t3) t3.verFachada(true); }
+        var m2 = document.querySelector('#fach-prompt-msg'); if (m2) m2.textContent = 'Entendi: ' + (nf.descricao || nf.lidos.join(', '));
+        toast('Fachada copiada da foto: ' + (nf.descricao || nf.lidos.slice(0, 5).join(', ')), function () { fazerUndo(); });
+      }
+    }).catch(function (e) {
+      hud(null); if (msg) msg.textContent = '';
+      var m = String(e && e.message || e);
+      if (m === 'SEM_CHAVE') { pedirChave(function () { copiarDeFoto(modo, file); }); return; }
+      if (m.indexOf('CHAVE_INVALIDA') === 0) { pedirChave(function () { copiarDeFoto(modo, file); }, 'A chave não foi aceita: ' + m.slice(15, 120)); return; }
+      toast('Não consegui ler a foto: ' + m, null, true);
+    });
+  }
+  function pedirChave(depois, aviso){
+    var ov = $('#visao'); if (!ov) return;
+    ov.innerHTML = '<div class="sheet"><h3>Copiar de uma foto</h3>' +
+      '<p class="vsub" style="margin-top:6px">Para ler fotos o app usa o <b>Gemini</b> (Google) com uma chave sua — grátis, criada em 1 minuto. Ela fica guardada só neste navegador e nunca vai para nenhum servidor nosso.</p>' +
+      '<ol class="vsub" style="margin:10px 0 12px 18px;line-height:1.7"><li>Abra <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></li><li>Clique em <b>Create API key</b> e copie</li><li>Cole aqui</li></ol>' +
+      (aviso ? '<div class="alertbox" style="margin-bottom:10px"><b>' + esc(aviso) + '</b></div>' : '') +
+      '<div class="f"><div class="inp"><input id="visao-key" placeholder="AIza…" value="' + esc(VISAO.chave()) + '" autocomplete="off" spellcheck="false"></div></div>' +
+      '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn solid" id="visao-ok">Salvar e continuar</button><button class="btn ghost" id="visao-cancel">Cancelar</button>' + (VISAO.chave() ? '<button class="btn ghost" id="visao-del" style="margin-left:auto">Apagar chave</button>' : '') + '</div></div>';
+    ov.hidden = false;
+    var inp = ov.querySelector('#visao-key'); inp.focus();
+    inp.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') ov.querySelector('#visao-ok').click(); if (e.key === 'Escape') ov.hidden = true; };
+    ov.querySelector('#visao-ok').onclick = function () { var k = inp.value.trim(); if (!k) { inp.focus(); return; } VISAO.setChave(k); ov.hidden = true; toast('Chave guardada neste navegador.'); if (depois) depois(); };
+    ov.querySelector('#visao-cancel').onclick = function () { ov.hidden = true; };
+    var del = ov.querySelector('#visao-del'); if (del) del.onclick = function () { VISAO.setChave(''); ov.hidden = true; toast('Chave apagada.'); };
+    ov.onclick = function (e) { if (e.target === ov) ov.hidden = true; };
+  }
+
   /* ================= CLICAR NO ITEM PARA TROCAR (fachada) =================
      O 3D etiqueta cada elemento (userData.fk). Clicou → popover ao lado do clique com SÓ as opções daquele item;
      cada escolha aplica na hora (com desfazer) e o popover continua aberto para comparar. */
@@ -1528,6 +1602,7 @@ var UI = (function () {
     } else {
       titulo = 'Aqui (' + M.fmtMs(p.x) + ' ; ' + M.fmtMs(p.y) + ' m)';
       it('Adicionar ambiente aqui…', function () { escolherAmbiente(e.clientX, e.clientY, p); });
+      it('Copiar planta de uma foto…', function () { $('#foto-in').click(); });
       it('Mobiliar (catálogo)', function () { toggleCatalogo(true); });
       it('Mobiliar tudo automaticamente', function () { M.mobiliarAuto(); M.commit('Mobiliar automaticamente'); PLAN.render(); inspector(); });
       it('Enquadrar', function () { PLAN.enquadrar(); PLAN.render(); });
@@ -1742,7 +1817,7 @@ var UI = (function () {
     editarCota:editarCota, renomearInline:renomearInline, addRoomDefault:addRoomDefault,
     radial:radial, addMovel:addMovel, acaoMovel:acaoMovel, toggleCatalogo:toggleCatalogo, htmlPasseio:htmlPasseio,
     selTap:selTap, fecharInsp:function(){ setInsp(false); },
-    toast:toast, saveState:saveState, zoomLabel:zoomLabel, coord:coord, hud:hud, msg:msg, menuContexto:menuContexto, fecharPop:fecharPop,
+    toast:toast, saveState:saveState, zoomLabel:zoomLabel, coord:coord, hud:hud, msg:msg, menuContexto:menuContexto, fecharPop:fecharPop, copiarDeFoto:copiarDeFoto, pedirChave:pedirChave,
     closeOverlays:closeOverlays, fecharApres:fecharApres, abrirApres:abrirApres, exportar:exportar,
     get shift(){ return shift; }, get alt(){ return alt; }, get espaco(){ return espaco; }
   };

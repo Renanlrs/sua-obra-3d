@@ -10,7 +10,7 @@ h1{font-size:15px;margin:0 0 16px}
 <h1>SUA OBRA 3D — verificação do modelo e das vistas</h1>
 <div id="out"></div>
 <div id="resumo"></div>
-<script src="icons.js"></script><script src="moveis.js"></script><script src="model.js"></script>
+<script src="icons.js"></script><script src="moveis.js"></script><script src="model.js"></script><script src="visao.js"></script>
 <script src="views.js"></script>
 <script src="tres.js"></script>
 <script>
@@ -292,6 +292,28 @@ var anE = TF.analise(M.proj, 0);
 t('3D: análise do térreo da escola tem entrada e trata o salão como coberto', !!anE.entrada && anE.ambs.some(function (r) { return /Salão/.test(r.nome); }) && anE.ambs.every(function (r) { return r.tipo !== 'agua'; }));
 M.novo('casa-terrea', 1000, 2500);
 t('casa sem piscina: sem grupo Piscina, sem cenário de piscina, aba Piscina vazia', !M.orcamento().grupos.some(function (g) { return g.grupo === 'Piscina'; }) && !M.cenarios().some(function (c) { return /Piscina/.test(c.nome); }) && M.piscinas().length === 0);
+
+/* ---- visão: copiar de uma foto (só a normalização; a chamada ao modelo é de rede) ---- */
+M.novo('zero', 1000, 2500);
+var bruto = {largura_m:8, profundidade_m:12, frente:'cima', ambientes:[
+  {nome:'Sala', tipo:'social', x:0, y:0, w:.5, h:.4}, {nome:'Cozinha', tipo:'molhado', x:.5, y:0, w:.5, h:.4},
+  {nome:'Quarto', tipo:'intimo', x:0, y:.4, w:.5, h:.6}, {nome:'Banheiro', tipo:'molhado', x:.5, y:.4, w:.5, h:.6}]};
+var np = VISAO.normalizarPlanta(bruto, M.proj.terreno);
+t('visão/planta: 4 ambientes em cm, snap 5, dentro do terreno', np.ambientes.length === 4 && np.ambientes.every(function (a) { return a.x % 5 === 0 && a.w % 5 === 0 && a.x >= 0 && a.x + a.w <= 1000 && a.y + a.h <= 2500; }), JSON.stringify(np.ambientes.map(function (a) { return [a.nome, a.x, a.y, a.w, a.h]; })));
+t('visão/planta: escala respeita a largura dita (8 m → cabe nos 7 m úteis)', Math.abs(np.ambientes[0].w + np.ambientes[1].w - 700) <= 10, np.ambientes[0].w + np.ambientes[1].w);
+t('visão/planta: começa nos recuos', np.ambientes[0].x === M.proj.terreno.recuoLateral && np.ambientes[0].y === M.proj.terreno.recuoFrontal);
+var brutoLado = JSON.parse(JSON.stringify(bruto)); brutoLado.frente = 'esquerda';
+var npL = VISAO.normalizarPlanta(brutoLado, M.proj.terreno);
+t('visão/planta: frente à esquerda gira a planta (Sala continua na frente/cima)', npL.ambientes[0].y === M.proj.terreno.recuoFrontal && npL.ambientes[0].nome === 'Sala' && npL.largura_m === 12);
+var brutoSob = {largura_m:6, profundidade_m:6, ambientes:[{nome:'A', tipo:'social', x:0, y:0, w:.52, h:1}, {nome:'B', tipo:'intimo', x:.5, y:0, w:.5, h:1}]};
+var npS = VISAO.normalizarPlanta(brutoSob, M.proj.terreno);
+t('visão/planta: sobreposição pequena vira encosto', npS.ambientes[0].x + npS.ambientes[0].w <= npS.ambientes[1].x);
+t('visão/planta: tipo desconhecido vira social, sem cômodos dá erro', VISAO.normalizarPlanta({ambientes:[{nome:'X', tipo:'zzz', x:0, y:0, w:.5, h:.5}]}, M.proj.terreno).ambientes[0].tipo === 'social' && (function () { try { VISAO.normalizarPlanta({ambientes:[]}, M.proj.terreno); return false; } catch (e) { return true; } })());
+var nf = VISAO.normalizarFachada({estilo:'moderno', cobertura:'telhado4', telha:'ceramica', corParede:'#e2ddd3', revestimento:'xyz', jardim:true, marquise:'sim', letreiro:'  ACQUA BELO ', numero:'128', portao:'ripado', descricao:'casa'});
+t('visão/fachada: só valores válidos entram; cor vira maiúscula; letreiro ganha estilo', nf.fachada.cobertura === 'telhado4' && !nf.fachada.revestimento && nf.fachada.corParede === '#E2DDD3' && nf.fachada.jardim === true && nf.fachada.marquise === undefined && nf.fachada.letreiro === 'ACQUA BELO' && nf.fachada.letreiroEstilo === 'led' && nf.fachada.numero === '128', JSON.stringify(nf.fachada));
+t('visão/fachada: sem estilo, deduz pelo telhado/revestimento', VISAO.normalizarFachada({cobertura:'telhado4'}).fachada.estilo === 'classico' && VISAO.normalizarFachada({revestimento:'pedra'}).fachada.estilo === 'rustico');
+t('visão: limparJson aceita cerca de código e texto em volta', VISAO.limparJson('claro! ```json\n{"a":1}\n``` fim').a === 1);
+M.novo('casa-terrea', 1000, 2500);
 
 var r=document.getElementById('resumo');
 r.textContent = ok+' passaram · '+bad+' falharam';
