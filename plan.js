@@ -7,6 +7,37 @@ var PLAN = (function () {
   var svg, gRoot, host;
   var view = {x:0, y:0, w:1000, h:1000};   // viewBox em cm
   var sel = null, selTipo = 'amb', tool = 'sel';   /* selTipo: 'amb' (ambiente) ou 'mov' (móvel) */
+  /* seleção em GRUPO (laço): lista de {t:'amb'|'mov', id}. Arrastar qualquer item do grupo move todos juntos;
+     um ambiente sempre leva os móveis que estão dentro dele (nada se separa). */
+  var multi = [];
+  function emMulti(t, id){ return multi.some(function (m) { return m.t === t && m.id === id; }); }
+  function setMulti(lista){ multi = lista || []; sel = null; render(); UI.inspector(); UI.radial(null); }
+  function toggleMulti(t, id){
+    if (emMulti(t, id)) multi = multi.filter(function (m) { return !(m.t === t && m.id === id); });
+    else { if (sel && !multi.length) multi.push({t:selTipo, id:sel}); multi.push({t:t, id:id}); }
+    if (multi.length === 1) { var u = multi[0]; multi = []; if (u.t === 'mov') selecionarMovel(u.id); else selecionar(u.id); return; }
+    sel = null; render(); UI.inspector(); UI.radial(null);
+  }
+  /* itens do grupo com posição inicial (para arrastar / cancelar): ambientes + móveis dentro deles + móveis avulsos */
+  function itensGrupo(){
+    var ambs = [], movs = [], vistos = {};
+    multi.forEach(function (m) {
+      if (m.t === 'amb') { var a = M.proj.ambientes.filter(function (x) { return x.id === m.id; })[0]; if (!a) return; ambs.push({a:a, x0:a.x, y0:a.y });
+        M.moveisDe(a.id).forEach(function (mv) { if (!vistos[mv.id]) { vistos[mv.id] = 1; movs.push({m:mv, x0:mv.x, y0:mv.y}); } }); }
+    });
+    multi.forEach(function (m) { if (m.t === 'mov') { var mv = M.movelDe(m.id); if (mv && !vistos[mv.id]) { vistos[mv.id] = 1; movs.push({m:mv, x0:mv.x, y0:mv.y}); } } });
+    return {ambs:ambs, movs:movs};
+  }
+  function moverGrupo(g, dx, dy){
+    g.ambs.forEach(function (o) { o.a.x = o.x0 + dx; o.a.y = o.y0 + dy; });
+    g.movs.forEach(function (o) { o.m.x = o.x0 + dx; o.m.y = o.y0 + dy; var amb = M.ambienteDe(o.m); o.m.amb = amb ? amb.id : undefined; });
+  }
+  function bboxGrupo(g){
+    var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    g.ambs.forEach(function (o) { x1 = Math.min(x1, o.a.x); y1 = Math.min(y1, o.a.y); x2 = Math.max(x2, o.a.x + o.a.w); y2 = Math.max(y2, o.a.y + o.a.h); });
+    g.movs.forEach(function (o) { var d = MOVEIS.dims(o.m); x1 = Math.min(x1, o.m.x - d.w / 2); y1 = Math.min(y1, o.m.y - d.d / 2); x2 = Math.max(x2, o.m.x + d.w / 2); y2 = Math.max(y2, o.m.y + d.d / 2); });
+    return x1 < Infinity ? {x:x1, y:y1, w:x2 - x1, h:y2 - y1} : null;
+  }
   var VERDE = '#2FA36B';
   /* grade/cotas/móveis/etc. são CAMADAS do projeto (M.camada) — visível e bloqueada; vindo do ACQUA BELO */
   function vis(k){ return M.camada(k).vis; }
@@ -92,7 +123,7 @@ var PLAN = (function () {
     M.ambsPav(pav).slice().sort(function (a, b) { return (a.tipo === 'agua') - (b.tipo === 'agua'); }).forEach(function (a) {
       if (!vis(a.tipo === 'agua' ? 'piscina' : 'ambientes')) return;
       var ti = M.TIPOS[a.tipo] || M.TIPOS.social;
-      var ruim = ruins[a.id], on = sel === a.id;
+      var ruim = ruins[a.id], on = sel === a.id || emMulti('amb', a.id);
       s += '<g class="amb' + (bloq(a.tipo === 'agua' ? 'piscina' : 'ambientes') ? ' bloq' : '') + '" data-id="' + a.id + '">';
       s += '<rect x="' + a.x + '" y="' + a.y + '" width="' + a.w + '" height="' + a.h + '" rx="' + (2 * esc) +
            '" fill="' + ti.cor + '" fill-opacity="' + (a.tipo === 'agua' ? .5 : .13) + '"/>';
@@ -129,7 +160,7 @@ var PLAN = (function () {
       if (on) {
         s += '<rect x="' + (a.x - 3 * esc) + '" y="' + (a.y - 3 * esc) + '" width="' + (a.w + 6 * esc) + '" height="' + (a.h + 6 * esc) +
              '" fill="none" stroke="#0F7E96" stroke-width="' + (2 * esc) + '"/>';
-        if (!bloq(a.tipo === 'agua' ? 'piscina' : 'ambientes')) s += alcas(a, esc);
+        if (!bloq(a.tipo === 'agua' ? 'piscina' : 'ambientes') && !multi.length) s += alcas(a, esc);   /* no grupo não há redimensionar, só mover */
       }
       s += '</g>';
     });
@@ -152,6 +183,16 @@ var PLAN = (function () {
     if (drag && drag.modo === 'novo' && drag.novo)
       s += '<rect x="' + drag.novo.x + '" y="' + drag.novo.y + '" width="' + drag.novo.w + '" height="' + drag.novo.h +
            '" fill="#22B8D6" fill-opacity=".18" stroke="#0F7E96" stroke-width="' + (1.6 * esc) + '"/>';
+    /* laço de seleção */
+    if (drag && drag.modo === 'laco') {
+      var lx = Math.min(drag.p0.x, drag.p1.x), ly2 = Math.min(drag.p0.y, drag.p1.y), lw = Math.abs(drag.p1.x - drag.p0.x), lh = Math.abs(drag.p1.y - drag.p0.y);
+      s += '<rect x="' + lx + '" y="' + ly2 + '" width="' + lw + '" height="' + lh + '" fill="#22B8D6" fill-opacity=".10" stroke="#0F7E96" stroke-width="' + (1.2 * esc) + '" stroke-dasharray="' + (8 * esc) + ' ' + (5 * esc) + '" style="pointer-events:none"/>';
+    }
+    /* moldura do grupo selecionado */
+    if (multi.length > 1) {
+      var bg = bboxGrupo(itensGrupo());
+      if (bg) s += '<rect x="' + (bg.x - 8 * esc) + '" y="' + (bg.y - 8 * esc) + '" width="' + (bg.w + 16 * esc) + '" height="' + (bg.h + 16 * esc) + '" rx="' + (4 * esc) + '" fill="none" stroke="#0F7E96" stroke-width="' + (1.4 * esc) + '" stroke-dasharray="' + (10 * esc) + ' ' + (6 * esc) + '" style="pointer-events:none"/>';
+    }
 
     svg.innerHTML = s;
   }
@@ -161,7 +202,7 @@ var PLAN = (function () {
     if (!window.MOVEIS || !M.proj.moveis) return '';
     var s = '', lista = M.proj.moveis.filter(function (m) { return (m.pav || 0) === M.pav; }).sort(function (a, b) { return MOVEIS.dims(a).alt - MOVEIS.dims(b).alt; });   /* tapete embaixo de tudo */
     lista.forEach(function (mv) {
-      var m = MOVEIS.dims(mv), on = selTipo === 'mov' && sel === mv.id;
+      var m = MOVEIS.dims(mv), on = (selTipo === 'mov' && sel === mv.id) || emMulti('mov', mv.id);
       var sym = MOVEIS.symDe(mv).replace(/stroke-width="([\d.]+)"/g, function (_, v) { return 'stroke-width="' + (parseFloat(v) * esc * .85) + '"'; });
       s += '<g class="mov" data-id="' + mv.id + '" transform="translate(' + mv.x + ' ' + mv.y + ') rotate(' + (mv.rot || 0) + ')" style="cursor:move">';
       s += '<g transform="scale(' + (mv.esp ? -1 : 1) + ' 1)">' + sym + '</g>';
@@ -203,7 +244,7 @@ var PLAN = (function () {
     if (selTipo !== 'mov' || !sel) return null;
     return M.movelDe(sel);
   }
-  function selecionarMovel(id){ sel = id; selTipo = id ? 'mov' : 'amb'; render(); UI.inspector(); UI.radial(id ? movAtual() : null); }
+  function selecionarMovel(id){ sel = id; selTipo = id ? 'mov' : 'amb'; multi = []; render(); UI.inspector(); UI.radial(id ? movAtual() : null); }
   /* ímã do móvel: encosta a caixa envolvente nas faces internas das paredes e nas bordas dos vizinhos */
   function grudarMovel(mv, nx, ny){
     var b = MOVEIS.aabb(mv), hw = b.w / 2, hh = b.h / 2, r = M.ambienteDe({x:nx, y:ny}) || M.ambienteDe(mv);
@@ -321,7 +362,7 @@ var PLAN = (function () {
     if (!sel || selTipo !== 'amb') return null;
     return M.proj.ambientes.filter(function (a) { return a.id === sel; })[0] || null;
   }
-  function selecionar(id){ sel = id; selTipo = 'amb'; render(); UI.inspector(); UI.radial(null); }
+  function selecionar(id){ sel = id; selTipo = 'amb'; multi = []; render(); UI.inspector(); UI.radial(null); }
 
   /* ---------- interação ---------- */
   function onDown(e){
@@ -352,6 +393,14 @@ var PLAN = (function () {
     /* móvel → arrastar (tem prioridade sobre o ambiente embaixo) */
     var gm = e.target.closest ? e.target.closest('.mov') : null;
     if (gm && bloq('moveis')) gm = null;   /* camada bloqueada: o clique passa para o ambiente */
+    /* ⇧ clique: entra/sai do grupo (ambiente ou móvel) */
+    var gAmb0 = e.target.closest ? e.target.closest('.amb') : null;
+    if (e.shiftKey && tool === 'sel' && (gm || gAmb0)) { toggleMulti(gm ? 'mov' : 'amb', (gm || gAmb0).getAttribute('data-id')); return; }
+    /* clicou num item do grupo → arrasta o grupo inteiro */
+    if (multi.length > 1 && tool === 'sel' && !UI.espaco && ((gm && emMulti('mov', gm.getAttribute('data-id'))) || (gAmb0 && emMulti('amb', gAmb0.getAttribute('data-id'))))) {
+      drag = {modo:'grupo', g:itensGrupo(), p0:p, mudou:false}; UI.radial(null); svg.setPointerCapture(e.pointerId); return;
+    }
+    if (multi.length && !e.shiftKey) { multi = []; render(); }
     if (gm && tool === 'sel' && !UI.espaco) {
       var mid = gm.getAttribute('data-id'), mv = M.movelDe(mid);
       if (mv) {
@@ -387,10 +436,13 @@ var PLAN = (function () {
       var a = M.proj.ambientes.filter(function (x) { return x.id === id; })[0];
       selecionar(id);
       if (g.classList.contains('bloq')) { UI.toast('Camada bloqueada — desbloqueie na aba Camadas para mover.'); return; }
-      drag = {modo:'move', id:id, ini:{x:a.x, y:a.y}, off:{x:p.x - a.x, y:p.y - a.y}, mudou:false};
+      /* o ambiente leva os móveis que estão dentro dele */
+      drag = {modo:'move', id:id, ini:{x:a.x, y:a.y}, off:{x:p.x - a.x, y:p.y - a.y}, mudou:false, movs:M.moveisDe(id).map(function (mv) { return {m:mv, x0:mv.x, y0:mv.y}; })};
       svg.setPointerCapture(e.pointerId);
     } else {
       selecionar(null);
+      /* vazio + ferramenta seleção: laço — tudo que ficar dentro vira um grupo */
+      if (tool === 'sel' && !UI.espaco) { drag = {modo:'laco', p0:p, p1:p, mudou:false}; svg.setPointerCapture(e.pointerId); }
     }
   }
 
@@ -412,6 +464,14 @@ var PLAN = (function () {
     if (drag.modo === 'pan') {
       setView(drag.v0.x - (p.x - drag.p0.x), drag.v0.y - (p.y - drag.p0.y), view.w, view.h);
       render(); UI.radial(movAtual()); return;
+    }
+    if (drag.modo === 'laco') { drag.p1 = p; drag.mudou = Math.abs(p.x - drag.p0.x) > 10 || Math.abs(p.y - drag.p0.y) > 10; render(); return; }
+    if (drag.modo === 'grupo') {
+      var gdx = snap(p.x - drag.p0.x), gdy = snap(p.y - drag.p0.y);
+      if (UI.shift) { if (Math.abs(gdx) > Math.abs(gdy)) gdy = 0; else gdx = 0; }
+      moverGrupo(drag.g, gdx, gdy); drag.mudou = drag.mudou || gdx !== 0 || gdy !== 0;
+      UI.hud((drag.g.ambs.length + drag.g.movs.length) + ' itens  ' + (gdx >= 0 ? '+' : '') + M.fmtMs(gdx) + ' ; ' + (gdy >= 0 ? '+' : '') + M.fmtMs(gdy) + ' m');
+      render(); return;
     }
     if (drag.modo === 'novo') {
       var x = Math.min(drag.p0.x, snap(p.x)), y = Math.min(drag.p0.y, snap(p.y));
@@ -450,6 +510,7 @@ var PLAN = (function () {
         if (Math.abs(nx - drag.ini.x) > Math.abs(ny - drag.ini.y)) ny = drag.ini.y; else nx = drag.ini.x;
       }
       a.x = nx; a.y = ny; drag.mudou = true;
+      (drag.movs || []).forEach(function (o) { o.m.x = o.x0 + (nx - drag.ini.x); o.m.y = o.y0 + (ny - drag.ini.y); });   /* móveis vão junto */
       UI.hud(a.nome + '  ' + M.fmtMs(a.w) + ' × ' + M.fmtMs(a.h) + ' m');
     }
     if (drag.modo === 'resize') {
@@ -473,7 +534,9 @@ var PLAN = (function () {
     if (d.modo === 'move' || d.modo === 'resize') {
       var a = M.proj.ambientes.filter(function (x) { return x.id === d.id; })[0];
       if (a) { a.x = d.ini.x; a.y = d.ini.y; if (d.ini.w) { a.w = d.ini.w; a.h = d.ini.h; } }
+      (d.movs || []).forEach(function (o) { o.m.x = o.x0; o.m.y = o.y0; });
     }
+    if (d.modo === 'grupo') moverGrupo(d.g, 0, 0);
     if (d.modo === 'movmove') { var mv = M.movelDe(d.id); if (mv) { mv.x = d.ini.x; mv.y = d.ini.y; } }
     if (d.modo === 'movrot') { var mv2 = M.movelDe(d.id); if (mv2) mv2.rot = d.rot0; }
     render();
@@ -484,6 +547,21 @@ var PLAN = (function () {
     if (pinch) { if (Object.keys(ptrs).length < 2) pinch = null; return; }
     if (!drag) return;
     var d = drag; drag = null; guias = []; UI.hud(null);
+    if (d.modo === 'laco') {
+      if (!d.mudou) { render(); return; }
+      var lx1 = Math.min(d.p0.x, d.p1.x), ly1 = Math.min(d.p0.y, d.p1.y), lx2 = Math.max(d.p0.x, d.p1.x), ly2 = Math.max(d.p0.y, d.p1.y), lista = [];
+      function dentro(x, y){ return x >= lx1 && x <= lx2 && y >= ly1 && y <= ly2; }
+      if (vis('ambientes') || vis('piscina')) M.ambsPav(M.pav).forEach(function (a) { if (!vis(a.tipo === 'agua' ? 'piscina' : 'ambientes') || bloq(a.tipo === 'agua' ? 'piscina' : 'ambientes')) return; if (dentro(a.x + a.w / 2, a.y + a.h / 2)) lista.push({t:'amb', id:a.id}); });
+      if (vis('moveis') && !bloq('moveis')) (M.proj.moveis || []).forEach(function (mv) { if ((mv.pav || 0) !== M.pav) return; var amb = M.ambienteDe(mv); if (amb && lista.some(function (m) { return m.t === 'amb' && m.id === amb.id; })) return; /* já vai com o ambiente */ if (dentro(mv.x, mv.y)) lista.push({t:'mov', id:mv.id}); });
+      if (lista.length === 1) { if (lista[0].t === 'mov') selecionarMovel(lista[0].id); else selecionar(lista[0].id); return; }
+      setMulti(lista);
+      if (lista.length) UI.toast(lista.length + ' itens selecionados — arraste qualquer um para mover todos juntos. Del exclui, Ctrl+D duplica.');
+      return;
+    }
+    if (d.modo === 'grupo') {
+      if (d.mudou) { M.commit('Mover ' + (d.g.ambs.length + d.g.movs.length) + ' itens'); UI.refreshTop(); }
+      render(); UI.inspector(); return;
+    }
     if (!d.mudou && d.modo !== 'novo' && d.modo !== 'pan') UI.selTap();
     if (d.modo === 'novo' && d.novo && d.novo.w >= 90 && d.novo.h >= 90) {
       var a = {id:M.uid(), nome:'Ambiente', tipo:M.pav > 0 ? 'intimo' : 'social', x:d.novo.x, y:d.novo.y, w:d.novo.w, h:d.novo.h};
@@ -553,6 +631,7 @@ var PLAN = (function () {
     toggleGrid:function () { M.setCamada('grade', 'vis', !vis('grade')); M.salvar(); render(); return vis('grade'); },
     toggleCotas:function () { M.setCamada('cotas', 'vis', !vis('cotas')); M.salvar(); render(); return vis('cotas'); },
     vis:vis, bloq:bloq,
+    get multi(){ return multi; }, setMulti:setMulti, toggleMulti:toggleMulti, itensGrupo:itensGrupo, moverGrupo:moverGrupo, bboxGrupo:bboxGrupo,
     onUp:onUp, toModel:toModel,
     get svgEl(){ return svg; }
   };

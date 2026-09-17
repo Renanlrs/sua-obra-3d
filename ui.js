@@ -102,6 +102,7 @@ var UI = (function () {
       if (q.has('noite') && t3) t3.setNoite(true);
       /* &fpop=janela abre o popover de troca · &ctx=amb|mov|vazio abre o menu de contexto — conferência e print */
       if (q.get('fpop')) setTimeout(function () { popFachada(q.get('fpop'), 520, 220); }, 200);
+      if (q.has('laco') && viewAtual === 'planta') setTimeout(function () { var tudo = M.ambsPav(M.pav).slice(0, +q.get('laco') || 3).map(function (a) { return {t:'amb', id:a.id}; }); PLAN.setMulti(tudo); }, 150);   /* &laco=N seleciona N ambientes como grupo */
       if (q.get('ctx') && viewAtual === 'planta') setTimeout(function () {
         var alvo = q.get('ctx') === 'amb' ? PLAN.svgEl.querySelector('.amb rect') : q.get('ctx') === 'mov' ? PLAN.svgEl.querySelector('.mov') : PLAN.svgEl;
         var r = alvo.getBoundingClientRect(), ev = {target:alvo, clientX:r.left + r.width / 2, clientY:r.top + r.height / 2};
@@ -622,6 +623,7 @@ var UI = (function () {
 
   function inspector(){
     var a = PLAN.atual(), p = M.proj, h = '', mv = PLAN.movAtual();
+    if (PLAN.multi.length > 1) { inspectorGrupo(); return; }
     if (isMobile()) {
       if (!a && !mv && inspPorSel) setInsp(false);
       h += '<button class="icon-btn insp-close" onclick="UI.fecharInsp()" title="Fechar">' + icon('close') + '</button>';
@@ -704,6 +706,47 @@ var UI = (function () {
     }
     insp.innerHTML = h;
     ligarInspector(a);
+  }
+  /* grupo selecionado pelo laço: N itens, ações em bloco */
+  function inspectorGrupo(){
+    var g = PLAN.itensGrupo(), n = g.ambs.length + g.movs.length, bb = PLAN.bboxGrupo(g), h = '';
+    if (isMobile()) h += '<button class="icon-btn insp-close" onclick="UI.fecharInsp()" title="Fechar">' + icon('close') + '</button>';
+    h += '<h4>' + n + ' itens selecionados</h4><div class="sub">' + g.ambs.length + (g.ambs.length === 1 ? ' ambiente' : ' ambientes') + ' · ' + g.movs.length + (g.movs.length === 1 ? ' móvel' : ' móveis') + (bb ? ' · ' + M.fmtMs(bb.w) + ' × ' + M.fmtMs(bb.h) + ' m' : '') + '</div>';
+    h += '<section><h6>NO GRUPO</h6><div class="ins-empty" style="line-height:1.7">' + g.ambs.map(function (o) { return '▪ ' + esc(o.a.nome); }).concat(g.movs.filter(function (o) { return !g.ambs.some(function (q) { return M.contem(q.a, {x:o.m.x, y:o.m.y, w:0, h:0}); }); }).map(function (o) { return '▫ ' + esc((MOVEIS.def(o.m.k) || {}).nome || 'Móvel'); })).join('<br>') + '</div></section>';
+    h += '<section><h6>MOVER</h6><div class="f-row">' + campo('g-dx', 'DESLOCAR X', '0,00', 'm') + campo('g-dy', 'DESLOCAR Y', '0,00', 'm') + '</div><div class="ins-empty" style="margin-top:-2px">Ou arraste qualquer item do grupo na planta. Setas movem 5 cm (⇧ 50 cm).</div></section>';
+    h += '<section><h6>AÇÕES</h6><div class="acts">' +
+      '<button class="btn" data-gact="dup">Duplicar grupo <kbd style="margin-left:auto">Ctrl D</kbd></button>' +
+      (M.nPavs() > 1 && g.ambs.length ? Array.apply(null, Array(M.nPavs())).map(function (_, pv) { return pv === M.pav ? '' : '<button class="btn" data-gact="pav" data-pv="' + pv + '">Enviar para ' + M.nomePav(pv) + '</button>'; }).join('') : '') +
+      '<button class="btn" data-gact="none">Desmarcar <kbd style="margin-left:auto">Esc</kbd></button>' +
+      '<button class="btn danger" data-gact="del">Excluir tudo <kbd style="margin-left:auto">Del</kbd></button></div></section>';
+    insp.innerHTML = h;
+    function bindG(id, fn){ var el = insp.querySelector('#' + id); if (!el) return; el.onkeydown = function (e) { if (e.key === 'Enter') this.blur(); e.stopPropagation(); }; el.onchange = function () { fn(this.value); }; }
+    bindG('g-dx', function (v) { var n = M.parseM(v); if (n) { PLAN.moverGrupo(PLAN.itensGrupo(), n, 0); M.commit('Mover grupo'); PLAN.render(); inspector(); } });
+    bindG('g-dy', function (v) { var n = M.parseM(v); if (n) { PLAN.moverGrupo(PLAN.itensGrupo(), 0, n); M.commit('Mover grupo'); PLAN.render(); inspector(); } });
+    insp.querySelectorAll('[data-gact]').forEach(function (b) { b.onclick = function () { acaoGrupo(b.getAttribute('data-gact'), b.getAttribute('data-pv')); }; });
+  }
+  function acaoGrupo(k, pv){
+    var g = PLAN.itensGrupo(), n = g.ambs.length + g.movs.length; if (!n) return;
+    if (k === 'none') { PLAN.setMulti([]); return; }
+    if (k === 'del') {
+      var idsA = g.ambs.map(function (o) { return o.a.id; }), idsM = g.movs.map(function (o) { return o.m.id; });
+      M.proj.ambientes = M.proj.ambientes.filter(function (a) { return idsA.indexOf(a.id) < 0; });
+      M.proj.moveis = (M.proj.moveis || []).filter(function (m) { return idsM.indexOf(m.id) < 0; });
+      PLAN.setMulti([]); M.commit('Excluir ' + n + ' itens'); PLAN.render(); inspector();
+      toast(n + ' itens excluídos.', function () { fazerUndo(); }); return;
+    }
+    if (k === 'dup') {
+      var bb = PLAN.bboxGrupo(g), dx = bb ? Math.min(bb.w + 30, 300) : 50, novos = [], mapa = {};
+      g.ambs.forEach(function (o) { var c = JSON.parse(JSON.stringify(o.a)); c.id = M.uid(); c.x += dx; mapa[o.a.id] = c.id; M.proj.ambientes.push(c); novos.push({t:'amb', id:c.id}); });
+      g.movs.forEach(function (o) { var c = JSON.parse(JSON.stringify(o.m)); c.id = M.uid(); c.x += dx; if (c.amb && mapa[c.amb]) c.amb = mapa[c.amb]; M.proj.moveis.push(c); if (!(o.m.amb && mapa[o.m.amb])) novos.push({t:'mov', id:c.id}); });
+      M.commit('Duplicar ' + n + ' itens'); PLAN.setMulti(novos); toast('Grupo duplicado ao lado — arraste para o lugar.'); return;
+    }
+    if (k === 'pav') {
+      var pv2 = +pv;
+      g.ambs.forEach(function (o) { if (pv2) o.a.pav = pv2; else delete o.a.pav; });
+      g.movs.forEach(function (o) { if (pv2) o.m.pav = pv2; else delete o.m.pav; });
+      M.commit('Enviar grupo para ' + M.nomePav(pv2)); M.setPav(pv2); irPara('planta'); toast(n + ' itens enviados para ' + M.nomePav(pv2) + '.', function () { fazerUndo(); });
+    }
   }
   function campo(id, rot, val, un){
     return '<div class="f"><label>' + rot + '</label><div class="inp"><input id="' + id + '" value="' + val + '"><span class="un">' + un + '</span></div></div>';
@@ -1109,7 +1152,7 @@ var UI = (function () {
     var pares = [
       ['V','Selecionar'], ['R','Novo ambiente'], ['Espaço','Mover a tela'], ['G','Grade'],
       ['C','Cotas'], ['P','Planta'], ['A','Ambientes'], ['3','3D'], ['O','Orçamento'], ['S','Simulador'],
-      ['Ctrl+Z','Desfazer'], ['Ctrl+Shift+Z','Refazer'], ['Ctrl+D','Duplicar'], ['Delete','Excluir'],
+      ['Ctrl+Z','Desfazer'], ['Ctrl+Shift+Z','Refazer'], ['Ctrl+D','Duplicar'], ['Delete','Excluir'], ['Arrastar no vazio','Laço: seleciona tudo que ficar dentro'], ['⇧ clique','Adiciona ao grupo'], ['Ctrl+A','Seleciona o andar inteiro'],
       ['Ctrl+0','Enquadrar'], ['Ctrl+K','Buscar / executar'], ['Alt (segurar)','Desligar o ímã'],
       ['Shift (segurar)','Travar no eixo'], ['Duplo clique','Renomear ambiente'], ['Clique na cota','Editar a medida']
     ];
@@ -1135,6 +1178,7 @@ var UI = (function () {
         if ((fp0 && !fp0.hidden) || (cx0 && !cx0.hidden)) { fecharPop(); return; }
         if (!$('#apres').hidden) { fecharApres(); return; }
         if (!$('#ajuda').hidden) { closeOverlays(); return; }
+        if (PLAN.multi.length) { PLAN.setMulti([]); return; }
         if (PLAN.sel) { PLAN.selecionar(null); return; }
         if (!$('#app').hidden) voltarHome();
         return;
@@ -1146,12 +1190,15 @@ var UI = (function () {
       if (e.key === ' ') { espaco = true; e.preventDefault(); }
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? fazerRedo() : fazerUndo(); return; }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); if (PLAN.movAtual()) acaoMovel('dup', PLAN.sel); else if (PLAN.sel) duplicar(PLAN.sel); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); if (PLAN.multi.length > 1) acaoGrupo('dup'); else if (PLAN.movAtual()) acaoMovel('dup', PLAN.sel); else if (PLAN.sel) duplicar(PLAN.sel); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && viewAtual === 'planta') {   /* Ctrl+A: seleciona tudo do andar */
+        e.preventDefault(); var tudo = M.ambsPav(M.pav).map(function (a) { return {t:'amb', id:a.id}; }); if (tudo.length > 1) { PLAN.setMulti(tudo); toast(tudo.length + ' ambientes selecionados (os móveis vão junto).'); } return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); irPara('planta'); PLAN.enquadrar(); PLAN.render(); return; }
       if (e.ctrlKey || e.metaKey) return;
 
       var k = e.key.toLowerCase();
-      if (k === 'delete' || k === 'backspace') { if (PLAN.movAtual()) { e.preventDefault(); acaoMovel('del', PLAN.sel); } else if (PLAN.sel) { e.preventDefault(); excluir(PLAN.sel); } return; }
+      if (k === 'delete' || k === 'backspace') { if (PLAN.multi.length > 1) { e.preventDefault(); acaoGrupo('del'); } else if (PLAN.movAtual()) { e.preventDefault(); acaoMovel('del', PLAN.sel); } else if (PLAN.sel) { e.preventDefault(); excluir(PLAN.sel); } return; }
       if (k === 'm') { if (viewAtual === 'planta' || viewAtual === 'tresd') toggleCatalogo(); return; }
       if (k === '2') { irPara('planta'); return; }
       if (k === 'r' && e.shiftKey && PLAN.movAtual()) { acaoMovel('rot', PLAN.sel); return; }
@@ -1168,7 +1215,12 @@ var UI = (function () {
       if (k === 'f') irPara('fachada');
       if (k === 'o') irPara('orcamento');
       if (k === 's') irPara('simulador');
-      /* setas movem o selecionado */
+      /* setas movem o selecionado (ou o grupo) */
+      if (k.indexOf('arrow') === 0 && PLAN.multi.length > 1) {
+        e.preventDefault();
+        var pg = e.shiftKey ? 50 : 5, gdx = k === 'arrowleft' ? -pg : k === 'arrowright' ? pg : 0, gdy = k === 'arrowup' ? -pg : k === 'arrowdown' ? pg : 0;
+        PLAN.moverGrupo(PLAN.itensGrupo(), gdx, gdy); M.commit('Mover grupo'); PLAN.render(); inspector(); return;
+      }
       if (k.indexOf('arrow') === 0 && PLAN.movAtual()) {
         e.preventDefault();
         var mv = PLAN.movAtual(), pm = e.shiftKey ? 50 : 5;
@@ -1444,7 +1496,14 @@ var UI = (function () {
     var alvoMov = e.target.closest ? e.target.closest('.mov') : null, alvoAmb = e.target.closest ? e.target.closest('.amb') : null;
     var p = PLAN.toModel(e), itens = [], titulo = '';
     function it(rot, fn, cls){ itens.push({rot:rot, fn:fn, cls:cls || ''}); }
-    if (alvoMov && !PLAN.bloq('moveis')) {
+    var noGrupo = PLAN.multi.length > 1 && ((alvoMov && PLAN.multi.some(function (m) { return m.t === 'mov' && m.id === alvoMov.getAttribute('data-id'); })) || (alvoAmb && PLAN.multi.some(function (m) { return m.t === 'amb' && m.id === alvoAmb.getAttribute('data-id'); })));
+    if (noGrupo) {
+      var gg = PLAN.itensGrupo(); titulo = (gg.ambs.length + gg.movs.length) + ' itens selecionados';
+      it('Duplicar grupo', function () { acaoGrupo('dup'); });
+      if (M.nPavs() > 1 && gg.ambs.length) for (var pvg = 0; pvg < M.nPavs(); pvg++) if (pvg !== M.pav) (function (pv3) { it('Enviar grupo para ' + M.nomePav(pv3), function () { acaoGrupo('pav', pv3); }); })(pvg);
+      it('Desmarcar', function () { PLAN.setMulti([]); });
+      it('Excluir tudo', function () { acaoGrupo('del'); }, 'danger');
+    } else if (alvoMov && !PLAN.bloq('moveis')) {
       var mid = alvoMov.getAttribute('data-id'), mv = M.movelDe(mid), d = mv && MOVEIS.def(mv.k);
       if (!mv) return; PLAN.selecionarMovel(mid); titulo = d ? d.nome : 'Móvel';
       it('Girar 90°', function () { acaoMovel('rot', mid); }); it('Girar −90°', function () { acaoMovel('rotm', mid); }); it('Espelhar', function () { acaoMovel('esp', mid); });
@@ -1472,6 +1531,7 @@ var UI = (function () {
       it('Mobiliar (catálogo)', function () { toggleCatalogo(true); });
       it('Mobiliar tudo automaticamente', function () { M.mobiliarAuto(); M.commit('Mobiliar automaticamente'); PLAN.render(); inspector(); });
       it('Enquadrar', function () { PLAN.enquadrar(); PLAN.render(); });
+      it('Selecionar tudo do andar', function () { var tudo = M.ambsPav(M.pav).map(function (a) { return {t:'amb', id:a.id}; }); if (tudo.length) PLAN.setMulti(tudo); });
       if (M.podeUndo()) it('Desfazer: ' + M.proxUndo(), function () { fazerUndo(); });
     }
     var c = document.getElementById('ctx');

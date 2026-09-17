@@ -52,6 +52,7 @@ As funções do app da escola de natação passaram a viver no mesmo editor, len
 
 ### 7. Prático: clique no item para trocar · botão direito para agir
 - Na **Fachada** (e no 3D), passe o mouse: janela, porta, telhado, parede, revestimento, muro, portão, piso da frente, letreiro… viram clicáveis. **Clique** → aparece só o que dá para trocar naquele item; cada escolha aplica na hora e o popover fica aberto para comparar. "Todas as opções" leva ao painel completo.
+- Na **Planta**, **arraste no vazio** para laçar: tudo que ficar dentro (ambientes + os móveis deles, móveis avulsos) vira um grupo — arraste qualquer item e todos vão juntos; ⇧ clique adiciona/retira; Ctrl+A seleciona o andar; Del/Ctrl+D/setas agem no grupo; dá para mandar o grupo para outro andar. Mover um ambiente sozinho também leva os móveis dele.
 - Na **Planta**, **botão direito** em um ambiente (renomear, tipo, mobiliar só ele, duplicar, girar, andar, excluir), em um móvel (girar, espelhar, duplicar, elevar, **trocar por outro**, excluir) ou no vazio (adicionar ambiente aqui, mobiliar, enquadrar, desfazer).
 
 ## Conferir sem clicar
