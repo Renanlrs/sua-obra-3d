@@ -460,6 +460,53 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 /* ============ CELULAR / TABLET EM PÉ ============
    A mesma tela, reorganizada: menu vira barra inferior, inspector vira folha
    que sobe de baixo, catálogo idem. Nada de dado ou lógica muda. */
+
+/* ===== fusão ACQUA BELO: piscina, cenários, camadas, cotas, relatório, renders, versões ===== */
+.etapas-bar{display:flex;gap:3px;margin:8px 0 14px;height:46px}
+.etapas-bar .et{min-width:0;border-radius:6px;background:#E6EDF3;padding:6px 8px;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.etapas-bar .et:nth-child(1){background:#DDE5EC}.etapas-bar .et:nth-child(2){background:#D2DEE8}.etapas-bar .et:nth-child(3){background:#C4D4E3}.etapas-bar .et:nth-child(4){background:#B6CBDF}.etapas-bar .et:nth-child(5){background:#A7C1DA}.etapas-bar .et:nth-child(6){background:#98B7D5}
+.etapas-bar .et b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1B2229}
+.etapas-bar .et span{font-family:ui-monospace,monospace;font-size:11px;color:#3C4A57}
+.tbl td.dim,.tbl .dim,.dim{color:#7B8794;font-size:12px}
+.tbl tr.dim td{color:#9AA5B0;text-decoration:line-through}
+.chip.sm{padding:2px 8px;font-size:11px}
+.chip.warn{border-color:#E5533D;color:#B4432F}
+.cenarios{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.cen{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;padding:10px 14px;border:1px solid #DFE6EC;border-radius:8px;background:#fff}
+.cen-t b{display:block;font-size:13px}.cen-t span{display:block;font-size:11.5px;color:#7B8794;margin-top:2px}.cen-t .cen-warn{color:#B4432F}
+.cen-v{font-family:ui-monospace,monospace;font-size:13px;text-align:right;font-weight:600}.cen-v.neg{color:#1F8A3B}.cen-v.pos{color:#B4432F}
+.cen-v small{display:block;font-weight:400;color:#7B8794;font-size:11px}
+.ver-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 14px}
+.ver-add input{flex:1;min-width:160px;padding:8px 10px;border:1px solid #CFD8E0;border-radius:6px;font:inherit;font-size:13px}
+.cotas-tbl .cota-in{width:80px;text-align:right;padding:4px 6px;border:1px solid #CFD8E0;border-radius:5px;font:inherit;font-size:12.5px;font-family:ui-monospace,monospace}
+.cotas-tbl .cota-in:focus{outline:2px solid #22B8D6;border-color:transparent}
+.alertas{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.al{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.5;padding:7px 10px;border-radius:6px;background:#F4F7F9}
+.al i{flex:0 0 9px;width:9px;height:9px;border-radius:50%;margin-top:5px;background:#9AA5B0}
+.al.ok i{background:#2FA36B}.al.aviso i{background:#E0A42B}.al.erro i{background:#E5533D}
+.al.erro{background:#FDF0EE}.al.aviso{background:#FBF5E6}
+.pis{margin:22px 0 0;padding:18px 20px;border:1px solid #DFE6EC;border-radius:10px;background:#fff}
+.pis h3{margin:0 0 10px;font-size:15px}.pis h3 small{font-weight:400;color:#7B8794;font-size:12px;margin-left:6px}
+.pis-f{flex-wrap:wrap}.pis-f .f{min-width:130px}
+.praias{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:#3C4A57;padding:9px 12px;background:#EEF7FA;border-radius:6px;margin:8px 0}
+.praias>b{font-size:11px;letter-spacing:.06em;color:#0F5E72}.praias span b{font-family:ui-monospace,monospace}
+.rend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.rend{margin:0;border:1px solid #DFE6EC;border-radius:10px;overflow:hidden;background:#fff}
+.rend img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;background:#E6EDF3}
+.rend figcaption{display:flex;gap:6px;align-items:center;padding:8px 10px}
+.rend figcaption input{flex:1;min-width:0;border:1px solid transparent;border-radius:5px;padding:4px 6px;font:inherit;font-size:12.5px}
+.rend figcaption input:focus{border-color:#CFD8E0;outline:none}
+label.btn{cursor:pointer}
+.ap-etapas{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.ap-et{flex:1;min-width:120px;padding:12px 14px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+.ap-et b{display:block;font-family:ui-monospace,monospace;font-size:18px;color:#E8EDF2}.ap-et span{display:block;font-size:10.5px;letter-spacing:.08em;color:#8FA3B1;margin-top:3px}.ap-et small{display:block;font-size:11px;color:#C6D3DC;margin-top:4px}
+.ap-renders{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.ap-renders figure{margin:0;border-radius:12px;overflow:hidden;background:#101418}
+.ap-renders img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover}
+.ap-renders figcaption{padding:10px 14px;font-size:12px;letter-spacing:.08em;color:#8FA3B1}
+.ap-hero.com-render .med img{width:100%;height:100%;object-fit:cover;opacity:.55}
+@media print{.etapas-bar{break-inside:avoid}.pis{break-inside:avoid}}
+
 @media (max-width:900px){
   :root{--tab:58px}
   .only-mobile{display:grid!important}

@@ -8,7 +8,9 @@ var PLAN = (function () {
   var view = {x:0, y:0, w:1000, h:1000};   // viewBox em cm
   var sel = null, selTipo = 'amb', tool = 'sel';   /* selTipo: 'amb' (ambiente) ou 'mov' (móvel) */
   var VERDE = '#2FA36B';
-  var showGrid = true, showCotas = true;
+  /* grade/cotas/móveis/etc. são CAMADAS do projeto (M.camada) — visível e bloqueada; vindo do ACQUA BELO */
+  function vis(k){ return M.camada(k).vis; }
+  function bloq(k){ return M.camada(k).bloq; }
   var drag = null, guias = [], PAREDE = 15, SNAP = 5, IMA = 12;
   var ptrs = {}, pinch = null;   /* dedos na tela; dois dedos = pinça (zoom + pan) no celular */
 
@@ -68,16 +70,16 @@ var PLAN = (function () {
     var esc = view.w / Math.max(1, host.clientWidth);   // cm por pixel
 
     s += defs();
-    if (showGrid) s += grade(t);
+    if (vis('grade')) s += grade(t);
 
     /* terreno + recuos */
     s += '<rect x="0" y="0" width="' + t.largura + '" height="' + t.profundidade + '" fill="#FFFFFF" stroke="#B6C0C9" stroke-width="' + (2 * esc) + '"/>';
-    s += '<rect x="' + t.recuoLateral + '" y="' + t.recuoFrontal + '" width="' + (t.largura - t.recuoLateral * 2) +
+    if (vis('terreno')) s += '<rect x="' + t.recuoLateral + '" y="' + t.recuoFrontal + '" width="' + (t.largura - t.recuoLateral * 2) +
          '" height="' + (t.profundidade - t.recuoFrontal - t.recuoFundo) + '" fill="none" stroke="#22B8D6" stroke-opacity=".45" stroke-width="' + (1.2 * esc) + '" stroke-dasharray="' + (10 * esc) + ' ' + (8 * esc) + '"/>';
 
     /* andar de baixo em fantasma (para alinhar o andar de cima) */
     var pav = M.pav;
-    if (pav > 0) {
+    if (pav > 0 && vis('fantasma')) {
       M.ambsPav(pav - 1).forEach(function (b) {
         s += '<rect x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" fill="#8FA3B1" fill-opacity=".08" stroke="#8FA3B1" stroke-width="' + (1.4 * esc) + '" stroke-dasharray="' + (8 * esc) + ' ' + (6 * esc) + '" style="pointer-events:none"/>';
       });
@@ -86,10 +88,12 @@ var PLAN = (function () {
     var probs = M.problemas(), ruins = {};
     probs.forEach(function (q) { if (q.id) ruins[q.id] = true; });
 
-    M.ambsPav(pav).forEach(function (a) {
+    /* piscina por cima do salão que a contém (partido da escola de natação) */
+    M.ambsPav(pav).slice().sort(function (a, b) { return (a.tipo === 'agua') - (b.tipo === 'agua'); }).forEach(function (a) {
+      if (!vis(a.tipo === 'agua' ? 'piscina' : 'ambientes')) return;
       var ti = M.TIPOS[a.tipo] || M.TIPOS.social;
       var ruim = ruins[a.id], on = sel === a.id;
-      s += '<g class="amb" data-id="' + a.id + '">';
+      s += '<g class="amb' + (bloq(a.tipo === 'agua' ? 'piscina' : 'ambientes') ? ' bloq' : '') + '" data-id="' + a.id + '">';
       s += '<rect x="' + a.x + '" y="' + a.y + '" width="' + a.w + '" height="' + a.h + '" rx="' + (2 * esc) +
            '" fill="' + ti.cor + '" fill-opacity="' + (a.tipo === 'agua' ? .5 : .13) + '"/>';
       /* parede: traço grosso por dentro */
@@ -97,19 +101,27 @@ var PLAN = (function () {
            '" height="' + Math.max(1, a.h - PAREDE) + '" fill="none" stroke="' + (ruim ? '#E5533D' : '#1B2229') +
            '" stroke-width="' + PAREDE + '" stroke-opacity="' + (ruim ? .85 : .9) + '"/>';
       if (a.tipo === 'agua') {
-        var raias = Math.max(1, Math.round(a.w / 150));
-        for (var i = 1; i < raias; i++)
-          s += '<line x1="' + (a.x + a.w / raias * i) + '" y1="' + (a.y + 25) + '" x2="' + (a.x + a.w / raias * i) +
-               '" y2="' + (a.y + a.h - 25) + '" stroke="#1E7E96" stroke-width="' + (1.4 * esc) + '" stroke-dasharray="' + (22 * esc) + ' ' + (16 * esc) + '"/>';
+        /* raias correm no sentido do comprimento; a largura (lado menor) é dividida em `raias` */
+        var pc = M.piscinaCfg(a), raias = pc.raias, vert = a.h >= a.w, larg = vert ? a.w : a.h, passo = larg / raias;
+        for (var i = 1; i < raias; i++) {
+          var d0 = passo * i;
+          s += vert
+            ? '<line x1="' + (a.x + d0) + '" y1="' + (a.y + 25) + '" x2="' + (a.x + d0) + '" y2="' + (a.y + a.h - 25) + '" stroke="#1E7E96" stroke-width="' + (1.4 * esc) + '" stroke-dasharray="' + (22 * esc) + ' ' + (16 * esc) + '"/>'
+            : '<line x1="' + (a.x + 25) + '" y1="' + (a.y + d0) + '" x2="' + (a.x + a.w - 25) + '" y2="' + (a.y + d0) + '" stroke="#1E7E96" stroke-width="' + (1.4 * esc) + '" stroke-dasharray="' + (22 * esc) + ' ' + (16 * esc) + '"/>';
+        }
+        /* linha de blocos de partida / profundidade */
+        if (larg / esc > 40) { var fsP = Math.max(7.5 * esc, Math.min(11 * esc, larg * .1));
+          s += '<text x="' + (a.x + a.w - 8 * esc) + '" y="' + (a.y + fsP * 1.3) + '" text-anchor="end" font-family="ui-monospace,monospace" font-size="' + fsP + '" fill="#0F5E72" style="pointer-events:none">' + M.fmtMs(pc.prof) + '–' + M.fmtMs(pc.profMax) + ' m · ' + raias + (raias > 1 ? ' raias' : ' raia') + '</text>'; }
       }
       /* rótulo — abrevia em vez de sumir; só desaparece quando é ilegível mesmo */
       var pxW = a.w / esc, pxH = a.h / esc;
-      if (pxW > 34 && pxH > 22) {
+      if (pxW > 34 && pxH > 22 && vis('rotulos')) {
         /* rótulo no canto inferior esquerdo, com fundo translúcido — legível por cima dos móveis */
         var fs = Math.min(a.w, a.h) * 0.13, fsMax = 13 * esc, fsMin = 7.5 * esc;
         fs = Math.max(fsMin, Math.min(fsMax, fs));
         var rot = rotuloQueCabe(a.nome, a.w - 24 * esc, fs), area = pxH > 40 ? '  ' + M.fmtM2(M.areaOf(a)) : '';
         var tw = (rot.length * .55 + area.length * .5) * fs, th = fs * 1.6, lx = a.x + PAREDE / 2 + 5 * esc, ly = a.y + a.h - PAREDE / 2 - 5 * esc - th;
+        if (a.tipo !== 'agua' && M.piscinas().some(function (q) { return M.contem(a, q); })) ly = a.y + PAREDE / 2 + 5 * esc;   /* salão com piscina: rótulo em cima, longe do da piscina */
         s += '<g style="pointer-events:none"><rect x="' + lx + '" y="' + ly + '" width="' + (tw + fs * .9) + '" height="' + th + '" rx="' + (th / 2) + '" fill="#FFFFFF" fill-opacity=".82"/>';
         s += '<text x="' + (lx + fs * .45) + '" y="' + (ly + th * .68) + '" font-family="Inter,system-ui,sans-serif" font-size="' + fs + '" fill="#28313A">' + esc4(rot) +
              (area ? '<tspan font-family="ui-monospace,monospace" font-size="' + (fs * .82) + '" fill="#6B7885">' + area + '</tspan>' : '') + '</text></g>';
@@ -117,13 +129,13 @@ var PLAN = (function () {
       if (on) {
         s += '<rect x="' + (a.x - 3 * esc) + '" y="' + (a.y - 3 * esc) + '" width="' + (a.w + 6 * esc) + '" height="' + (a.h + 6 * esc) +
              '" fill="none" stroke="#0F7E96" stroke-width="' + (2 * esc) + '"/>';
-        s += alcas(a, esc);
+        if (!bloq(a.tipo === 'agua' ? 'piscina' : 'ambientes')) s += alcas(a, esc);
       }
       s += '</g>';
     });
     /* escada (derivada de M.escada): degraus no térreo, vão no andar de cima */
     var esc2 = M.escada();
-    if (esc2 && (pav === 0 || pav === 1)) {
+    if (esc2 && (pav === 0 || pav === 1) && vis('escada')) {
       s += '<g style="pointer-events:none"><rect x="' + esc2.x + '" y="' + esc2.y + '" width="' + esc2.w + '" height="' + esc2.h + '" fill="' + (pav === 0 ? '#FFFFFF' : '#F4F6F8') + '" fill-opacity=".9" stroke="#1B2229" stroke-width="' + (1.6 * esc) + '"' + (pav === 1 ? ' stroke-dasharray="' + (6 * esc) + ' ' + (4 * esc) + '"' : '') + '/>';
       if (pav === 0) { var dg = esc2.degraus, passo = esc2.h / dg; for (var di = 1; di < dg; di++) s += '<line x1="' + esc2.x + '" y1="' + (esc2.y + di * passo) + '" x2="' + (esc2.x + esc2.w) + '" y2="' + (esc2.y + di * passo) + '" stroke="#1B2229" stroke-width="' + (1 * esc) + '"/>';
         s += '<line x1="' + (esc2.x + esc2.w / 2) + '" y1="' + (esc2.y + esc2.h - 10) + '" x2="' + (esc2.x + esc2.w / 2) + '" y2="' + (esc2.y + 14) + '" stroke="#22B8D6" stroke-width="' + (1.6 * esc) + '"/><path d="M' + (esc2.x + esc2.w / 2 - 8) + ' ' + (esc2.y + 26) + ' l8 -14 l8 14" fill="none" stroke="#22B8D6" stroke-width="' + (1.6 * esc) + '"/>'; }
@@ -131,8 +143,8 @@ var PLAN = (function () {
       s += '</g>';
     }
 
-    s += moveisSvg(esc);
-    if (showCotas) s += cotas(esc);
+    if (vis('moveis')) s += moveisSvg(esc);
+    if (vis('cotas')) s += cotas(esc);
     guias.forEach(function (g) {
       s += '<line x1="' + g.x1 + '" y1="' + g.y1 + '" x2="' + g.x2 + '" y2="' + g.y2 +
            '" stroke="#E5533D" stroke-width="' + (1 * esc) + '" stroke-dasharray="' + (14 * esc) + ' ' + (10 * esc) + '"/>';
@@ -339,6 +351,7 @@ var PLAN = (function () {
     }
     /* móvel → arrastar (tem prioridade sobre o ambiente embaixo) */
     var gm = e.target.closest ? e.target.closest('.mov') : null;
+    if (gm && bloq('moveis')) gm = null;   /* camada bloqueada: o clique passa para o ambiente */
     if (gm && tool === 'sel' && !UI.espaco) {
       var mid = gm.getAttribute('data-id'), mv = M.movelDe(mid);
       if (mv) {
@@ -372,8 +385,9 @@ var PLAN = (function () {
     if (g) {
       var id = g.getAttribute('data-id');
       var a = M.proj.ambientes.filter(function (x) { return x.id === id; })[0];
-      drag = {modo:'move', id:id, ini:{x:a.x, y:a.y}, off:{x:p.x - a.x, y:p.y - a.y}, mudou:false};
       selecionar(id);
+      if (g.classList.contains('bloq')) { UI.toast('Camada bloqueada — desbloqueie na aba Camadas para mover.'); return; }
+      drag = {modo:'move', id:id, ini:{x:a.x, y:a.y}, off:{x:p.x - a.x, y:p.y - a.y}, mudou:false};
       svg.setPointerCapture(e.pointerId);
     } else {
       selecionar(null);
@@ -536,8 +550,9 @@ var PLAN = (function () {
     get sel(){ return sel; }, get selTipo(){ return selTipo; }, selecionar:selecionar, atual:atual,
     movAtual:movAtual, selecionarMovel:selecionarMovel, telaDe:telaDe, PAREDE:PAREDE,
     setTool:function (t) { tool = t; }, get tool(){ return tool; },
-    toggleGrid:function () { showGrid = !showGrid; render(); return showGrid; },
-    toggleCotas:function () { showCotas = !showCotas; render(); return showCotas; },
+    toggleGrid:function () { M.setCamada('grade', 'vis', !vis('grade')); M.salvar(); render(); return vis('grade'); },
+    toggleCotas:function () { M.setCamada('cotas', 'vis', !vis('cotas')); M.salvar(); render(); return vis('cotas'); },
+    vis:vis, bloq:bloq,
     onUp:onUp, toModel:toModel,
     get svgEl(){ return svg; }
   };

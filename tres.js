@@ -266,8 +266,10 @@ function TRES_ENGINE(THREE, M){
       var pequeno = q.W < 1.9 || q.D < 2.3;   /* banheiro, lavabo, despensa: olha da porta */
       var v0 = pequeno ? -0.35 : Math.min(0.55, q.D * 0.18), alvoV = Math.max(v0 + 1, q.D * 0.85);
       var p = q.mundo(u, v0), a = q.mundo(ua, alvoV);
+      var pp = pontoPraia(proj, r, 'frente');   /* salão com piscina: a câmera fica na praia, olhando as raias */
+      if (pp) { p = pp.pos; a = pp.alvo; }
       out.push({id:r.id, titulo:r.nome, sub:M.fmtM2(M.areaOf(r)) + ' · ' + M.fmtM(r.w) + ' × ' + M.fmtM(r.h),
-        frase:frase(r), pos:[p.x, 1.55, p.z], alvo:[a.x, 1.25, a.z], interno:true});
+        frase:frase(r), pos:[p.x, 1.55, p.z], alvo:[a.x, pp ? 0.4 : 1.25, a.z], interno:true});
     });
     (andares || []).forEach(function (d) {   /* andar de cima: mesmos enquadramentos, subindo a laje */
       d.an.ordem.forEach(function (r) {
@@ -284,13 +286,25 @@ function TRES_ENGINE(THREE, M){
       var rx = (r.x + r.w / 2) * CM, rz = (r.y + r.h / 2) * CM, dx = rx - cx, dz = rz - cz, lado;
       if (Math.abs(dx) * (by2 - by) > Math.abs(dz) * (bx2 - bx)) lado = dx < 0 ? 'dir' : 'esq'; else lado = dz < 0 ? 'fundo' : 'frente';
       var q = quadro(r, lado), p = q.mundo(q.W / 2, -0.9), a = q.mundo(q.W / 2, q.D * 0.8);
+      var salao = r.tipo === 'agua' ? proj.ambientes.filter(function (b) { return b !== r && coberto(b) && (b.pav || 0) === (r.pav || 0) && piscinasDentro(proj, b).indexOf(r) >= 0; })[0] : null;
+      var pp = salao ? pontoPraia(proj, salao, 'fundo') : null;   /* piscina coberta: vista da praia do fundo, de volta para a entrada */
+      if (pp) { p = pp.pos; a = pp.alvo; }
       out.push({id:r.id, titulo:r.nome, sub:M.fmtM2(M.areaOf(r)) + ' · ' + M.fmtM(r.w) + ' × ' + M.fmtM(r.h),
-        frase:frase(r), pos:[p.x, 1.65, p.z], alvo:[a.x, 0.6, a.z], externo:true});
+        frase:frase(r), pos:[p.x, 1.65, p.z], alvo:[a.x, pp ? 0.2 : 0.6, a.z], externo:pp ? false : true, interno:!!pp});
     });
     var raio = Math.max((bx2 - bx) * CM, (by2 - by) * CM * .8) + 4;
     out.push({id:'aerea', titulo:'O conjunto', sub:M.fmtM2(M.areaConstruida()) + ' construídos · ' + M.fmtPct(M.ocupacao()) + ' do terreno',
       frase:'Tudo no lugar, visto de cima.', pos:[cx + raio * 0.95, raio * 0.95, cz - raio * 0.75], alvo:[cx, 0.5, cz], externo:true, aerea:true});
     return out;
+  }
+
+  /* câmera na praia de um salão com piscina (frente ou fundo), olhando ao longo das raias — em metros */
+  function pontoPraia(proj, r, lado){
+    var pis = piscinasDentro(proj, r); if (!pis.length) return null;
+    var pw = pis[0], fr = pw.y - r.y, fu = r.y + r.h - pw.y - pw.h, usaFrente = lado === 'frente' ? fr >= 40 || fr >= fu : !(fu >= 40 || fu >= fr);
+    var praia = usaFrente ? fr : fu, zc = usaFrente ? r.y + Math.max(25, praia * .5) : r.y + r.h - Math.max(25, praia * .5);
+    var xc = (pw.x + pw.w / 2) * CM;
+    return {pos:{x:xc, z:zc * CM}, alvo:{x:xc, z:(usaFrente ? pw.y + pw.h * .75 : pw.y + pw.h * .25) * CM}};
   }
 
   /* ============================ FACHADA ============================
@@ -607,21 +621,40 @@ function TRES_ENGINE(THREE, M){
   }
 
   /* ============================ CONSTRUÇÃO ============================ */
+  /* FK = elemento de fachada em construção ('janela', 'porta', 'muro'…): cada primitiva criada enquanto
+     FK está ligado recebe userData.fk — é o que permite CLICAR no item no 3D e trocar só ele. */
+  var FK = null;
+  function fk(tag){ FK = tag || null; }
   function caixa(g, w, h, d, mat, x, y, z, sombra){
     var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, y + h / 2, z);
     m.castShadow = sombra !== false; m.receiveShadow = true;
+    if (FK) m.userData.fk = FK;
     g.add(m); return m;
+  }
+  /* piso horizontal com furos (a piscina dentro do salão): Shape no plano XZ, extrudado para cima `esp` metros.
+     x0/z0 = canto, w/d = tamanho, furos = [{x,z,w,d}] em metros; UV do Extrude já sai em metros. */
+  function pisoFurado(g, x0, z0, w, d, furos, mat, y, esp){
+    var sh = new THREE.Shape(); sh.moveTo(x0, -z0); sh.lineTo(x0 + w, -z0); sh.lineTo(x0 + w, -(z0 + d)); sh.lineTo(x0, -(z0 + d)); sh.closePath();
+    furos.forEach(function (f) { var h = new THREE.Path(); h.moveTo(f.x, -f.z); h.lineTo(f.x, -(f.z + f.d)); h.lineTo(f.x + f.w, -(f.z + f.d)); h.lineTo(f.x + f.w, -f.z); h.closePath(); sh.holes.push(h); });
+    var geo = esp > .01 ? new THREE.ExtrudeGeometry(sh, {depth:esp, bevelEnabled:false}) : new THREE.ShapeGeometry(sh);
+    var m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; m.position.y = y; m.receiveShadow = true; m.castShadow = false;
+    g.add(m); return m;
+  }
+  /* piscinas (do mesmo andar) inteiramente dentro do ambiente r — em cm */
+  function piscinasDentro(proj, r){
+    return proj.ambientes.filter(function (a) { return a.tipo === 'agua' && (a.pav || 0) === (r.pav || 0) && a.x >= r.x && a.y >= r.y && a.x + a.w <= r.x + r.w && a.y + a.h <= r.y + r.h; });
   }
   function plano(g, w, d, mat, x, y, z, rep){   /* plano horizontal virado para cima, UV em metros */
     var geo = new THREE.PlaneGeometry(w, d);
     if (rep !== false) { var uv = geo.attributes.uv; for (var i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w, uv.getY(i) * d); }
     var m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.receiveShadow = true;
+    if (FK) m.userData.fk = FK;
     g.add(m); return m;
   }
   function cil(g, r, h, mat, x, y, z, seg){
     var m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg || 10), mat);
-    m.position.set(x, y + h / 2, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
+    m.position.set(x, y + h / 2, z); m.castShadow = true; m.receiveShadow = true; if (FK) m.userData.fk = FK; g.add(m); return m;
   }
   function arvore(g, x, z, esc, R){
     var M2 = materiais(), s = esc || 1;
@@ -844,6 +877,7 @@ function TRES_ENGINE(THREE, M){
     caixa(G.terreno, TL + 40, .12, .15, Mt.laje, TL / 2, -.1, -2.55, false);
     plano(G.terreno, TL + 40, 7, Mt.asfalto, TL / 2, -.1, -6.1);
     /* muros laterais e de fundo */
+    fk('muro');
     caixa(G.terreno, .15, 1.8, TP, matMuroBase, .075, 0, TP / 2); caixa(G.terreno, .15, 1.8, TP, matMuroBase, TL - .075, 0, TP / 2);
     caixa(G.terreno, TL, 1.8, .15, matMuroBase, TL / 2, 0, TP - .075);
     /* muro frontal com portão alinhado à garagem ou à entrada */
@@ -863,6 +897,7 @@ function TRES_ENGINE(THREE, M){
     }
     /* pilaretes do portão */
     caixa(G.terreno, .25, muroH + .3, .25, matDest, x1 - .125, 0, .075); caixa(G.terreno, .25, muroH + .3, .25, matDest, x2 + .125, 0, .075);
+    fk('portao');
     var pH = Math.min(muroH + .2, 1.9);
     if (F.portao === 'chapa') {
       caixa(G.terreno, gw - .1, pH, .05, matPortao, gx, .05, .075); caixa(G.terreno, gw - .3, .02, .06, Mt.esquadria, gx, pH * .5, .075);
@@ -874,8 +909,10 @@ function TRES_ENGINE(THREE, M){
       for (var gi = 0; gi <= Math.round((gw - .1) / .13); gi++) caixa(G.terreno, .035, pH, .035, matPortao, gx - (gw - .1) / 2 + gi * ((gw - .1) / Math.round((gw - .1) / .13)), 0, .075);
     }
     /* caminho do portão até a casa */
+    fk('pisoFrente');
     var frenteCasa = an.ambs.length ? Math.min.apply(null, an.ambs.map(function (a) { return a.y; })) * CM : TP;
-    if (frenteCasa > .3 && matPisoFrente) plano(G.terreno, gw - .2, frenteCasa - .2, matPisoFrente, gx, .005, .1 + (frenteCasa - .2) / 2);
+    if (frenteCasa > .3) plano(G.terreno, gw - .2, frenteCasa - .2, matPisoFrente || Mt.calcada, gx, .005, .1 + (frenteCasa - .2) / 2);
+    fk('jardim');
     /* árvores no recuo frontal */
     var R = rnd(hash(proj.id || 'x'));
     if (t.recuoFrontal >= 250) { if (Math.abs(1 - gx) > 1.6) arvore(G.terreno, .9, 1.2, .9, R); if (Math.abs(TL - 1 - gx) > 1.6) arvore(G.terreno, TL - .9, 1.2, .8, R); }
@@ -890,6 +927,7 @@ function TRES_ENGINE(THREE, M){
       });
     }
     /* poste na calçada (acende à noite) */
+    fk(null);
     caixa(G.terreno, .12, 4.2, .12, Mt.poste, Math.min(TL - .8, gx + gw / 2 + 2.2), 0, -1.9); caixa(G.terreno, .6, .12, .3, Mt.poste, Math.min(TL - .8, gx + gw / 2 + 2.2) - .24, 4.1, -1.9);
     var posteLuz = {x: Math.min(TL - .8, gx + gw / 2 + 2.2) - .48, y: 4.0, z: -1.9};
 
@@ -899,8 +937,14 @@ function TRES_ENGINE(THREE, M){
     an.ambs.forEach(function (r) {
       var x = r.x * CM, z = r.y * CM, w = r.w * CM, d = r.h * CM;
       var mat = r.tipo === 'molhado' || r.tipo === 'servico' ? Mt.ceramica : (r.tipo === 'garagem' ? Mt.concreto : Mt.madeira);
-      var base = caixa(G.pisos, w, .1, d, Mt.laje, x + w / 2, 0, z + d / 2, false);
-      var p = plano(G.pisos, w, d, mat, x + w / 2, .101, z + d / 2);
+      var furos = piscinasDentro(proj, r).map(function (a) { return {x:a.x * CM, z:a.y * CM, w:a.w * CM, d:a.h * CM}; }), base, p;
+      if (furos.length) {   /* salão com piscina: laje e piso recortados na lâmina d'água */
+        base = pisoFurado(G.pisos, x, z, w, d, furos, Mt.laje, -.05, .1);
+        p = pisoFurado(G.pisos, x, z, w, d, furos, mat, .101, 0);
+      } else {
+        base = caixa(G.pisos, w, .1, d, Mt.laje, x + w / 2, 0, z + d / 2, false);
+        p = plano(G.pisos, w, d, mat, x + w / 2, .101, z + d / 2);
+      }
       p.userData.ambId = r.id; p.userData.pronto = mat; p.userData.cru = Mt.cruPiso; pisos.push(p);
       var teto = plano(G.cobertura, w, d, Mt.teto, x + w / 2, H - .005, z + d / 2, false); teto.rotation.x = Math.PI / 2;
       var laje = caixa(G.cobertura, w, .15, d, Mt.laje, x + w / 2, H, z + d / 2); laje.userData.pronto = Mt.laje; laje.userData.cru = Mt.cruLaje;
@@ -915,6 +959,7 @@ function TRES_ENGINE(THREE, M){
       /* vitrine: a parede da frente dos ambientes sociais vira vidro do piso ao teto (loja, recepção, sala) */
       var ehVitrine = F.vitrine && ehTerreo && naFrente && salaF && salaF.tipo === 'social';
       if (ehVitrine) {
+        fk('vitrine');
         var lenV = (pc.q2 - pc.p2) * CM, midV = (pc.p2 + pc.q2) / 2 * CM, zV = pc.c * CM;
         var vid2 = caixa(G.paredes, lenV, H - .1, .04, Mt.vidro, midV, .1, zV, false); vid2.userData.janela = true; vid2.userData.pronto = Mt.vidro; vid2.userData.cru = Mt.cruParede;
         caixa(G.paredes, lenV, .1, ESP * CM, matEsq, midV, 0, zV); caixa(G.paredes, lenV, .1, ESP * CM, matEsq, midV, H - .1, zV);
@@ -922,6 +967,7 @@ function TRES_ENGINE(THREE, M){
         pc.ab.forEach(function (ab) { if (ab.tipo === 'entrada') { var lenE = (ab.e - ab.s) * CM, midE = (ab.s + ab.e) / 2 * CM; caixa(G.paredes, lenE + .1, .08, .12, matEsq, midE, ab.z1 * CM + .02, zV); caixa(G.acabamento, .03, .03, .1, Mt.metal, midE + lenE / 2 - .12, 1.0, zV - .04); } });
       }
       /* revestimento na frente da casa (peças da testada que não são garagem) */
+      fk('revestimento');
       if (matRev && pc.ext && pc.o === 'h' && pc.c === frenteCm) {
         var salaFrente = pc.A || pc.B, ehGar = salaFrente && salaFrente.tipo === 'garagem';
         if (!ehGar && !ehVitrine) {
@@ -935,6 +981,7 @@ function TRES_ENGINE(THREE, M){
           });
         }
       }
+      fk(pc.ext ? 'parede' : null);
       pc.caixas.forEach(function (c) {
         if (ehVitrine) return;
         var len = (c.q - c.p) * CM, alt = (c.z1 - c.z0) * CM, mid = (c.p + c.q) / 2 * CM, y0 = c.z0 * CM;
@@ -942,6 +989,7 @@ function TRES_ENGINE(THREE, M){
         m.userData.pronto = mat; m.userData.cru = Mt.cruParede;
       });
       /* platibanda nas peças externas (só quando a cobertura é platibanda) */
+      fk('cobertura');
       if (pc.ext && F.cobertura === 'platibanda' && (ehTopo || !cobertoAcima(an.pav, pc.o === 'h' ? (pc.p2 + pc.q2) / 2 : pc.c, pc.o === 'h' ? pc.c : (pc.p2 + pc.q2) / 2))) {
         var len2 = (pc.q2 - pc.p2) * CM, mid2 = (pc.p2 + pc.q2) / 2 * CM;
         var pl = pc.o === 'h' ? caixa(G.cobertura, len2, .6, ESP * CM, matExt, mid2, H + .15, pc.c * CM) : caixa(G.cobertura, ESP * CM, .6, len2, matExt, pc.c * CM, H + .15, mid2);
@@ -950,6 +998,7 @@ function TRES_ENGINE(THREE, M){
       /* esquadrias, vidros e portas */
       pc.ab.forEach(function (ab) {
         if (ehVitrine && ab.tipo === 'janela') return;   /* a vitrine já é o vidro */
+        fk(!pc.ext ? null : ab.tipo === 'janela' ? 'janela' : ab.tipo === 'portao' ? 'garagem' : ab.tipo === 'entrada' ? 'porta' : null);
         var len = (ab.e - ab.s) * CM, alt = (ab.z1 - ab.z0) * CM, mid = (ab.s + ab.e) / 2 * CM, y0 = ab.z0 * CM;
         var horiz = pc.o === 'h', cx = horiz ? mid : pc.c * CM, cz = horiz ? pc.c * CM : mid;
         if (ab.tipo === 'entrada' && horiz && pc.c === frenteCm) entradaInfo = {cx:cx, cz:cz, len:len, p2:pc.p2 * CM, q2:pc.q2 * CM};
@@ -1018,8 +1067,8 @@ function TRES_ENGINE(THREE, M){
           }
           if (horiz && pc.c === frenteCm) {   /* fachada: volume de destaque, marquise, número e luz da entrada */
             var ladoX = cx - len / 2 - .35;
-            caixa(G.acabamento, .35, altTotal + (F.cobertura === 'platibanda' ? .75 : .1), .3, matDest, ladoX, 0, cz - .08);
-            if (F.marquise) caixa(G.acabamento, len + 1.2, .12, 1.1, matDest, cx + .1, 2.25, cz - .55);
+            fk('destaque'); caixa(G.acabamento, .35, altTotal + (F.cobertura === 'platibanda' ? .75 : .1), .3, matDest, ladoX, 0, cz - .08);
+            fk('marquise'); if (F.marquise) caixa(G.acabamento, len + 1.2, .12, 1.1, matDest, cx + .1, 2.25, cz - .55);
             if (F.pergolado) {   /* pergolado de madeira sobre a entrada */
               var pw2 = Math.max(2.4, len + 1.6), pd2 = 1.6;
               caixa(G.acabamento, .12, 2.5, .12, Mt.esqMadeira, cx - pw2 / 2 + .06, 0, cz - pd2 + .06); caixa(G.acabamento, .12, 2.5, .12, Mt.esqMadeira, cx + pw2 / 2 - .06, 0, cz - pd2 + .06);
@@ -1030,6 +1079,7 @@ function TRES_ENGINE(THREE, M){
             luzes.push({tipo:'ponto', x:cx, y:2.15, z:cz - .5, cor:'#FFD9A0', int:8, dist:6});
           }
         } else {   /* porta interna: aberta a 75° para dentro do ambiente B */
+          fk(null);
           peça(.05, alt, .12, Mt.esquadria, -len / 2 + .025, 0, 0); peça(.05, alt, .12, Mt.esquadria, len / 2 - .025, 0, 0); peça(len, .05, .12, Mt.esquadria, 0, alt - .05, 0);
           var folha = new THREE.Mesh(new THREE.BoxGeometry(len - .06, alt - .05, .04), Mt.porta); folha.castShadow = true;
           var piv = new THREE.Group(); piv.position.set(horiz ? cx - len / 2 + .03 : cx, y0 + (alt - .05) / 2, horiz ? cz : cz - len / 2 + .03);
@@ -1048,6 +1098,7 @@ function TRES_ENGINE(THREE, M){
       ['pisos', 'paredes', 'cobertura', 'acabamento'].forEach(function (k) { var g = new THREE.Group(); g.position.y = d.yb; g.name = k + d.pav; G[k].add(g); Gp[k] = g; });
       d.res = montarAndar(d.an, false, d.pav === nP - 1, Gp);
     });
+    fk(null);
     var anTopo = nP > 1 ? andares[nP - 2].an : an, yTopo = (nP - 1) * andarH;
     var frenteTopo = anTopo.ambs.length ? Math.min.apply(null, anTopo.ambs.map(function (a) { return a.y; })) : frenteCm;
     var topoX0 = anTopo.ambs.length ? Math.min.apply(null, anTopo.ambs.map(function (a) { return a.x; })) * CM : casaX0, topoX1 = anTopo.ambs.length ? Math.max.apply(null, anTopo.ambs.map(function (a) { return a.x + a.w; })) * CM : casaX1;
@@ -1062,6 +1113,7 @@ function TRES_ENGINE(THREE, M){
       caixa(G.acabamento, .04, .9, eh, matEsq, ex + ew + .01, 0, ez + eh / 2).rotation.x = 0;   /* corrimão simplificado ao longo da escada */
     }
     /* ---------- telhado (2 ou 4 águas) sobre a caixa da casa ---------- */
+    fk('cobertura');
     if (F.cobertura !== 'platibanda' && anTopo.ambs.length) {
       var bz0 = frenteTopo * CM, bz1 = Math.max.apply(null, anTopo.ambs.map(function (a) { return a.y + a.h; })) * CM, e = .5;
       var X0 = topoX0 - e, X1 = topoX1 + e, Z0 = bz0 - e, Z1 = bz1 + e, W = X1 - X0, D = Z1 - Z0, y0 = yTopo + H + .15, alongX = W >= D;
@@ -1075,7 +1127,7 @@ function TRES_ENGINE(THREE, M){
         if (alongX) { oit.push([X0 + e, y0, Z0 + e], [X0 + e, y0, Z1 - e], [X0 + e, y1 - e * .42, (Z0 + Z1) / 2], [X1 - e, y0, Z1 - e], [X1 - e, y0, Z0 + e], [X1 - e, y1 - e * .42, (Z0 + Z1) / 2]); }
         else { oit.push([X0 + e, y0, Z0 + e], [X1 - e, y0, Z0 + e], [(X0 + X1) / 2, y1 - e * .42, Z0 + e], [X1 - e, y0, Z1 - e], [X0 + e, y0, Z1 - e], [(X0 + X1) / 2, y1 - e * .42, Z1 - e]); }
         var go = new THREE.BufferGeometry(); go.setAttribute('position', new THREE.Float32BufferAttribute([].concat.apply([], oit), 3)); go.computeVertexNormals();
-        var mo = new THREE.Mesh(go, new THREE.MeshStandardMaterial({color: F.corParede, roughness:.85, side:THREE.DoubleSide})); mo.castShadow = true; mo.userData.pronto = mo.material; mo.userData.cru = Mt.cruParede; G.cobertura.add(mo);
+        var mo = new THREE.Mesh(go, new THREE.MeshStandardMaterial({color: F.corParede, roughness:.85, side:THREE.DoubleSide})); mo.castShadow = true; mo.userData.pronto = mo.material; mo.userData.cru = Mt.cruParede; mo.userData.fk = 'cobertura'; G.cobertura.add(mo);
       } else {   /* 4 águas: cumeeira curta no eixo maior */
         if (alongX) { var rx0 = X0 + meia, rx1 = X1 - meia, zm = (Z0 + Z1) / 2;
           q([X0, y0, Z0], [X1, y0, Z0], [rx1, y1, zm], [rx0, y1, zm]); q([X1, y0, Z1], [X0, y0, Z1], [rx0, y1, zm], [rx1, y1, zm]);
@@ -1088,11 +1140,12 @@ function TRES_ENGINE(THREE, M){
       var pos = [], uv = [];
       tri.forEach(function (v) { pos.push(v[0], v[1], v[2]); uv.push(v[0], v[2] + v[1] * 1.2); });
       var gt = new THREE.BufferGeometry(); gt.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gt.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); gt.computeVertexNormals();
-      var telhado = new THREE.Mesh(gt, matTelha); telhado.castShadow = true; telhado.receiveShadow = true; telhado.userData.pronto = matTelha; telhado.userData.cru = Mt.cruLaje; G.cobertura.add(telhado);
+      var telhado = new THREE.Mesh(gt, matTelha); telhado.castShadow = true; telhado.receiveShadow = true; telhado.userData.pronto = matTelha; telhado.userData.cru = Mt.cruLaje; telhado.userData.fk = 'cobertura'; G.cobertura.add(telhado);
       /* forro do beiral + calha */
       var fb = caixa(G.cobertura, W, .08, D, corMat(F.corParede), (X0 + X1) / 2, y0 - .08, (Z0 + Z1) / 2, false); fb.userData.pronto = fb.material; fb.userData.cru = Mt.cruLaje;
     }
     /* ---------- letreiro com o nome do estabelecimento + totem ---------- */
+    fk('letreiro');
     if (F.letreiro && an.ambs.length) {
       var lz = frenteCm * CM - ESP * CM / 2, larguraFrente = casaX1 - casaX0, fat = LETREIRO_FATOR[F.letreiroTam] || 1, fmt = F.letreiroFormato || 'retangular';
       var lh = (F.cobertura === 'platibanda' ? .7 : .6) * fat * (F.letreiroSub ? 1.35 : 1), lw, lx;
@@ -1123,6 +1176,7 @@ function TRES_ENGINE(THREE, M){
       }
     }
 
+    fk(null);
     /* ---------- luzes da fachada (só acendem à noite) ---------- */
     luzes.push({tipo:'ponto', x:posteLuz.x, y:posteLuz.y, z:posteLuz.z, cor:'#FFE9C4', int:30, dist:14});
     if (F.iluminacao) {
@@ -1135,15 +1189,30 @@ function TRES_ENGINE(THREE, M){
     proj.ambientes.filter(function (a) { return !coberto(a); }).forEach(function (r) {
       var x = r.x * CM, z = r.y * CM, w = r.w * CM, d = r.h * CM, cx = x + w / 2, cz = z + d / 2;
       if (r.tipo === 'agua') {
-        caixa(G.pisos, w + .8, .06, d + .8, Mt.deck, cx, 0, cz, false);
-        caixa(G.pisos, w + .16, .1, d + .16, Mt.piscina, cx, .02, cz, false);
-        plano(G.pisos, w, d, Mt.piscina, cx, -1.4, cz, false);
-        caixa(G.pisos, .1, 1.4, d, Mt.piscina, x + .05, -1.4, cz, false); caixa(G.pisos, .1, 1.4, d, Mt.piscina, x + w - .05, -1.4, cz, false);
-        caixa(G.pisos, w, 1.4, .1, Mt.piscina, cx, -1.4, z + .05, false); caixa(G.pisos, w, 1.4, .1, Mt.piscina, cx, -1.4, z + d - .05, false);
+        /* profundidade, raias e salão vêm do próprio ambiente (mesmos campos do model.piscinaCfg) */
+        var prof = ((r.prof || 140) + (r.profMax || r.prof || 140)) / 200, vert = r.h >= r.w, larg = vert ? w : d;
+        var raias = r.raias || Math.max(1, Math.floor(Math.min(r.w, r.h) / (r.raia || 150)));
+        var coberta = proj.ambientes.some(function (b) { return b !== r && coberto(b) && (b.pav || 0) === (r.pav || 0) && r.x >= b.x && r.y >= b.y && r.x + r.w <= b.x + b.w && r.y + r.h <= b.y + b.h; });
+        if (!coberta) caixa(G.pisos, w + .8, .06, d + .8, Mt.deck, cx, 0, cz, false);
+        caixa(G.pisos, w + .16, coberta ? .13 : .1, d + .16, Mt.piscina, cx, coberta ? 0 : .02, cz, false);   /* borda: dentro do salão sobe 3 cm acima do piso */
+        plano(G.pisos, w, d, Mt.piscina, cx, -prof, cz, false);
+        caixa(G.pisos, .1, prof + .1, d, Mt.piscina, x + .05, -prof, cz, false); caixa(G.pisos, .1, prof + .1, d, Mt.piscina, x + w - .05, -prof, cz, false);
+        caixa(G.pisos, w, prof + .1, .1, Mt.piscina, cx, -prof, z + .05, false); caixa(G.pisos, w, prof + .1, .1, Mt.piscina, cx, -prof, z + d - .05, false);
         var ag = plano(G.acabamento, w - .2, d - .2, Mt.agua, cx, -.25, cz, false); ag.userData.agua = true; ag.receiveShadow = false;
         var lp = caixa(G.pisos, w - .2, .12, d - .2, Mt.laje, cx, -.01, cz, false); lp.visible = false; lp.userData.lp = true;   /* tampa na obra crua */
-        /* espreguiçadeiras */
-        if (w > 3 && d > 3) { caixa(G.acabamento, .6, .3, 1.6, Mt.branco, x - .9, .06, cz - 1); caixa(G.acabamento, .6, .3, 1.6, Mt.branco, x - .9, .06, cz + 1); }
+        /* raias: cordas flutuantes no sentido do comprimento + linha de fundo */
+        for (var ri = 1; ri < raias; ri++) {
+          var off = larg * ri / raias, matR = ri % 2 ? Mt.branco : Mt.inox;
+          if (vert) { caixa(G.acabamento, .06, .05, d - .3, matR, x + off, -.27, cz, false); caixa(G.acabamento, .25, .01, d - .6, Mt.preto, x + off, -prof + .005, cz, false); }
+          else      { caixa(G.acabamento, w - .3, .05, .06, matR, cx, -.27, z + off, false); caixa(G.acabamento, w - .6, .01, .25, Mt.preto, cx, -prof + .005, z + off, false); }
+        }
+        /* blocos de partida na cabeceira, quando é piscina de raias */
+        if (raias > 1 && Math.max(w, d) >= 10) for (var bi = 0; bi < raias; bi++) {
+          var offB = larg * (bi + .5) / raias;
+          if (vert) caixa(G.acabamento, .5, .45, .5, Mt.branco, x + offB, coberta ? .1 : .06, z - .35); else caixa(G.acabamento, .5, .45, .5, Mt.branco, x - .35, coberta ? .1 : .06, z + offB);
+        }
+        /* espreguiçadeiras (só ao ar livre) */
+        if (!coberta && w > 3 && d > 3) { caixa(G.acabamento, .6, .3, 1.6, Mt.branco, x - .9, .06, cz - 1); caixa(G.acabamento, .6, .3, 1.6, Mt.branco, x - .9, .06, cz + 1); }
       } else {
         var gp = plano(G.pisos, w, d, Mt.grama, cx, .012, cz); gp.userData.ambId = r.id; pisos.push(gp);
         var Rj = rnd(hash(r.id)), n = Math.max(1, Math.min(4, Math.floor(w * d / 9)));
@@ -1385,8 +1454,13 @@ function TRES_ENGINE(THREE, M){
       }
       if (Object.keys(ptr).length === 2) { var k = Object.keys(ptr); arrasto = {pinch: dist2(ptr[k[0]], ptr[k[1]]), dist: orbD.dist}; }
     });
+    var fkHover = null;
     on(canvas, 'pointermove', function (e) {
-      var p = ptr[e.pointerId]; if (!p) return;
+      var p = ptr[e.pointerId];
+      if (!p) {   /* só passando o mouse: destaca o elemento de fachada clicável */
+        if (cb.fachadaHover && e.pointerType !== 'touch') { var fh = sobFachada(e); if (fh !== fkHover) { fkHover = fh; canvas.style.cursor = fh ? 'pointer' : ''; cb.fachadaHover(fh, e.clientX, e.clientY); } }
+        return;
+      }
       var dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
       if (arrastoMov) {
         var pt = noPlano(e, arrastoMov.g.position.y); if (!pt) return;
@@ -1473,9 +1547,22 @@ function TRES_ENGINE(THREE, M){
     on(canvas, 'blur', function () { teclas = {}; });
     function clique(e){
       if (op.editar !== false && sel3) { selecionarMovel(null); }   /* clicou fora: solta a seleção */
+      if (cb.fachadaClique) { var fkh = sobFachada(e); if (fkh) { cb.fachadaClique(fkh, e.clientX, e.clientY); return; } }
       var hit = sob(e);
       if (hit && hit.userData.ambId && cb.clique) cb.clique(hit.userData.ambId);
       if (hit && hit.userData.ambId && modo !== 'walk' && op.cliqueVai !== false) irAmbiente(hit.userData.ambId);
+    }
+    /* elemento de fachada sob o ponteiro (janela, porta, muro…) — lista de malhas etiquetadas, refeita a cada construção */
+    var fkCache = null;
+    function sobFachada(e){
+      if (!cena) return null;
+      var r = canvas.getBoundingClientRect();
+      ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      if (!fkCache || fkCache.cena !== cena) { fkCache = []; fkCache.cena = cena; cena.raiz.traverse(function (o) { if (o.isMesh && o.userData.fk) fkCache.push(o); }); }
+      var hits = raycaster.intersectObjects(fkCache, false);
+      for (var i = 0; i < hits.length; i++) { var o = hits[i].object, vis = true, p = o; while (p) { if (p.visible === false) { vis = false; break; } p = p.parent; } if (vis) return o.userData.fk; }
+      return null;
     }
     function sob(e){
       if (!cena) return null;

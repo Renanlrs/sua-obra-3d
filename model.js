@@ -38,7 +38,12 @@ var M = (function () {
     {nome:'Loja',             tipo:'social',     w:380, h:400},
     {nome:'Recepção',         tipo:'social',     w:350, h:350},
     {nome:'Vestiário',        tipo:'molhado',    w:360, h:420},
-    {nome:'Depósito',         tipo:'servico',    w:200, h:250}
+    {nome:'Depósito',         tipo:'servico',    w:200, h:250},
+    {nome:'Salão da piscina', tipo:'social',     w:900, h:1400},
+    {nome:'Banheiro acessível', tipo:'molhado',  w:240, h:240},
+    {nome:'Controle de acesso', tipo:'circulacao', w:220, h:100},
+    {nome:'Administração',    tipo:'social',     w:400, h:350},
+    {nome:'Deck',             tipo:'social',     w:600, h:200}
   ];
 
   /* programas iniciais por tipo de projeto */
@@ -55,6 +60,8 @@ var M = (function () {
       itens:['Loja','Recepção','Depósito','Banheiro','Corredor']},
     'piscina':      {rot:'Área de lazer',    desc:'piscina, deck, apoio',
       itens:['Piscina','Varanda','Banheiro','Depósito','Jardim']},
+    'escola-natacao':{rot:'Escola de natação', desc:'loja, recepção, vestiários, piscina com raias', terreno:{l:1500, p:2000},
+      itens:['Loja','Corredor','Recepção','Controle de acesso','Vestiário','Vestiário','Banheiro acessível','Salão da piscina','Piscina','Administração','Deck']},
     'zero':         {rot:'Do zero',          desc:'terreno vazio', itens:[]}
   };
 
@@ -80,10 +87,16 @@ var M = (function () {
       peDireito: 280,
       padrao: 'padrao',
       meta: 0,
+      reservaPct: 10,
+      equip: {aquecimento:0, filtragem:0},
       ambientes: [],
-      moveis: []
+      moveis: [],
+      cotas: [],
+      renders: [],
+      versoes: []
     };
-    if (pr.itens.length) { gerar(pr.itens); if (tipoKey === 'sobrado') subirIntimos(); mobiliarAuto(); }
+    if (tipoKey === 'escola-natacao') { gerarEscola(); mobiliarAuto(); }
+    else if (pr.itens.length) { gerar(pr.itens); if (tipoKey === 'sobrado') subirIntimos(); mobiliarAuto(); }
     pavAtual = 0;
     hist = []; fut = []; base = snap();
     return proj;
@@ -97,8 +110,10 @@ var M = (function () {
   }
   function mobiliarAuto(){
     if (!window.MOVEIS) return [];
-    var novos = MOVEIS.auto(proj, lados());
+    var novos = MOVEIS.auto(proj, lados()), agua = piscinas();
     novos.forEach(function (m) { m.id = uid(); var r = m.amb && proj.ambientes.filter(function (a) { return a.id === m.amb; })[0]; if (r && pavDe(r)) m.pav = pavDe(r); });
+    /* nada de móvel dentro da lâmina d'água (o salão da piscina é "social", mas o miolo é piscina) */
+    novos = novos.filter(function (m) { return !agua.some(function (a) { return pavDe(a) === (m.pav || 0) && m.x > a.x - 40 && m.x < a.x + a.w + 40 && m.y > a.y - 40 && m.y < a.y + a.h + 40; }); });
     proj.moveis = novos;
     return novos;
   }
@@ -186,6 +201,49 @@ var M = (function () {
       y += fx.alt;
     });
     proj.ambientes = out;
+  }
+
+  /* ---------- escola de natação (partido ACQUA BELO): RUA → PORTÃO → CORREDOR → CONTROLE →
+     VESTIÁRIOS → PISCINA. Três faixas: recuo 1,00 m + bloco frontal (loja | corredor | recepção,
+     2 pavimentos) + salão aquático com a piscina no centro e praias de 1,50 m nas laterais.
+     Loja e recepção abrem para o corredor, nunca para a rua. ---------- */
+  function gerarEscola(){
+    var t = proj.terreno;
+    t.recuoFrontal = 100; t.recuoLateral = 0; t.recuoFundo = 0;   /* faixa de acesso: portão eletrônico → porta de vidro */
+    var W = t.largura, D = t.profundidade, y0 = t.recuoFrontal;
+    var bloco = Math.max(400, Math.min(500, Math.round(D * .2)));       /* bloco frontal */
+    var cw = Math.max(180, Math.min(260, Math.round(W * .16)));          /* corredor central */
+    var cx = Math.round((W - cw) / 2);
+    var ctrl = 100;                                                      /* controle de acesso (catraca) */
+    var out = [];
+    function add(nome, tipo, x, y, w, h, extra){ var a = {id:uid(), nome:nome, tipo:tipo, x:Math.round(x), y:Math.round(y), w:Math.round(w), h:Math.round(h)}; if (extra) for (var k in extra) a[k] = extra[k]; out.push(a); return a; }
+    add('Loja', 'social', 0, y0, cx, bloco);
+    add('Corredor', 'circulacao', cx, y0, cw, bloco);
+    add('Recepção', 'social', cx + cw, y0, W - cx - cw, bloco);
+    add('Controle de acesso', 'circulacao', cx, y0 + bloco, cw, ctrl);
+    var ySal = y0 + bloco + ctrl, hSal = D - ySal;
+    var vw = Math.max(240, Math.min(300, Math.round(W * .2))), vh = Math.max(300, Math.min(450, Math.round(hSal * .3)));
+    add('Vestiário masculino', 'molhado', 0, ySal, vw, vh);
+    add('Vestiário feminino', 'molhado', W - vw, ySal, vw, vh);
+    add('Banheiro acessível', 'molhado', 0, ySal + vh, vw, 240);
+    add('Depósito', 'servico', W - vw, ySal + vh, vw, 240);
+    /* salão = o miolo da faixa aquática; a piscina fica DENTRO dele; as laterais viram circulação */
+    add('Salão da piscina', 'social', vw, ySal, W - vw * 2, hSal);
+    add('Circulação esq.', 'circulacao', 0, ySal + vh + 240, vw, hSal - vh - 240);
+    add('Circulação dir.', 'circulacao', W - vw, ySal + vh + 240, vw, hSal - vh - 240);
+    var praiaL = 150, praiaF = 100, praiaB = 50;
+    var pw = Math.min(600, W - vw * 2 - praiaL * 2), ph = Math.min(1250, hSal - praiaF - praiaB);
+    pw = Math.max(300, Math.floor(pw / 50) * 50); ph = Math.max(600, Math.floor(ph / 50) * 50);
+    var raias = Math.max(1, Math.floor(pw / 150));
+    add('Piscina', 'agua', (W - pw) / 2, ySal + praiaF, pw, ph, {prof:110, profMax:140, raias:raias, raia:150});
+    /* 1º andar: administração + deck do animador sobre o bloco frontal (em balanço sobre o salão) */
+    add('Administração', 'social', 0, y0, cx, bloco, {pav:1});
+    add('Hall', 'circulacao', cx, y0, cw, bloco, {pav:1});
+    add('Sala de apoio', 'social', cx + cw, y0, W - cx - cw, bloco, {pav:1});
+    add('Deck do animador', 'social', 0, y0 + bloco, W, ctrl + 200, {pav:1});
+    proj.ambientes = out;
+    proj.equip = {aquecimento:5500000, filtragem:3800000};
+    proj.meta = 70000000;
   }
 
   /* ---------- derivadas (funções puras) ---------- */
@@ -347,7 +405,7 @@ var M = (function () {
     return itens;
   }
   function custoFachada(){ return custoFachadaItens().reduce(function (s2, i) { return s2 + i.valor; }, 0); }
-  function custoGeral(){ return custoTotal() + custoFachada(); }
+  function custoGeral(){ return custoTotal() + custoFachada() + custoPiscina(); }
   function custoPorM2(){
     var ac = areaConstruida() / 10000;
     return ac ? Math.round(custoTotal() / ac) : 0;
@@ -374,13 +432,218 @@ var M = (function () {
         var A = proj.ambientes[i], B = proj.ambientes[j];
         if (pavDe(A) !== pavDe(B)) continue;
         var ov = A.x < B.x + B.w && B.x < A.x + A.w && A.y < B.y + B.h && B.y < A.y + A.h;
+        if (ov && ((A.tipo === 'agua' && contem(B, A)) || (B.tipo === 'agua' && contem(A, B)))) continue;   /* piscina dentro do salão */
         if (ov) p.push({id:A.id, tipo:'sobrepoe', msg: A.nome + ' está sobrepondo ' + B.nome});
       }
     proj.ambientes.forEach(function (a) { var ap = apoio(a); if (pavDe(a) && cobertoAmb(a) && ap < .5) p.push({id:a.id, tipo:'balanco', msg: a.nome + ' está em balanço — só ' + fmtPct(ap * 100) + ' apoiado no andar de baixo'}); });
     if (ocupacao() > 70)
       p.push({id:null, tipo:'ocupacao', msg:'Taxa de ocupação em ' + fmtPct(ocupacao()) + ' — a maioria dos municípios limita em 50% a 70%'});
+    piscinas().forEach(function (a) { piscinaAlertas(a).forEach(function (q) { if (q.nivel === 'erro') p.push({id:a.id, tipo:'piscina', msg:q.msg}); }); });
     return p;
   }
+
+  /* ---------- piscina (vinda do ACQUA BELO): raias, profundidade, praias, volume ---------- */
+  function contem(A, B){ return B.x >= A.x && B.y >= A.y && B.x + B.w <= A.x + A.w && B.y + B.h <= A.y + A.h; }
+  function piscinas(){ return proj.ambientes.filter(function (a) { return a.tipo === 'agua'; }); }
+  function salaoDe(a){   /* ambiente coberto do mesmo andar que contém a piscina inteira */
+    var cands = proj.ambientes.filter(function (b) { return b !== a && pavDe(b) === pavDe(a) && cobertoAmb(b) && contem(b, a); });
+    cands.sort(function (x, y) { return areaOf(x) - areaOf(y); });
+    return cands[0] || null;
+  }
+  function piscinaCfg(a){
+    var raia = a.raia || 150, raias = a.raias || Math.max(1, Math.floor(Math.min(a.w, a.h) / raia));
+    return {prof:a.prof || 140, profMax:a.profMax || a.prof || 140, raias:raias, raia:raia};
+  }
+  function praias(a){   /* distância da borda da piscina até as paredes do salão (ou do terreno) */
+    var s = salaoDe(a), t = proj.terreno, X0 = s ? s.x : 0, Y0 = s ? s.y : 0, X1 = s ? s.x + s.w : t.largura, Y1 = s ? s.y + s.h : t.profundidade;
+    return {esq:a.x - X0, dir:X1 - a.x - a.w, frente:a.y - Y0, fundo:Y1 - a.y - a.h, salao:s};
+  }
+  function piscinaInfo(a){
+    var c = piscinaCfg(a), w = a.w / 100, h = a.h / 100, pm = (c.prof + c.profMax) / 200;
+    var area = w * h, perimetro = 2 * (w + h), volume = area * pm, molhada = area + perimetro * pm;
+    var comp = Math.max(w, h), larg = Math.min(w, h);
+    /* as raias correm no sentido do comprimento: têm de caber na largura (lado menor) */
+    var raiasCabem = c.raias * c.raia <= larg * 100 + 1;
+    return {area:area, perimetro:perimetro, volume:volume, molhada:molhada, comp:comp, larg:larg, raias:c.raias, raia:c.raia, prof:c.prof, profMax:c.profMax, raiasCabem:raiasCabem, praias:praias(a)};
+  }
+  function piscinaAlertas(a){
+    var i = piscinaInfo(a), p = i.praias, out = [], n = a.nome;
+    if (!i.raiasCabem) out.push({nivel:'erro', msg:i.raias + ' raias de ' + fmtM(i.raia) + ' não cabem em ' + num(i.larg) + ' m de largura (' + n + ')'});
+    if (i.comp < 10 || i.larg < 5) out.push({nivel:'aviso', msg:n + ' abaixo do porte para natação e treino (mín. 10,00 × 5,00 m)'});
+    else out.push({nivel:'ok', msg:n + ' com porte para natação: ' + num(i.comp) + ' × ' + num(i.larg) + ' m'});
+    if (p.salao) {
+      var lat = Math.min(p.esq, p.dir), cab = Math.min(p.frente, p.fundo);
+      if (lat < 150) out.push({nivel:'erro', msg:'Praia lateral de ' + fmtM(lat) + ' — mínimo 1,50 m de cada lado da piscina'});
+      else out.push({nivel:'ok', msg:'Praias laterais: ' + fmtM(p.esq) + ' e ' + fmtM(p.dir)});
+      if (cab < 50) out.push({nivel:'erro', msg:'Praia de cabeceira de ' + fmtM(cab) + ' — mínimo 0,50 m'});
+      else out.push({nivel:'ok', msg:'Praias de cabeceira: frente ' + fmtM(p.frente) + ' · fundo ' + fmtM(p.fundo)});
+    } else if (p.esq < 0 || p.dir < 0 || p.frente < 0 || p.fundo < 0) out.push({nivel:'erro', msg:n + ' está fora do terreno'});
+    if (i.prof < 90) out.push({nivel:'aviso', msg:n + ' muito rasa (' + fmtM(i.prof) + ') para natação'});
+    return out;
+  }
+  var PRECO_PISCINA = {impermeabilizacao:42000, raia:240000, acessorios:1200000, iluminacao:9500};   /* centavos: por m² molhado, por raia, fixo, por m² de lâmina */
+  function custoPiscinaItens(){
+    var itens = [], eq = proj.equip || {};
+    piscinas().forEach(function (a) {
+      var i = piscinaInfo(a);
+      itens.push({rot:'Impermeabilização ' + a.nome + ' (' + num(i.molhada) + ' m² molhados)', valor:Math.round(i.molhada * PRECO_PISCINA.impermeabilizacao)});
+      if (i.raias > 1) itens.push({rot:'Raias e acessórios (' + i.raias + ' raias)', valor:i.raias * PRECO_PISCINA.raia + PRECO_PISCINA.acessorios});
+      itens.push({rot:'Iluminação subaquática ' + a.nome, valor:Math.round(i.area * PRECO_PISCINA.iluminacao)});
+    });
+    if (piscinas().length) {
+      if (eq.aquecimento) itens.push({rot:'Sistema de aquecimento', valor:eq.aquecimento, campo:'aquecimento'});
+      if (eq.filtragem) itens.push({rot:'Filtragem e tratamento', valor:eq.filtragem, campo:'filtragem'});
+    }
+    return itens;
+  }
+  function custoPiscina(){ return custoPiscinaItens().reduce(function (s2, i) { return s2 + i.valor; }, 0); }
+
+  /* ---------- orçamento por etapa da obra (vindo do ACQUA BELO) — a mesma sequência do slider 4D ----------
+     O custo dos ambientes cobertos é repartido em composição; piscina e fachada entram como grupos próprios;
+     a reserva técnica fecha o total e a faixa mín/máx dá a honestidade da estimativa. */
+  var COMPOSICAO = [
+    {k:'fundacao',   rot:'Fundação',                    pct:8,  etapa:1},
+    {k:'estrutura',  rot:'Estrutura (concreto/metálica)', pct:14, etapa:2},
+    {k:'alvenaria',  rot:'Alvenaria e vedações',        pct:10, etapa:3},
+    {k:'cobertura',  rot:'Cobertura e impermeabilização', pct:11, etapa:4},
+    {k:'hidraulica', rot:'Instalações hidráulicas',     pct:8,  etapa:5},
+    {k:'eletrica',   rot:'Instalações elétricas',       pct:7,  etapa:5},
+    {k:'esquadrias', rot:'Esquadrias e vidros',         pct:9,  etapa:5},
+    {k:'revest',     rot:'Revestimentos e pisos',       pct:12, etapa:5},
+    {k:'loucas',     rot:'Louças, metais e iluminação', pct:6,  etapa:5},
+    {k:'pintura',    rot:'Pintura e acabamentos',       pct:9,  etapa:5},
+    {k:'projeto',    rot:'Projeto, engenharia e gestão', pct:6,  etapa:0}
+  ];
+  var ETAPAS_OBRA = ['Terreno e projeto', 'Fundação e piso', 'Estrutura', 'Alvenaria', 'Cobertura', 'Acabamento'];
+  function orcamento(){
+    var cob = ambientesCobertos().reduce(function (s2, a) { return s2 + custoDe(a); }, 0);
+    var agua = piscinas().reduce(function (s2, a) { return s2 + custoDe(a); }, 0);
+    var ext = proj.ambientes.filter(function (a) { return a.tipo === 'externo'; }).reduce(function (s2, a) { return s2 + custoDe(a); }, 0);
+    var linhas = COMPOSICAO.map(function (c) { return {grupo:'Construção', rot:c.rot, valor:Math.round(cob * c.pct / 100), base:c.pct + '% do custo dos ambientes cobertos', etapa:c.etapa}; });
+    if (agua) linhas.push({grupo:'Piscina', rot:'Piscina em concreto armado', valor:agua, base:fmtM2(espelhoAgua()) + ' × ' + fmtBRL(TIPOS.agua.custo[proj.padrao] * 100) + '/m²', etapa:2});
+    custoPiscinaItens().forEach(function (i) { linhas.push({grupo:'Piscina', rot:i.rot, valor:i.valor, base:i.campo ? 'campo editável' : 'calculado da piscina', etapa:5, campo:i.campo}); });
+    custoFachadaItens().forEach(function (i) { linhas.push({grupo:'Fachada', rot:i.rot, valor:i.valor, base:'escolha na aba Fachada', etapa:5}); });
+    if (ext) linhas.push({grupo:'Externo', rot:'Jardim e áreas descobertas', valor:ext, base:'por m² descoberto', etapa:5});
+    var subtotal = linhas.reduce(function (s2, l) { return s2 + l.valor; }, 0);
+    var pct = proj.reservaPct == null ? 10 : proj.reservaPct, reserva = Math.round(subtotal * pct / 100), total = subtotal + reserva;
+    var grupos = []; linhas.forEach(function (l) { var g = grupos.filter(function (x) { return x.grupo === l.grupo; })[0]; if (!g) grupos.push(g = {grupo:l.grupo, valor:0}); g.valor += l.valor; });
+    var etapas = ETAPAS_OBRA.map(function (rot, i) { return {i:i, rot:rot, valor:linhas.filter(function (l) { return l.etapa === i; }).reduce(function (s2, l) { return s2 + l.valor; }, 0)}; });
+    var ac = areaConstruida() / 10000;
+    return {linhas:linhas, grupos:grupos, etapas:etapas, subtotal:subtotal, reservaPct:pct, reserva:reserva, total:total, minimo:Math.round(total * .88), maximo:Math.round(total * 1.18), porM2:ac ? Math.round(total / ac) : 0};
+  }
+
+  /* ---------- simulador de cenários: calcula num clone, nunca mexe no projeto ---------- */
+  function simular(fn){
+    var salvo = proj, copia = JSON.parse(JSON.stringify(salvo, function (k, v) { return k === 'renders' || k === 'versoes' ? undefined : v; }));
+    proj = copia;
+    try { fn(copia); return {total:orcamento().total, area:areaConstruida(), ocupacao:ocupacao(), problemas:problemas().length, proj:copia}; }
+    finally { proj = salvo; }
+  }
+  function cenarios(){
+    var out = [], p = proj;
+    function c(nome, nota, fn){ out.push({nome:nome, nota:nota, fn:fn}); }
+    if (p.padrao !== 'economico') c('Acabamento econômico', 'Mesma planta, padrão mais simples.', function (q) { q.padrao = 'economico'; });
+    if (p.padrao !== 'superior')  c('Padrão superior', 'Mesma planta, acabamento alto.', function (q) { q.padrao = 'superior'; });
+    if (p.peDireito > 260) c('Pé-direito 2,60 m', 'Menos parede e estrutura.', function (q) { q.peDireito = 260; });
+    piscinas().forEach(function (a) {
+      var i = piscinaInfo(a), vert = a.h >= a.w;
+      function dim(q, comp, larg){ var b = q.ambientes.filter(function (x) { return x.id === a.id; })[0]; if (!b) return; var cx2 = b.x + b.w / 2, cy2 = b.y + b.h / 2; b.w = vert ? larg : comp; b.h = vert ? comp : larg; b.x = Math.round(cx2 - b.w / 2); b.y = Math.round(cy2 - b.h / 2); b.raias = Math.max(1, Math.floor(larg / (b.raia || 150))); }
+      if (Math.abs(i.comp - 11) > .01 || Math.abs(i.larg - 6) > .01) c(a.nome + ' 11,00 × 6,00 m (compacta)', 'Praias folgadas. Não permite treino cronometrado padrão.', function (q) { dim(q, 1100, 600); });
+      if (Math.abs(i.comp - 12.5) > .01 || Math.abs(i.larg - 6) > .01) c(a.nome + ' 12,50 × 6,00 m (padrão de escola)', 'Meia piscina de 25 m: permite treino cronometrado.', function (q) { dim(q, 1250, 600); });
+      if (i.comp < 15) c(a.nome + ' 15,00 × 7,00 m', 'Piscina grande — confira as praias.', function (q) { dim(q, 1500, 700); });
+      if ((p.equip || {}).aquecimento > 2800000) c('Aquecimento simplificado', 'Trocador de calor em vez de bomba de calor.', function (q) { q.equip.aquecimento = 2800000; });
+    });
+    if (nPavs() > 1) c('Sem ' + nomePav(nPavs() - 1), 'Remove o último andar (o custo cai, o programa também).', function (q) { q.ambientes = q.ambientes.filter(function (a) { return (a.pav || 0) < nPavs() - 1; }); });
+    var f = p.fachada || {};
+    if (f.revestimento && f.revestimento !== 'nenhum') c('Fachada sem revestimento', 'Só pintura na frente.', function (q) { q.fachada = q.fachada || {}; q.fachada.revestimento = 'nenhum'; });
+    if ((p.reservaPct == null ? 10 : p.reservaPct) > 5) c('Reserva técnica de 5%', 'Menos gordura para imprevistos — mais risco.', function (q) { q.reservaPct = 5; });
+    var menor = ambientesCobertos().filter(function (a) { return a.tipo === 'intimo' || a.tipo === 'social'; }).sort(function (a, b) { return areaOf(a) - areaOf(b); })[0];
+    if (menor && ambientesCobertos().length > 3) c('Sem ' + menor.nome, 'Corta o menor ambiente (' + fmtM2(areaOf(menor)) + ').', function (q) { q.ambientes = q.ambientes.filter(function (a) { return a.id !== menor.id; }); q.moveis = (q.moveis || []).filter(function (m) { return m.amb !== menor.id; }); });
+    var base0 = orcamento().total;
+    return out.map(function (cn) { var r = simular(cn.fn); return {nome:cn.nome, nota:cn.nota, fn:cn.fn, total:r.total, delta:r.total - base0, area:r.area, problemas:r.problemas}; });
+  }
+  function aplicarCenario(cn){ cn.fn(proj); }
+
+  /* ---------- camadas (vindo do ACQUA BELO): visível / bloqueada; ficam no projeto ---------- */
+  var CAMADAS = [
+    {k:'terreno',   rot:'Terreno e recuos'},
+    {k:'ambientes', rot:'Ambientes e paredes'},
+    {k:'piscina',   rot:'Piscina e raias'},
+    {k:'escada',    rot:'Escada'},
+    {k:'moveis',    rot:'Móveis'},
+    {k:'rotulos',   rot:'Nomes e áreas'},
+    {k:'cotas',     rot:'Cotas'},
+    {k:'grade',     rot:'Grade'},
+    {k:'fantasma',  rot:'Andar de baixo (fantasma)'}
+  ];
+  function camada(k){ var c = (proj && proj.camadas || {})[k] || {}; return {vis:c.vis !== false, bloq:!!c.bloq}; }
+  function setCamada(k, prop, val){ if (!proj.camadas) proj.camadas = {}; var c = proj.camadas[k] = proj.camadas[k] || {}; c[prop] = val; if (c.vis !== false) delete c.vis; if (!c.bloq) delete c.bloq; if (!Object.keys(c).length) delete proj.camadas[k]; }
+
+  /* ---------- cotas: lista derivada das medidas + cotas livres do usuário ---------- */
+  function cotasLista(){
+    var t = proj.terreno, out = [];
+    function add(rot, cm, ref, campo){ out.push({rot:rot, cm:cm, ref:ref, campo:campo}); }
+    add('Terreno — largura', t.largura, 'terreno', 'largura'); add('Terreno — profundidade', t.profundidade, 'terreno', 'profundidade');
+    add('Recuo frontal', t.recuoFrontal, 'terreno', 'recuoFrontal'); add('Recuo lateral', t.recuoLateral, 'terreno', 'recuoLateral'); add('Recuo de fundo', t.recuoFundo, 'terreno', 'recuoFundo');
+    add('Pé-direito', proj.peDireito, 'proj', 'peDireito');
+    proj.ambientes.slice().sort(function (a, b) { return pavDe(a) - pavDe(b) || a.y - b.y || a.x - b.x; }).forEach(function (a) {
+      var pv = nPavs() > 1 ? ' (' + nomePav(pavDe(a)) + ')' : '';
+      add(a.nome + pv + ' — largura', a.w, a.id, 'w'); add(a.nome + pv + ' — profundidade', a.h, a.id, 'h');
+      if (a.tipo === 'agua') { var pr = praias(a); add(a.nome + ' — profundidade mín.', piscinaCfg(a).prof, a.id, 'prof'); add(a.nome + ' — profundidade máx.', piscinaCfg(a).profMax, a.id, 'profMax');
+        if (pr.salao) { add(a.nome + ' — praia esquerda', pr.esq); add(a.nome + ' — praia direita', pr.dir); add(a.nome + ' — praia de frente', pr.frente); add(a.nome + ' — praia de fundo', pr.fundo); } }
+    });
+    var e = escada(); if (e) { add('Escada — largura', e.w); add('Escada — comprimento', e.h); }
+    return out;
+  }
+  function setCota(ref, campo, cm){
+    if (ref === 'terreno') proj.terreno[campo] = cm;
+    else if (ref === 'proj') proj[campo] = cm;
+    else { var a = proj.ambientes.filter(function (x) { return x.id === ref; })[0]; if (a) a[campo] = cm; }
+  }
+
+  /* ---------- relatório técnico: quantitativos derivados ---------- */
+  function relatorio(){
+    var o = orcamento(), L = [], porTipo = {};
+    proj.ambientes.forEach(function (a) { porTipo[a.tipo] = (porTipo[a.tipo] || 0) + areaOf(a); });
+    L.push(['Área do terreno', fmtM2(areaTerreno())]);
+    L.push(['Área construída total', fmtM2(areaConstruida())]);
+    L.push(['Projeção no terreno (térreo)', fmtM2(projecao())]);
+    L.push(['Taxa de ocupação', fmtPct(ocupacao())]);
+    for (var n = 0; n < nPavs(); n++) if (nPavs() > 1) L.push(['Área do ' + nomePav(n).toLowerCase(), fmtM2(ambsPav(n).filter(cobertoAmb).reduce(function (s2, a) { return s2 + areaOf(a); }, 0))]);
+    Object.keys(TIPOS).forEach(function (k) { if (porTipo[k]) L.push(['Área — ' + TIPOS[k].rot.toLowerCase(), fmtM2(porTipo[k])]); });
+    piscinas().forEach(function (a) {
+      var i = piscinaInfo(a);
+      L.push([a.nome + ' — lâmina d’água', num(i.area) + ' m² (' + num(i.comp) + ' × ' + num(i.larg) + ' m)']);
+      L.push([a.nome + ' — raias', i.raias + ' × ' + fmtM(i.raia)]);
+      L.push([a.nome + ' — profundidade', fmtM(i.prof) + ' a ' + fmtM(i.profMax)]);
+      L.push([a.nome + ' — perímetro', num(i.perimetro) + ' m']);
+      L.push([a.nome + ' — volume de água', num(i.volume) + ' m³']);
+      L.push([a.nome + ' — área molhada (fundo + paredes)', num(i.molhada) + ' m²']);
+    });
+    L.push(['Ambientes', String(proj.ambientes.length)]);
+    L.push(['Móveis', String((proj.moveis || []).length)]);
+    L.push(['Pé-direito', fmtM(proj.peDireito)]);
+    L.push(['Padrão de acabamento', PADROES[proj.padrao].rot]);
+    L.push(['Custo estimado por m²', fmtBRL(o.porM2)]);
+    L.push(['Reserva técnica', fmtPct(o.reservaPct) + ' = ' + fmtBRL(o.reserva)]);
+    L.push(['Investimento estimado', fmtBRL(o.total)]);
+    L.push(['Faixa estimada', fmtBRL(o.minimo) + ' – ' + fmtBRL(o.maximo)]);
+    if (proj.meta > 0) L.push(['Meta de investimento', fmtBRL(proj.meta) + ' (' + fmtPct(proj.meta / Math.max(1, o.total) * 100) + ' do estimado)']);
+    return L;
+  }
+
+  /* ---------- renders (fotos do 3D ou imagens enviadas) e versões do estudo — ficam fora do undo ---------- */
+  var MAX_RENDERS = 8;
+  function addRender(r){ if (!proj.renders) proj.renders = []; r.id = uid(); r.quando = Date.now(); proj.renders.push(r); while (proj.renders.length > MAX_RENDERS) proj.renders.shift(); salvar(); emitir(); return r; }
+  function delRender(id){ proj.renders = (proj.renders || []).filter(function (r) { return r.id !== id; }); salvar(); emitir(); }
+  function estadoVersao(){ return JSON.parse(JSON.stringify(proj, function (k, v) { return k === 'renders' || k === 'versoes' || k === 'salvo' ? undefined : v; })); }
+  function salvarVersao(nome){ if (!proj.versoes) proj.versoes = []; var v = {id:uid(), nome:nome || ('Estudo ' + (proj.versoes.length + 1)), quando:Date.now(), estado:estadoVersao()}; v.resumo = {area:areaConstruida(), total:orcamento().total, ambientes:proj.ambientes.length}; proj.versoes.push(v); salvar(); emitir(); return v; }
+  function carregarVersao(id){
+    var v = (proj.versoes || []).filter(function (x) { return x.id === id; })[0]; if (!v) return false;
+    var renders = proj.renders, versoes = proj.versoes, e = JSON.parse(JSON.stringify(v.estado));
+    e.id = proj.id; e.renders = renders; e.versoes = versoes; proj = e; commit('Carregar versão “' + v.nome + '”'); return true;
+  }
+  function excluirVersao(id){ proj.versoes = (proj.versoes || []).filter(function (x) { return x.id !== id; }); salvar(); emitir(); }
 
   /* ---------- formatação — vírgula decimal, 2 casas, sufixo ---------- */
   function fmtM(cm){ return num(cm / 100) + ' m'; }
@@ -406,7 +669,8 @@ var M = (function () {
      mudanças são feitas no lugar e o commit vem DEPOIS, é a base que vai para
      o histórico — assim o primeiro Ctrl+Z desfaz de verdade. */
   var base = null;
-  function snap(){ return JSON.stringify(proj); }
+  function snap(){ return JSON.stringify(proj, function (k, v) { return k === 'renders' || k === 'versoes' ? undefined : v; }); }
+  function restaurar(json){ var r = proj.renders, vs = proj.versoes; proj = JSON.parse(json); if (r) proj.renders = r; if (vs) proj.versoes = vs; }
   function commit(nome){
     hist.push({nome: nome, dado: base || snap()});
     if (hist.length > 100) hist.shift();
@@ -417,7 +681,7 @@ var M = (function () {
     if (!hist.length) return null;
     var p = hist.pop();
     fut.push({nome: p.nome, dado: snap()});
-    proj = JSON.parse(p.dado); base = p.dado;
+    restaurar(p.dado); base = p.dado;
     salvar(); emitir();
     return p.nome;
   }
@@ -425,7 +689,7 @@ var M = (function () {
     if (!fut.length) return null;
     var p = fut.pop();
     hist.push({nome: p.nome, dado: snap()});
-    proj = JSON.parse(p.dado); base = p.dado;
+    restaurar(p.dado); base = p.dado;
     salvar(); emitir();
     return p.nome;
   }
@@ -486,6 +750,10 @@ var M = (function () {
     areaTotalAmbientes:areaTotalAmbientes, ocupacao:ocupacao, projecao:projecao, espelhoAgua:espelhoAgua,
     get pav(){ return pavAtual; }, setPav:setPav, pavDe:pavDe, nPavs:nPavs, ambsPav:ambsPav, nomePav:nomePav, apoio:apoio, addPavimento:addPavimento, removerPavimento:removerPavimento, escada:escada,
     custoDe:custoDe, custoTotal:custoTotal, custoPorM2:custoPorM2, custoFachada:custoFachada, custoFachadaItens:custoFachadaItens, custoGeral:custoGeral, fachadaCfg:fachadaCfg, testada:testada, PRECO_FACHADA:PRECO_FACHADA, bbox:bbox, problemas:problemas,
+    contem:contem, piscinas:piscinas, salaoDe:salaoDe, piscinaCfg:piscinaCfg, praias:praias, piscinaInfo:piscinaInfo, piscinaAlertas:piscinaAlertas, custoPiscinaItens:custoPiscinaItens, custoPiscina:custoPiscina, PRECO_PISCINA:PRECO_PISCINA,
+    COMPOSICAO:COMPOSICAO, ETAPAS_OBRA:ETAPAS_OBRA, orcamento:orcamento, simular:simular, cenarios:cenarios, aplicarCenario:aplicarCenario,
+    CAMADAS:CAMADAS, camada:camada, setCamada:setCamada, cotasLista:cotasLista, setCota:setCota, relatorio:relatorio,
+    addRender:addRender, delRender:delRender, salvarVersao:salvarVersao, carregarVersao:carregarVersao, excluirVersao:excluirVersao, MAX_RENDERS:MAX_RENDERS,
     fmtM:fmtM, fmtMs:fmtMs, fmtM2:fmtM2, fmtPct:fmtPct, fmtBRL:fmtBRL, num:num, parseM:parseM,
     commit:commit, undo:undo, redo:redo, podeUndo:podeUndo, podeRedo:podeRedo, proxUndo:proxUndo,
     salvar:salvar, abrir:abrir, carregar:carregar, excluir:excluir, todos:todos, ultimoId:ultimoId, onChange:onChange

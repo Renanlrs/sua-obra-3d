@@ -61,7 +61,7 @@ var UI = (function () {
         var m = e.data || {};
         if (m.type === 'suaobra:projeto') {
           if (m.proj && m.proj.terreno) M.carregar(m.proj);
-          else M.novo(m.tipoKey || 'casa-terrea', m.largura || 1000, m.profundidade || 2500, m.nome);
+          else { M.novo(m.tipoKey || 'casa-terrea', m.largura || 1000, m.profundidade || 2500, m.nome); if (m.nome) M.proj.nome = m.nome; M.salvar(); }   /* planta gerada vai logo para o banco */
           if (m.nome) M.proj.nome = m.nome;
           localStorage.setItem('suaobra3d.coach', '1');
           entrarApp();
@@ -117,6 +117,8 @@ var UI = (function () {
         tipoSel = b.getAttribute('data-k');
         document.querySelectorAll('.tipo').forEach(function (o) { o.classList.remove('on'); });
         b.classList.add('on');
+        var tp = M.PROGRAMAS[tipoSel].terreno;   /* programa com terreno típico (escola de natação: 15 × 20) */
+        if (tp) { $('#t-larg').value = M.fmtMs(tp.l); $('#t-prof').value = M.fmtMs(tp.p); dicaTerreno(); }
       };
     });
     dicaTerreno();
@@ -165,6 +167,7 @@ var UI = (function () {
     PLAN.montar(stage);
     PLAN.enquadrar(); PLAN.render();
     inspector(); refreshTop();
+    $('#btn-grid').classList.toggle('on', PLAN.vis('grade')); $('#btn-cotas').classList.toggle('on', PLAN.vis('cotas'));
   }
   function voltarHome(){
     if (window.CLOUD) { window.parent.postMessage({type:'suaobra:voltar'}, '*'); return; }
@@ -270,6 +273,7 @@ var UI = (function () {
         '<button class="tg" id="t3-mob" title="Catálogo de móveis (M)">Mobiliar</button>' +
         '<select id="t3-amb" title="Ir para um ambiente"><option value="">Ir para…</option></select>' +
         '<button class="btn ghost sm" id="t3-foto" title="Salvar a imagem atual em PNG">Foto</button>' +
+        '<button class="btn solid sm" id="t3-render" title="Guarda esta vista na aba Renders (entra na apresentação)">+ Render</button>' +
         '</div>' +
         '<div class="t3-stage" id="t3-stage">' +
         '<div class="t3-nav" id="t3-nav" hidden><button id="t3-ant" title="Anterior (←)">‹</button><button id="t3-auto" title="Passeio automático">▶</button><button id="t3-prox" title="Próximo (→)">›</button></div>' +
@@ -286,6 +290,7 @@ var UI = (function () {
         '<span class="grow"></span>' +
         '<button class="btn solid sm" id="fach-4" title="Fotografa a sua casa nos 4 estilos, lado a lado">✨ Ver os 4 estilos</button>' +
         '<button class="btn ghost sm" id="fach-foto" title="Salvar a imagem atual em PNG">Foto</button>' +
+        '<button class="btn solid sm" id="fach-render" title="Guarda esta vista na aba Renders (entra na apresentação)">+ Render</button>' +
         '</div>' +
         '<div class="fach-body"><div class="t3-stage" id="fach-stage"><div class="fach-elev" id="fach-elev-pad" hidden></div><div class="t3-dica">Arraste para girar · roda para aproximar</div></div>' +
         '<aside class="fach-panel" id="fach-panel"></aside></div>';
@@ -294,7 +299,7 @@ var UI = (function () {
 
     if (v === 'orcamento') {
       var h2 = '<h2>Orçamento estimado</h2><p class="vsub">Custo por m² por tipo de ambiente, no padrão <b>' + M.PADROES[p.padrao].rot + '</b>. Estimativa de estudo, não substitui orçamento de construtor.</p>';
-      h2 += '<div class="cards">' + card(M.fmtBRL(M.custoGeral()), 'INVESTIMENTO ESTIMADO') +
+      h2 += '<div class="cards">' + card(M.fmtBRL(M.orcamento().total), 'INVESTIMENTO ESTIMADO (C/ RESERVA)') +
         card(M.fmtBRL(M.custoPorM2()), 'CUSTO POR M²') + card(M.fmtM2(M.areaConstruida()), 'ÁREA CONSTRUÍDA') +
         card(M.fmtPct(M.ocupacao()), 'OCUPAÇÃO') + '</div>';
       h2 += '<table class="tbl"><tr><th>AMBIENTE</th><th class="n">ÁREA</th><th class="n">R$/M²</th><th class="n">SUBTOTAL</th></tr>';
@@ -306,7 +311,23 @@ var UI = (function () {
       });
       h2 += '<tr class="tot"><td>AMBIENTES</td><td class="n">' + M.fmtM2(M.areaTotalAmbientes()) + '</td><td></td><td class="n">' + M.fmtBRL(M.custoTotal()) + '</td></tr>';
       M.custoFachadaItens().forEach(function (it) { h2 += '<tr><td><span class="sw" style="background:#2B2F33"></span>Fachada · ' + esc(it.rot) + '</td><td class="n"></td><td class="n"></td><td class="n">' + M.fmtBRL(it.valor) + '</td></tr>'; });
-      h2 += '<tr class="tot"><td>TOTAL GERAL</td><td class="n"></td><td></td><td class="n">' + M.fmtBRL(M.custoGeral()) + '</td></tr></table>';
+      M.custoPiscinaItens().forEach(function (it) { h2 += '<tr><td><span class="sw" style="background:#7FD6E8"></span>Piscina · ' + esc(it.rot) + '</td><td class="n"></td><td class="n"></td><td class="n">' + M.fmtBRL(it.valor) + '</td></tr>'; });
+      h2 += '<tr class="tot"><td>TOTAL SEM RESERVA</td><td class="n"></td><td></td><td class="n">' + M.fmtBRL(M.custoGeral()) + '</td></tr></table>';
+      /* composição por etapa da obra — a mesma sequência do slider 4D do 3D */
+      var oc = M.orcamento();
+      h2 += '<h2 style="margin-top:34px;font-size:15px">Por etapa da obra</h2><p class="vsub">O custo dos ambientes cobertos repartido na sequência em que a obra acontece — a mesma do slider OBRA no 3D. Piscina, fachada e reserva técnica entram como grupos próprios.</p>';
+      h2 += '<div class="etapas-bar">' + oc.etapas.filter(function (e) { return e.valor > 0; }).map(function (e) { return '<div class="et" style="flex:' + Math.max(1, e.valor) + '" title="' + esc(e.rot) + ' · ' + M.fmtBRL(e.valor) + '"><b>' + esc(e.rot) + '</b><span>' + M.fmtPct(e.valor / Math.max(1, oc.subtotal) * 100) + '</span></div>'; }).join('') + '</div>';
+      h2 += '<table class="tbl"><tr><th>ETAPA</th><th>ITEM</th><th>BASE</th><th class="n">VALOR</th></tr>';
+      oc.etapas.forEach(function (e) {
+        oc.linhas.filter(function (l) { return l.etapa === e.i; }).forEach(function (l, i2) {
+          h2 += '<tr><td>' + (i2 === 0 ? '<b>' + e.i + ' · ' + esc(e.rot) + '</b>' : '') + '</td><td>' + esc(l.rot) + (l.campo ? ' <button class="chip sm" data-equip="' + l.campo + '">editar</button>' : '') + '</td><td class="dim">' + esc(l.base) + '</td><td class="n">' + M.fmtBRL(l.valor) + '</td></tr>';
+        });
+      });
+      h2 += '<tr class="tot"><td colspan="3">SUBTOTAL</td><td class="n">' + M.fmtBRL(oc.subtotal) + '</td></tr>';
+      h2 += '<tr><td colspan="3">Reserva técnica <input class="range" id="orc-res" type="range" min="0" max="25" step="1" value="' + oc.reservaPct + '" style="width:140px;vertical-align:middle;margin:0 8px"><b id="orc-res-v">' + M.fmtPct(oc.reservaPct) + '</b></td><td class="n">' + M.fmtBRL(oc.reserva) + '</td></tr>';
+      h2 += '<tr class="tot"><td colspan="3">INVESTIMENTO ESTIMADO</td><td class="n">' + M.fmtBRL(oc.total) + '</td></tr>';
+      h2 += '<tr><td colspan="3" class="dim">Faixa estimada (−12% / +18%) · ' + M.fmtBRL(oc.porM2) + '/m² construído</td><td class="n dim">' + M.fmtBRL(oc.minimo) + ' – ' + M.fmtBRL(oc.maximo) + '</td></tr></table>';
+      h2 += '<div class="cards" style="margin-top:14px">' + oc.grupos.map(function (g) { return card(M.fmtBRL(g.valor), g.grupo.toUpperCase() + ' · ' + M.fmtPct(g.valor / Math.max(1, oc.subtotal) * 100)); }).join('') + '</div>';
       var pr = M.problemas();
       if (pr.length) {
         h2 += '<div class="alertbox"><b>' + pr.length + (pr.length > 1 ? ' PONTOS' : ' PONTO') + ' PARA RESOLVER</b><p>' +
@@ -317,23 +338,34 @@ var UI = (function () {
       return h2;
     }
     if (v === 'simulador') {
-      var meta = p.meta || Math.round(M.custoTotal() * 0.8);
+      var tot0 = M.orcamento().total, meta = p.meta || Math.round(tot0 * 0.8);
       var h3 = '<h2>Simulador</h2><p class="vsub">Mexa e veja o efeito no custo. Nada aqui altera a planta sozinho.</p>';
-      h3 += '<div class="cards">' + card(M.fmtBRL(M.custoTotal()), 'ESTIMADO') + card(M.fmtBRL(meta), 'SUA META') +
-        card(M.fmtBRL(Math.abs(M.custoTotal() - meta)), M.custoTotal() > meta ? 'FALTAM' : 'SOBRAM') + '</div>';
+      h3 += '<div class="cards">' + card(M.fmtBRL(tot0), 'ESTIMADO (C/ RESERVA)') + card(M.fmtBRL(meta), 'SUA META') +
+        card(M.fmtBRL(Math.abs(tot0 - meta)), tot0 > meta ? 'FALTAM' : 'SOBRAM') + '</div>';
       h3 += '<div class="sim-row"><b>Padrão de acabamento</b><div>' +
         Object.keys(M.PADROES).map(function (k) {
           return '<button class="chip' + (p.padrao === k ? ' on' : '') + '" data-padrao="' + k + '" style="margin-right:6px">' + M.PADROES[k].rot + '</button>';
         }).join('') + '</div><div class="v">' + M.fmtBRL(M.custoPorM2()) + '/m²</div></div>';
       h3 += '<div class="sim-row"><b>Meta de investimento</b><input class="range" id="sim-meta" type="range" min="0" max="' +
-        Math.max(100000, Math.round(M.custoTotal() / 100 * 1.5)) + '" step="5000" value="' + Math.round(meta / 100) + '"><div class="v" id="sim-meta-v">' + M.fmtBRL(meta) + '</div></div>';
+        Math.max(100000, Math.round(tot0 / 100 * 1.5)) + '" step="5000" value="' + Math.round(meta / 100) + '"><div class="v" id="sim-meta-v">' + M.fmtBRL(meta) + '</div></div>';
       h3 += '<div class="sim-row"><b>Pé-direito</b><input class="range" id="sim-pd" type="range" min="240" max="400" step="5" value="' + p.peDireito + '"><div class="v" id="sim-pd-v">' + M.fmtM(p.peDireito) + '</div></div>';
-      if (M.custoTotal() > meta) {
-        var excedente = M.custoTotal() - meta;
+      if (tot0 > meta) {
+        var excedente = tot0 - meta;
         var m2cortar = M.custoPorM2() ? excedente / M.custoPorM2() : 0;
         h3 += '<div class="alertbox"><b>PARA CABER NA META</b><p>Seria preciso cortar cerca de <b>' + M.num(m2cortar) +
           ' m²</b> de área construída, ou descer um padrão de acabamento. O app não encolhe o projeto sozinho — a decisão é sua.</p></div>';
       }
+      /* cenários (vindo do ACQUA BELO): cada um é calculado num clone; "aplicar" muda o projeto de verdade, com desfazer */
+      var oc2 = M.orcamento(), cns = M.cenarios();
+      h3 += '<h2 style="margin-top:34px;font-size:15px">Cenários</h2><p class="vsub">Investimento estimado hoje: <b>' + M.fmtBRL(oc2.total) + '</b> (com reserva). Cada linha mostra quanto muda se você aplicar — e aplica com um clique, com desfazer.</p>';
+      if (!cns.length) h3 += '<p class="vsub">Nenhum cenário aplicável a este projeto.</p>';
+      h3 += '<div class="cenarios">' + cns.map(function (c, i) {
+        var neg = c.delta < 0;
+        return '<div class="cen"><div class="cen-t"><b>' + esc(c.nome) + '</b>' + (c.nota ? '<span>' + esc(c.nota) + '</span>' : '') +
+          (c.problemas > M.problemas().length ? '<span class="cen-warn">⚠ gera ' + (c.problemas - M.problemas().length) + ' ponto(s) para resolver</span>' : '') + '</div>' +
+          '<div class="cen-v ' + (neg ? 'neg' : 'pos') + '">' + (neg ? '−' : '+') + M.fmtBRL(Math.abs(c.delta)) + '<small>' + M.fmtBRL(c.total) + '</small></div>' +
+          '<button class="btn sm" data-cen="' + i + '">aplicar</button></div>';
+      }).join('') + '</div>';
       return h3;
     }
     if (v === 'exportar') {
@@ -345,15 +377,175 @@ var UI = (function () {
         '<button data-exp="html">Passeio 3D em HTML (mandar pelo WhatsApp)</button>' +
         '<button data-exp="pdf">Imprimir / salvar PDF</button>' +
         '<button data-exp="json">Arquivo do projeto (.json)</button>' +
-        '</div><p class="vsub" style="margin-top:26px">O arquivo .json guarda o projeto inteiro e pode ser reaberto aqui depois.</p>';
+        '<button data-exp="csv">Orçamento em CSV (planilha)</button>' +
+        '<button data-exp="txt">Relatório técnico (.txt)</button>' +
+        '</div><p class="vsub" style="margin-top:26px">O arquivo .json guarda o projeto inteiro e pode ser reaberto aqui depois.</p>' +
+        '<h2 style="margin-top:34px;font-size:15px">Versões do estudo</h2><p class="vsub">Guarde o estado atual com um nome (Estudo 01, Versão econômica…) e volte a ele quando quiser. Renders não entram na versão.</p>' +
+        '<div class="ver-add"><input id="ver-nome" placeholder="Nome da versão" value="Estudo ' + (((p.versoes || []).length) + 1).toString().padStart(2, '0') + '"><button class="btn solid sm" id="ver-salvar">Salvar versão</button>' +
+        ['Versão econômica', 'Versão padrão', 'Versão otimizada'].map(function (n) { return '<button class="chip" data-ver-nome="' + n + '">' + n + '</button>'; }).join('') + '</div>' +
+        ((p.versoes || []).length ? '<table class="tbl"><tr><th>VERSÃO</th><th>QUANDO</th><th class="n">ÁREA</th><th class="n">INVESTIMENTO</th><th></th></tr>' +
+          p.versoes.slice().reverse().map(function (v) { return '<tr><td><b>' + esc(v.nome) + '</b></td><td>' + new Date(v.quando).toLocaleString('pt-BR') + '</td><td class="n">' + M.fmtM2(v.resumo.area) + '</td><td class="n">' + M.fmtBRL(v.resumo.total) + '</td><td class="n"><button class="chip sm" data-ver-ir="' + v.id + '">carregar</button> <button class="chip sm" data-ver-del="' + v.id + '">✕</button></td></tr>'; }).join('') + '</table>' : '');
+    }
+    if (v === 'piscina') return viewPiscina();
+    if (v === 'camadas') {
+      var hc = '<h2>Camadas</h2><p class="vsub">Mostre, esconda ou bloqueie o que aparece na planta. Camada bloqueada não se move nem se redimensiona — evita esbarrar no que já está resolvido.</p>';
+      hc += '<table class="tbl"><tr><th>CAMADA</th><th>VISÍVEL</th><th>EDIÇÃO</th></tr>';
+      M.CAMADAS.forEach(function (c) {
+        var st = M.camada(c.k), temBloq = ['ambientes', 'piscina', 'moveis'].indexOf(c.k) >= 0;
+        hc += '<tr' + (st.vis ? '' : ' class="dim"') + '><td>' + esc(c.rot) + '</td><td><button class="chip' + (st.vis ? ' on' : '') + '" data-cam-vis="' + c.k + '">' + (st.vis ? 'visível' : 'oculta') + '</button></td>' +
+          '<td>' + (temBloq ? '<button class="chip' + (st.bloq ? ' on warn' : '') + '" data-cam-bloq="' + c.k + '">' + (st.bloq ? '🔒 bloqueada' : 'editável') + '</button>' : '<span class="dim">—</span>') + '</td></tr>';
+      });
+      return hc + '</table>';
+    }
+    if (v === 'cotas') {
+      var lst = M.cotasLista(), hk = '<h2>Cotas</h2><p class="vsub">Todas as medidas do projeto, com duas casas decimais, recalculadas a cada mudança. As editáveis aceitam um valor novo direto aqui (Enter aplica). Também dá para clicar no número da cota dentro da planta.</p>';
+      hk += '<table class="tbl cotas-tbl"><tr><th>COTA</th><th class="n">MEDIDA</th></tr>';
+      lst.forEach(function (c, i) {
+        hk += '<tr><td>' + esc(c.rot) + '</td><td class="n">' + (c.campo ? '<input class="cota-in" data-cota-i="' + i + '" value="' + M.fmtMs(c.cm) + '"> m' : '<span class="dim">' + M.fmtM(c.cm) + '</span>') + '</td></tr>';
+      });
+      hk += '</table>';
+      hk += '<h2 style="margin-top:30px;font-size:15px">Cotas livres</h2><p class="vsub">Medidas que você quer registrar (entre dois pontos, um vão, uma folga). Ficam no projeto e saem no relatório.</p>';
+      hk += '<div class="ver-add"><input id="cota-nome" placeholder="Nome / entre quais pontos"><input id="cota-val" placeholder="Distância (m)" style="max-width:130px"><input id="cota-obs" placeholder="Observação"><button class="btn solid sm" id="cota-add">Adicionar</button></div>';
+      if ((p.cotas || []).length) { hk += '<table class="tbl"><tr><th>COTA</th><th>OBS.</th><th class="n">MEDIDA</th><th></th></tr>';
+        p.cotas.forEach(function (c) { hk += '<tr><td>' + esc(c.nome) + '</td><td class="dim">' + esc(c.obs || '') + '</td><td class="n">' + M.fmtM(c.cm) + '</td><td class="n"><button class="chip sm" data-cota-del="' + c.id + '">✕</button></td></tr>'; });
+        hk += '</table>'; }
+      return hk;
+    }
+    if (v === 'relatorio') {
+      var hr = '<h2>Relatório técnico</h2><p class="vsub">Quantitativos e áreas calculados do desenho. Nada aqui é digitado.</p>';
+      hr += '<div class="cards">' + card(M.fmtM2(M.areaConstruida()), 'ÁREA CONSTRUÍDA') + card(M.fmtPct(M.ocupacao()), 'OCUPAÇÃO') + card(M.fmtBRL(M.orcamento().total), 'INVESTIMENTO') + card(M.fmtBRL(M.orcamento().porM2), 'POR M²') + '</div>';
+      hr += '<table class="tbl">' + M.relatorio().map(function (l) { return '<tr><td>' + esc(l[0]) + '</td><td class="n">' + esc(l[1]) + '</td></tr>'; }).join('') + '</table>';
+      var al = alertasTodos();
+      hr += '<h2 style="margin-top:30px;font-size:15px">Alertas inteligentes</h2><div class="alertas">' + al.map(function (q) { return '<div class="al ' + q.nivel + '"><i></i>' + esc(q.msg) + '</div>'; }).join('') + '</div>';
+      hr += '<div style="display:flex;gap:8px;margin-top:22px;flex-wrap:wrap"><button class="btn solid" data-exp="pdf">Imprimir / salvar PDF</button><button class="btn" data-exp="txt">Baixar relatório (.txt)</button><button class="btn" data-exp="csv">Orçamento em CSV</button></div>';
+      return hr;
+    }
+    if (v === 'renders') {
+      var rs = p.renders || [], hv = '<h2>Renders</h2><p class="vsub">Imagens do projeto para mostrar ao cliente: capture do 3D e da fachada com o botão <b>+ Render</b>, ou envie imagens prontas. Entram na apresentação. Até ' + M.MAX_RENDERS + ' por projeto.</p>';
+      hv += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px"><button class="btn solid sm" data-go="tresd">📷 Capturar do 3D</button><button class="btn sm" data-go="fachada">📷 Capturar da fachada</button><label class="btn sm" for="rend-file">⬆ Enviar imagem</label><input id="rend-file" type="file" accept="image/*" multiple hidden></div>';
+      if (!rs.length) hv += '<div class="okbox"><b>Nenhum render ainda.</b><p style="font-size:12.5px;margin-top:5px">Vá ao 3D, escolha um ângulo e clique em <b>+ Render</b>.</p></div>';
+      hv += '<div class="rend-grid">' + rs.map(function (r) {
+        return '<figure class="rend"><img src="' + r.src + '" alt=""><figcaption><input data-rend-cap="' + r.id + '" value="' + esc(r.titulo || '') + '" placeholder="Legenda"><button class="chip sm" data-rend-del="' + r.id + '" title="Excluir">✕</button></figcaption></figure>';
+      }).join('') + '</div>';
+      return hv;
     }
     return '';
   }
   function card(v, k){ return '<div class="c"><b>' + v + '</b><span>' + k + '</span></div>'; }
 
+  /* ---------- PISCINA (vinda do ACQUA BELO): raias, profundidade, praias, volume, equipamentos ---------- */
+  function viewPiscina(){
+    var p = M.proj, ps = M.piscinas();
+    var h = '<h2>Piscina</h2><p class="vsub">Lâmina d’água, raias, profundidade e praias — tudo derivado do retângulo da piscina na planta. Dentro de um salão, as praias são medidas até as paredes dele.</p>';
+    if (!ps.length) {
+      return h + '<div class="okbox"><b>Este projeto não tem piscina.</b><p style="font-size:12.5px;margin-top:5px">Adicione uma da biblioteca e arraste para o lugar. Se ficar dentro de um ambiente coberto, ele vira o salão da piscina.</p></div>' +
+        '<div style="margin-top:14px"><button class="btn solid" id="pis-add">+ Adicionar piscina</button></div>';
+    }
+    ps.forEach(function (a) {
+      var i = M.piscinaInfo(a), pr = i.praias, al = M.piscinaAlertas(a);
+      h += '<section class="pis"><h3>' + esc(a.nome) + (pr.salao ? ' <small>dentro de ' + esc(pr.salao.nome) + '</small>' : ' <small>ao ar livre</small>') + '</h3>';
+      h += '<div class="cards">' + card(M.num(i.comp) + ' × ' + M.num(i.larg) + ' m', 'LÂMINA D’ÁGUA · ' + M.num(i.area) + ' M²') + card(M.num(i.volume) + ' m³', 'VOLUME DE ÁGUA') + card(i.raias + ' × ' + M.fmtMs(i.raia) + ' m', i.raiasCabem ? 'RAIAS' : 'RAIAS — NÃO CABEM') + card(M.fmtMs(i.prof) + '–' + M.fmtMs(i.profMax) + ' m', 'PROFUNDIDADE') + '</div>';
+      h += '<div class="f-row pis-f">' + campo('pis-comp-' + a.id, 'COMPRIMENTO', M.fmtMs(i.comp), 'm') + campo('pis-larg-' + a.id, 'LARGURA', M.fmtMs(i.larg), 'm') + campo('pis-prof-' + a.id, 'PROF. MÍN.', M.fmtMs(i.prof), 'm') + campo('pis-profmax-' + a.id, 'PROF. MÁX.', M.fmtMs(i.profMax), 'm') + '</div>';
+      h += '<div class="f-row pis-f">' + campo('pis-raias-' + a.id, 'RAIAS', i.raias, 'un') + campo('pis-raia-' + a.id, 'LARGURA DA RAIA', M.fmtMs(i.raia), 'm') + '</div>';
+      h += '<div class="chips" style="margin:6px 0 12px">' + [[1100, 600, '11,00 × 6,00 compacta'], [1250, 600, '12,50 × 6,00 escola'], [1500, 700, '15,00 × 7,00'], [2500, 1250, '25,00 × 12,50 semiolímpica']].map(function (d) { return '<button class="chip" data-pis-dim="' + a.id + '|' + d[0] + '|' + d[1] + '">' + d[2] + '</button>'; }).join('') + '</div>';
+      h += '<div class="praias"><b>PRAIAS</b> <span>esquerda <b>' + M.fmtM(pr.esq) + '</b></span><span>direita <b>' + M.fmtM(pr.dir) + '</b></span><span>frente <b>' + M.fmtM(pr.frente) + '</b></span><span>fundo <b>' + M.fmtM(pr.fundo) + '</b></span>' + (pr.salao ? '<span class="dim">mín. 1,50 m laterais · 0,50 m cabeceiras</span>' : '<span class="dim">até a divisa do terreno</span>') + '</div>';
+      h += '<div class="alertas">' + al.map(function (q) { return '<div class="al ' + q.nivel + '"><i></i>' + esc(q.msg) + '</div>'; }).join('') + '</div>';
+      h += '<p class="vsub" style="margin-top:8px">Perímetro ' + M.num(i.perimetro) + ' m · área molhada (fundo + paredes) ' + M.num(i.molhada) + ' m² · <button class="chip sm" data-pis-ir="' + a.id + '">ver na planta</button></p></section>';
+    });
+    var eq = p.equip || {};
+    h += '<section class="pis"><h3>Equipamentos</h3><p class="vsub">Valores em reais, editáveis — entram no orçamento no grupo Piscina.</p><div class="f-row pis-f">' + campo('pis-aq', 'AQUECIMENTO', M.num((eq.aquecimento || 0) / 100), 'R$') + campo('pis-fi', 'FILTRAGEM E TRATAMENTO', M.num((eq.filtragem || 0) / 100), 'R$') + '</div>';
+    h += '<table class="tbl">' + M.custoPiscinaItens().map(function (it) { return '<tr><td>' + esc(it.rot) + '</td><td class="n">' + M.fmtBRL(it.valor) + '</td></tr>'; }).join('') +
+      ps.map(function (a) { return '<tr><td>' + esc(a.nome) + ' em concreto armado (' + M.fmtM2(M.areaOf(a)) + ')</td><td class="n">' + M.fmtBRL(M.custoDe(a)) + '</td></tr>'; }).join('') +
+      '<tr class="tot"><td>PISCINA — TOTAL</td><td class="n">' + M.fmtBRL(M.custoPiscina() + ps.reduce(function (s2, a) { return s2 + M.custoDe(a); }, 0)) + '</td></tr></table></section>';
+    return h;
+  }
+  function alertasTodos(){
+    var out = [];
+    M.problemas().forEach(function (q) { if (q.tipo !== 'piscina') out.push({nivel:'erro', msg:q.msg}); });
+    M.piscinas().forEach(function (a) { M.piscinaAlertas(a).forEach(function (q) { out.push(q); }); });
+    if (M.ocupacao() <= 70) out.push({nivel:'ok', msg:'Taxa de ocupação de ' + M.fmtPct(M.ocupacao()) + ' (' + M.fmtM2(M.projecao()) + ' em ' + M.fmtM2(M.areaTerreno()) + ')'});
+    var oc = M.orcamento();
+    if (M.proj.meta > 0) out.push(oc.total > M.proj.meta ? {nivel:'aviso', msg:'Estimativa ' + M.fmtBRL(oc.total) + ' acima da meta de ' + M.fmtBRL(M.proj.meta) + ' (+' + M.fmtPct((oc.total - M.proj.meta) / M.proj.meta * 100) + ')'} : {nivel:'ok', msg:'Estimativa dentro da meta de ' + M.fmtBRL(M.proj.meta)});
+    var gp = oc.grupos.filter(function (g) { return g.grupo === 'Piscina'; })[0];
+    if (gp && gp.valor / oc.subtotal > .35) out.push({nivel:'aviso', msg:'A piscina representa ' + M.fmtPct(gp.valor / oc.subtotal * 100) + ' do investimento — verificar viabilidade'});
+    if (M.nPavs() > 1) { var bal = M.proj.ambientes.filter(function (a) { return M.pavDe(a) && M.apoio(a) < .5; }); if (!bal.length) out.push({nivel:'ok', msg:'Todos os ambientes do andar de cima apoiam no de baixo'}); }
+    if (!M.proj.ambientes.some(function (a) { return a.tipo === 'molhado'; })) out.push({nivel:'aviso', msg:'Nenhum ambiente molhado (banheiro, cozinha ou vestiário)'});
+    return out;
+  }
+  /* guarda uma foto do 3D como render (JPEG até 1280 px, para caber no armazenamento) */
+  function guardarRender(dataUrl, titulo){
+    var img = new Image();
+    img.onload = function () {
+      var k = Math.min(1, 1280 / img.width), cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      var cx = cv.getContext('2d'); cx.fillStyle = '#FFFFFF'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+      var n = (M.proj.renders || []).length + 1;
+      M.addRender({titulo:titulo + ' ' + String(n).padStart(2, '0'), src:cv.toDataURL('image/jpeg', .82)});
+      toast('Render guardado (' + M.proj.renders.length + '/' + M.MAX_RENDERS + '). Veja em Renders.', function () { irPara('renders'); }, false, 'Abrir');
+    };
+    img.src = dataUrl;
+  }
+
   function ligarView(v, pad){
     if (v === 'tresd' && window.TRES) { ligar3D(pad); return; }
     if (v === 'fachada' && window.TRES) { ligarFachada(pad); return; }
+    if (v === 'piscina') {
+      var addP = pad.querySelector('#pis-add'); if (addP) addP.onclick = function () { var i2 = M.LIB.map(function (l) { return l.nome; }).indexOf('Piscina'); addDaLib(i2); irPara('piscina'); };
+      M.piscinas().forEach(function (a) {
+        function bindP(id, fn){ var el = pad.querySelector('#' + id); if (!el) return; el.onkeydown = function (e) { if (e.key === 'Enter') this.blur(); }; el.onchange = function () { fn(this.value); }; }
+        var vert = a.h >= a.w;
+        bindP('pis-comp-' + a.id, function (v2) { var n = M.parseM(v2); if (n) { if (vert) a.h = Math.max(200, n); else a.w = Math.max(200, n); M.commit('Comprimento da piscina'); irPara('piscina'); } });
+        bindP('pis-larg-' + a.id, function (v2) { var n = M.parseM(v2); if (n) { if (vert) a.w = Math.max(150, n); else a.h = Math.max(150, n); M.commit('Largura da piscina'); irPara('piscina'); } });
+        bindP('pis-prof-' + a.id, function (v2) { var n = M.parseM(v2); if (n) { a.prof = Math.max(40, n); if ((a.profMax || 0) < a.prof) a.profMax = a.prof; M.commit('Profundidade da piscina'); irPara('piscina'); } });
+        bindP('pis-profmax-' + a.id, function (v2) { var n = M.parseM(v2); if (n) { a.profMax = Math.max(a.prof || 40, n); M.commit('Profundidade máxima da piscina'); irPara('piscina'); } });
+        bindP('pis-raias-' + a.id, function (v2) { var n = parseInt(v2, 10); if (n > 0) { a.raias = Math.min(12, n); M.commit('Raias da piscina'); irPara('piscina'); } });
+        bindP('pis-raia-' + a.id, function (v2) { var n = M.parseM(v2); if (n) { a.raia = Math.max(100, n); M.commit('Largura da raia'); irPara('piscina'); } });
+      });
+      pad.querySelectorAll('[data-pis-dim]').forEach(function (b) { b.onclick = function () {
+        var q = b.getAttribute('data-pis-dim').split('|'), a = M.proj.ambientes.filter(function (x) { return x.id === q[0]; })[0]; if (!a) return;
+        var vert = a.h >= a.w, cx2 = a.x + a.w / 2, cy2 = a.y + a.h / 2, comp = +q[1], larg = +q[2];
+        a.w = vert ? larg : comp; a.h = vert ? comp : larg; a.x = Math.round(cx2 - a.w / 2); a.y = Math.round(cy2 - a.h / 2); a.raias = Math.max(1, Math.floor(larg / (a.raia || 150)));
+        M.commit('Piscina ' + M.fmtMs(comp) + ' × ' + M.fmtMs(larg)); irPara('piscina'); toast('Piscina ' + M.fmtMs(comp) + ' × ' + M.fmtMs(larg) + ' m — confira as praias.', function () { fazerUndo(); });
+      }; });
+      pad.querySelectorAll('[data-pis-ir]').forEach(function (b) { b.onclick = function () { var id2 = b.getAttribute('data-pis-ir'); irPara('planta'); var a = M.proj.ambientes.filter(function (x) { return x.id === id2; })[0]; if (a) { M.setPav(M.pavDe(a)); PLAN.enquadrarAmb(a); PLAN.selecionar(id2); } }; });
+      var aq = pad.querySelector('#pis-aq'), fi = pad.querySelector('#pis-fi');
+      function reais(v2){ var n = parseFloat(String(v2).replace(/\./g, '').replace(',', '.')); return isNaN(n) ? null : Math.round(n * 100); }
+      if (aq) aq.onchange = function () { var n = reais(this.value); if (n !== null) { M.proj.equip = M.proj.equip || {}; M.proj.equip.aquecimento = n; M.commit('Aquecimento da piscina'); irPara('piscina'); } };
+      if (fi) fi.onchange = function () { var n = reais(this.value); if (n !== null) { M.proj.equip = M.proj.equip || {}; M.proj.equip.filtragem = n; M.commit('Filtragem da piscina'); irPara('piscina'); } };
+      return;
+    }
+    if (v === 'camadas') {
+      pad.querySelectorAll('[data-cam-vis]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-cam-vis'); M.setCamada(k, 'vis', !M.camada(k).vis); M.salvar(); irPara('camadas'); }; });
+      pad.querySelectorAll('[data-cam-bloq]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-cam-bloq'); M.setCamada(k, 'bloq', !M.camada(k).bloq); M.salvar(); irPara('camadas'); }; });
+      return;
+    }
+    if (v === 'cotas') {
+      var lst2 = M.cotasLista();
+      pad.querySelectorAll('.cota-in').forEach(function (el) {
+        el.onkeydown = function (e) { if (e.key === 'Enter') this.blur(); if (e.key === 'Escape') { this.value = M.fmtMs(lst2[+this.getAttribute('data-cota-i')].cm); this.blur(); } };
+        el.onchange = function () { var c = lst2[+this.getAttribute('data-cota-i')], n = M.parseM(this.value); if (!c || !n) { irPara('cotas'); return; } M.setCota(c.ref, c.campo, Math.max(c.ref === 'terreno' && /recuo/.test(c.campo) ? 0 : 40, n)); M.commit('Cota: ' + c.rot); irPara('cotas'); };
+      });
+      var addC = pad.querySelector('#cota-add');
+      if (addC) addC.onclick = function () { var nm = pad.querySelector('#cota-nome').value.trim(), vl = M.parseM(pad.querySelector('#cota-val').value), ob = pad.querySelector('#cota-obs').value.trim(); if (!nm || !vl) { toast('Informe nome e distância.', null, true); return; } M.proj.cotas = M.proj.cotas || []; M.proj.cotas.push({id:M.uid(), nome:nm, cm:vl, obs:ob}); M.commit('Adicionar cota'); irPara('cotas'); };
+      pad.querySelectorAll('[data-cota-del]').forEach(function (b) { b.onclick = function () { var id2 = b.getAttribute('data-cota-del'); M.proj.cotas = (M.proj.cotas || []).filter(function (c) { return c.id !== id2; }); M.commit('Excluir cota'); irPara('cotas'); }; });
+      return;
+    }
+    if (v === 'renders') {
+      pad.querySelectorAll('[data-go]').forEach(function (b) { b.onclick = function () { irPara(b.getAttribute('data-go')); toast('Escolha o ângulo e clique em + Render.'); }; });
+      var fin = pad.querySelector('#rend-file');
+      if (fin) fin.onchange = function () { Array.prototype.forEach.call(this.files, function (file) { var rd = new FileReader(); rd.onload = function () { guardarRender(rd.result, file.name.replace(/\.[^.]+$/, '')); setTimeout(function () { if (viewAtual === 'renders') irPara('renders'); }, 300); }; rd.readAsDataURL(file); }); };
+      pad.querySelectorAll('[data-rend-cap]').forEach(function (el) { el.onkeydown = function (e) { if (e.key === 'Enter') this.blur(); }; el.onchange = function () { var r = (M.proj.renders || []).filter(function (x) { return x.id === el.getAttribute('data-rend-cap'); })[0]; if (r) { r.titulo = this.value.trim(); M.salvar(); } }; });
+      pad.querySelectorAll('[data-rend-del]').forEach(function (b) { b.onclick = function () { M.delRender(b.getAttribute('data-rend-del')); irPara('renders'); }; });
+      return;
+    }
+    if (v === 'relatorio') {
+      pad.querySelectorAll('[data-exp]').forEach(function (b) { b.onclick = function () { exportar(b.getAttribute('data-exp')); }; });
+      return;
+    }
+    if (v === 'orcamento') {
+      var res = pad.querySelector('#orc-res');
+      if (res) { res.oninput = function () { pad.querySelector('#orc-res-v').textContent = M.fmtPct(+this.value); }; res.onchange = function () { M.proj.reservaPct = +this.value; M.commit('Reserva técnica'); irPara('orcamento'); }; }
+      pad.querySelectorAll('[data-equip]').forEach(function (b) { b.onclick = function () { irPara('piscina'); }; });
+    }
     if (v === 'pavimentos') {
       pad.querySelectorAll('[data-pav-add]').forEach(function (b) { b.onclick = function () { M.addPavimento(b.getAttribute('data-pav-add') === 'copia'); M.commit('Adicionar ' + M.nomePav(M.pav)); irPara('planta'); toast(M.nomePav(M.pav) + ' criado. Ajuste os ambientes na planta.'); }; });
       pad.querySelectorAll('[data-pav-ir]').forEach(function (b) { b.onclick = function () { M.setPav(+b.getAttribute('data-pav-ir')); irPara('planta'); }; });
@@ -390,11 +582,18 @@ var UI = (function () {
         pd.oninput = function () { pad.querySelector('#sim-pd-v').textContent = M.fmtM(this.value); };
         pd.onchange = function () { M.proj.peDireito = parseInt(this.value, 10); M.commit('Mudar pé-direito'); };
       }
+      var cns2 = M.cenarios();
+      pad.querySelectorAll('[data-cen]').forEach(function (b) { b.onclick = function () { var c = cns2[+b.getAttribute('data-cen')]; if (!c) return; M.aplicarCenario(c); M.commit('Cenário: ' + c.nome); irPara('simulador'); toast('“' + c.nome + '” aplicado.', function () { fazerUndo(); }); }; });
     }
     if (v === 'exportar') {
       pad.querySelectorAll('[data-exp]').forEach(function (b) {
         b.onclick = function () { exportar(b.getAttribute('data-exp')); };
       });
+      var vs = pad.querySelector('#ver-salvar');
+      if (vs) vs.onclick = function () { var v2 = M.salvarVersao(pad.querySelector('#ver-nome').value.trim()); irPara('exportar'); toast('Versão “' + v2.nome + '” guardada.'); };
+      pad.querySelectorAll('[data-ver-nome]').forEach(function (b) { b.onclick = function () { pad.querySelector('#ver-nome').value = b.getAttribute('data-ver-nome'); }; });
+      pad.querySelectorAll('[data-ver-ir]').forEach(function (b) { b.onclick = function () { if (M.carregarVersao(b.getAttribute('data-ver-ir'))) { irPara('planta'); toast('Versão carregada.', function () { fazerUndo(); }); } }; });
+      pad.querySelectorAll('[data-ver-del]').forEach(function (b) { b.onclick = function () { M.excluirVersao(b.getAttribute('data-ver-del')); irPara('exportar'); }; });
     }
   }
 
@@ -449,6 +648,15 @@ var UI = (function () {
         '<div class="kv derived" title="' + M.fmtM(a.w) + ' × ' + M.fmtM(a.h) + '"><span>Área</span><b>' + M.fmtM2(M.areaOf(a)) + '</b></div>' +
         '<div class="kv derived" title="' + M.fmtM2(M.areaOf(a)) + ' × ' + M.fmtBRL(ti.custo[p.padrao] * 100) + '/m²"><span>Custo estimado</span><b>' + M.fmtBRL(M.custoDe(a)) + '</b></div>' +
         '</section>';
+      if (a.tipo === 'agua') {
+        var pi = M.piscinaInfo(a), prs = pi.praias;
+        h += '<section><h6>PISCINA</h6><div class="f-row">' + campo('i-prof', 'PROF. MÍN.', M.fmtMs(pi.prof), 'm') + campo('i-profmax', 'PROF. MÁX.', M.fmtMs(pi.profMax), 'm') + '</div>' +
+          '<div class="f-row">' + campo('i-raias', 'RAIAS', pi.raias, 'un') + campo('i-raia', 'LARG. RAIA', M.fmtMs(pi.raia), 'm') + '</div>' +
+          kv('Volume de água', M.num(pi.volume) + ' m³', 'área × profundidade média') +
+          (prs.salao ? kv('Praias', M.fmtMs(prs.esq) + ' · ' + M.fmtMs(prs.dir) + ' · ' + M.fmtMs(prs.frente) + ' · ' + M.fmtMs(prs.fundo), 'esq · dir · frente · fundo, até as paredes de ' + prs.salao.nome) : '') +
+          (!pi.raiasCabem ? '<div class="ins-empty" style="color:#FF9583">As raias não cabem na largura.</div>' : '') +
+          '<button class="btn" data-act="piscina" style="margin-top:8px">Abrir aba Piscina</button></section>';
+      }
       if (M.nPavs() > 1 || M.pavDe(a) > 0) {
         h += '<section><h6>PAVIMENTO</h6><div class="chips">';
         for (var pv2 = 0; pv2 < M.nPavs(); pv2++) h += '<button class="chip' + (M.pavDe(a) === pv2 ? ' on' : '') + '" data-pav-amb="' + pv2 + '">' + M.nomePav(pv2) + '</button>';
@@ -474,7 +682,7 @@ var UI = (function () {
         kv('Área construída', M.fmtM2(M.areaConstruida()), 'soma dos ambientes cobertos') +
         kv('Taxa de ocupação', M.fmtPct(M.ocupacao()), 'construída ÷ terreno') +
         (M.espelhoAgua() ? kv('Espelho d’água', M.fmtM2(M.espelhoAgua()), '') : '') +
-        kv('Investimento', M.fmtBRL(M.custoGeral()), 'ambientes ' + M.fmtBRL(M.custoTotal()) + ' + fachada ' + M.fmtBRL(M.custoFachada())) +
+        kv('Investimento', M.fmtBRL(M.orcamento().total), 'ambientes ' + M.fmtBRL(M.custoTotal()) + ' + fachada ' + M.fmtBRL(M.custoFachada()) + (M.custoPiscina() ? ' + piscina ' + M.fmtBRL(M.custoPiscina()) : '') + ' + reserva ' + M.fmtPct(M.orcamento().reservaPct)) +
         '</section>';
       var pr = M.problemas();
       if (pr.length) {
@@ -516,6 +724,10 @@ var UI = (function () {
       bind('i-h', function (v) { var n = M.parseM(v); if (n) { a.h = Math.max(90, n); M.commit('Mudar profundidade'); PLAN.render(); inspector(); } });
       bind('i-x', function (v) { var n = M.parseM(v); if (n !== null) { a.x = n; M.commit('Mover ambiente'); PLAN.render(); inspector(); } });
       bind('i-y', function (v) { var n = M.parseM(v); if (n !== null) { a.y = n; M.commit('Mover ambiente'); PLAN.render(); inspector(); } });
+      bind('i-prof', function (v) { var n = M.parseM(v); if (n) { a.prof = Math.max(40, n); if ((a.profMax || 0) < a.prof) a.profMax = a.prof; M.commit('Profundidade da piscina'); PLAN.render(); inspector(); } });
+      bind('i-profmax', function (v) { var n = M.parseM(v); if (n) { a.profMax = Math.max(a.prof || 40, n); M.commit('Profundidade máxima'); PLAN.render(); inspector(); } });
+      bind('i-raias', function (v) { var n = parseInt(v, 10); if (n > 0) { a.raias = Math.min(12, n); M.commit('Raias da piscina'); PLAN.render(); inspector(); } });
+      bind('i-raia', function (v) { var n = M.parseM(v); if (n) { a.raia = Math.max(100, n); M.commit('Largura da raia'); PLAN.render(); inspector(); } });
       insp.querySelectorAll('[data-tipo]').forEach(function (b) {
         b.onclick = function () { a.tipo = b.getAttribute('data-tipo'); M.commit('Mudar tipo'); PLAN.render(); inspector(); };
       });
@@ -532,6 +744,7 @@ var UI = (function () {
           if (k === 'dup') duplicar(a.id);
           if (k === 'rot') { var w = a.w; a.w = a.h; a.h = w; M.commit('Girar ambiente'); PLAN.render(); inspector(); }
           if (k === 'del') excluir(a.id);
+          if (k === 'piscina') irPara('piscina');
         };
       });
     } else {
@@ -821,6 +1034,13 @@ var UI = (function () {
     {n:'Criar fachada por prompt', g:'',  f:function(){ irPara('fachada'); setTimeout(function(){ var p = document.querySelector('#fach-prompt'); if (p) p.focus(); }, 60); }},
     {n:'Ver a casa nos 4 estilos de fachada', g:'', f:function(){ irPara('fachada'); setTimeout(compararEstilos, 60); }},
     {n:'Corte',               g:'',       f:function(){ irPara('corte'); }},
+    {n:'Piscina (raias, profundidade, praias)', g:'', f:function(){ irPara('piscina'); }},
+    {n:'Camadas',             g:'',       f:function(){ irPara('camadas'); }},
+    {n:'Cotas',               g:'',       f:function(){ irPara('cotas'); }},
+    {n:'Relatório técnico',   g:'',       f:function(){ irPara('relatorio'); }},
+    {n:'Renders',             g:'',       f:function(){ irPara('renders'); }},
+    {n:'Salvar versão do estudo', g:'',   f:function(){ var v2 = M.salvarVersao(''); toast('Versão “' + v2.nome + '” guardada.'); }},
+    {n:'Exportar orçamento em CSV', g:'', f:function(){ exportar('csv'); }},
     {n:'Orçamento',           g:'O',      f:function(){ irPara('orcamento'); }},
     {n:'Simulador',           g:'S',      f:function(){ irPara('simulador'); }},
     {n:'Exportar',            g:'',       f:function(){ irPara('exportar'); }},
@@ -996,6 +1216,7 @@ var UI = (function () {
     pad.querySelector('#t3-foto').onclick = function () {
       var a = document.createElement('a'); a.href = t3.foto(); a.download = slug() + '-3d.png'; a.click(); toast('Imagem salva.');
     };
+    pad.querySelector('#t3-render').onclick = function () { guardarRender(t3.foto(), t3.modo === 'tour' ? 'Passeio' : 'Vista 3D'); };
   }
 
   /* ================= FACHADA (designer) ================= */
@@ -1021,6 +1242,7 @@ var UI = (function () {
       if (!e.hidden) e.innerHTML = VIEWS.fachada();
     };
     pad.querySelector('#fach-foto').onclick = function () { var a = document.createElement('a'); a.href = t3.foto(); a.download = slug() + '-fachada.png'; a.click(); toast('Imagem da fachada salva.'); };
+    pad.querySelector('#fach-render').onclick = function () { guardarRender(t3.foto(), 'Fachada' + (t3.noite ? ' à noite' : '')); };
     pad.querySelector('#fach-4').onclick = compararEstilos;
     fachPanel(pad);
   }
@@ -1217,6 +1439,23 @@ var UI = (function () {
       baixar(new Blob([JSON.stringify(M.proj, null, 2)], {type:'application/json'}), slug() + '.json');
       toast('Projeto exportado.'); return;
     }
+    if (tipo === 'csv') {
+      var oc = M.orcamento(), csv = 'Etapa;Grupo;Item;Base;Valor (R$)\n';
+      oc.linhas.forEach(function (l) { csv += [M.ETAPAS_OBRA[l.etapa], l.grupo, l.rot, l.base, M.num(l.valor / 100)].map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(';') + '\n'; });
+      csv += ';;Subtotal;;' + M.num(oc.subtotal / 100) + '\n;;Reserva técnica ' + M.fmtPct(oc.reservaPct) + ';;' + M.num(oc.reserva / 100) + '\n;;TOTAL;;' + M.num(oc.total / 100) + '\n';
+      baixar(new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8'}), slug() + '-orcamento.csv');
+      toast('Orçamento exportado em CSV (abre no Excel).'); return;
+    }
+    if (tipo === 'txt') {
+      var L = [M.proj.nome.toUpperCase(), 'ESTUDO CONCEITUAL PRELIMINAR — SUA OBRA 3D', new Date().toLocaleString('pt-BR'), ''];
+      M.relatorio().forEach(function (l) { L.push(l[0] + ': ' + l[1]); });
+      L.push('', 'AMBIENTES'); M.proj.ambientes.forEach(function (a) { L.push('- ' + a.nome + (M.nPavs() > 1 ? ' (' + M.nomePav(M.pavDe(a)) + ')' : '') + ': ' + M.fmtM(a.w) + ' × ' + M.fmtM(a.h) + ' = ' + M.fmtM2(M.areaOf(a))); });
+      if ((M.proj.cotas || []).length) { L.push('', 'COTAS LIVRES'); M.proj.cotas.forEach(function (c) { L.push('- ' + c.nome + ': ' + M.fmtM(c.cm) + (c.obs ? ' (' + c.obs + ')' : '')); }); }
+      L.push('', 'ALERTAS'); alertasTodos().forEach(function (q) { L.push('[' + q.nivel.toUpperCase() + '] ' + q.msg); });
+      L.push('', 'Este material é uma representação conceitual para estudo. Não substitui projeto executivo, licenciamento ou ART/RRT.');
+      baixar(new Blob([L.join('\n')], {type:'text/plain;charset=utf-8'}), slug() + '-relatorio.txt');
+      toast('Relatório exportado.'); return;
+    }
     var svgTxt = VIEWS.miniPlanta({labels:true});
     if (tipo === 'svg') {
       baixar(new Blob([svgTxt], {type:'image/svg+xml'}), slug() + '-planta.svg');
@@ -1248,10 +1487,10 @@ var UI = (function () {
 
   /* ================= FEEDBACK ================= */
   var toastT = null;
-  function toast(msg, desfazer, erro){
+  function toast(msg, desfazer, erro, rotulo){   /* rotulo: texto do botão de ação (padrão "Desfazer") */
     var t = $('#toast');
     t.className = 'toast' + (erro ? ' err' : '');
-    t.innerHTML = esc(msg) + (desfazer ? ' <span class="u">Desfazer</span>' : '');
+    t.innerHTML = esc(msg) + (desfazer ? ' <span class="u">' + esc(rotulo || 'Desfazer') + '</span>' : '');
     t.hidden = false;
     if (desfazer) t.querySelector('.u').onclick = function () { desfazer(); t.hidden = true; };
     clearTimeout(toastT);

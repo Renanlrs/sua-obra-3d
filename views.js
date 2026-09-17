@@ -236,12 +236,14 @@ var VIEWS = (function () {
       '<button class="btn ghost sm" onclick="UI.exportar(\'html\')">Baixar passeio 3D (.html)</button>' +
       '<button class="btn ghost sm" onclick="window.print()">Salvar PDF</button></div>';
 
-    h += '<div class="ap-hero"><div class="med">' + miniPlanta({wire:true}) + '</div><div class="veil"></div><div class="in">' +
+    var rends = p.renders || [], oc = M.orcamento();
+    /* capa: o primeiro render, se houver; senão o wireframe da planta */
+    h += '<div class="ap-hero' + (rends.length ? ' com-render' : '') + '"><div class="med">' + (rends.length ? '<img src="' + rends[0].src + '" alt="">' : miniPlanta({wire:true})) + '</div><div class="veil"></div><div class="in">' +
       '<span class="ap-kick">TERRENO ' + M.fmtMs(t.largura) + ' × ' + M.fmtMs(t.profundidade) + ' M · ' + M.fmtM2(M.areaTerreno()) + '</span>' +
       '<h1>' + esc(p.nome) + '</h1>' +
       '<p class="lead" style="margin-top:18px">' + M.fmtM2(M.areaConstruida()) + ' de área construída' +
       (quartos ? ', ' + quartos + (quartos > 1 ? ' quartos' : ' quarto') : '') +
-      ', ' + cobertos.length + ' ambientes. Investimento estimado de ' + M.fmtBRL(M.custoTotal()) + '.</p>' +
+      ', ' + cobertos.length + ' ambientes. Investimento estimado de ' + M.fmtBRL(oc.total) + '.</p>' +
       '</div></div>';
 
     h += '<div class="ap-passeio-hd"><span class="ap-eye">PASSEIO 3D</span><h2>Entre. Role a página e ande pela casa.</h2>' +
@@ -257,6 +259,16 @@ var VIEWS = (function () {
     });
     h += '</div></section>';
 
+    if (rends.length) {
+      h += '<section><span class="ap-eye">RENDERS</span><h2>Como vai ficar.</h2><div class="ap-renders">' +
+        rends.map(function (r) { return '<figure><img src="' + r.src + '" alt=""><figcaption>' + esc((r.titulo || '').toUpperCase()) + '</figcaption></figure>'; }).join('') + '</div></section>';
+    }
+    M.piscinas().forEach(function (a) {
+      var i = M.piscinaInfo(a);
+      h += '<section><span class="ap-eye">PISCINA</span><h2>' + esc(a.nome) + ': ' + M.num(i.comp) + ' × ' + M.num(i.larg) + ' m, ' + i.raias + (i.raias > 1 ? ' raias.' : ' raia.') + '</h2><div class="ap-stats">' +
+        st('Lâmina d’água', M.num(i.area) + ' m²') + st('Volume', M.num(i.volume) + ' m³') + st('Profundidade', M.fmtMs(i.prof) + '–' + M.fmtMs(i.profMax) + ' m') + st('Raias', i.raias + ' × ' + M.fmtMs(i.raia) + ' m') +
+        (i.praias.salao ? st('Praias laterais', M.fmtMs(i.praias.esq) + ' · ' + M.fmtMs(i.praias.dir) + ' m') : '') + '</div></section>';
+    });
     h += '<section><span class="ap-eye">IMAGENS</span><h2>Planta, 3D, fachada e corte.</h2><div class="ap-gal">' +
       '<figure>' + miniPlanta({labels:true}) + '<figcaption>PLANTA</figcaption></figure>' +
       '<figure>' + iso() + '<figcaption>VOLUMETRIA</figcaption></figure>' +
@@ -268,15 +280,18 @@ var VIEWS = (function () {
       st('Área construída', M.fmtM2(M.areaConstruida())) +
       st('Taxa de ocupação', M.fmtPct(M.ocupacao())) +
       (M.espelhoAgua() ? st('Espelho d’água', M.fmtM2(M.espelhoAgua())) : '') +
-      st('Custo por m²', M.fmtBRL(M.custoPorM2())) +
-      st('Investimento', M.fmtBRL(M.custoTotal())) +
+      st('Custo por m²', M.fmtBRL(oc.porM2)) +
+      st('Investimento', M.fmtBRL(oc.total)) +
+      st('Faixa', M.fmtBRL(oc.minimo) + ' – ' + M.fmtBRL(oc.maximo)) +
       '</div>';
+    /* por etapa da obra — o cliente vê onde o dinheiro vai */
+    h += '<div class="ap-etapas">' + oc.etapas.filter(function (e) { return e.valor > 0; }).map(function (e) { return '<div class="ap-et"><b>' + M.fmtPct(e.valor / Math.max(1, oc.subtotal) * 100) + '</b><span>' + esc(e.rot).toUpperCase() + '</span><small>' + M.fmtBRL(e.valor) + '</small></div>'; }).join('') + '</div>';
     if (p.meta > 0) {
-      var dif = M.custoTotal() - p.meta;
+      var dif = oc.total - p.meta;
       h += '<div style="margin-top:22px;padding:18px 20px;border-left:3px solid ' + (dif > 0 ? '#E5533D' : '#2FA36B') +
         ';background:rgba(' + (dif > 0 ? '229,83,61' : '47,163,107') + ',.09);border-radius:0 8px 8px 0">' +
         '<b class="mono" style="color:' + (dif > 0 ? '#FF9583' : '#7FE0B4') + '">META ' + M.fmtBRL(p.meta) + ' = ' +
-        M.fmtPct(p.meta / Math.max(1, M.custoTotal()) * 100) + ' DO ESTIMADO</b>' +
+        M.fmtPct(p.meta / Math.max(1, oc.total) * 100) + ' DO ESTIMADO</b>' +
         '<p style="font-size:13px;line-height:1.65;color:#C6D3DC;margin-top:8px">' +
         (dif > 0 ? 'Faltam <b>' + M.fmtBRL(dif) + '</b>. O projeto não foi encolhido para caber no número.'
                  : 'Sobram <b>' + M.fmtBRL(-dif) + '</b> sobre a estimativa.') + '</p></div>';
