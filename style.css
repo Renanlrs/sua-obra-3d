@@ -453,7 +453,9 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 .fach-prompt .inp{display:block}
 .fach-prompt textarea{width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg-2);color:var(--txt-1);font-size:12.5px;line-height:1.4;resize:vertical;min-height:52px}
 .fach-prompt textarea:focus{border-color:var(--acento);outline:none}
-.fach-prompt-acts{display:flex;align-items:center;gap:10px;margin-top:8px}
+.fach-prompt-acts{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.fach-prompt-acts .btn{white-space:nowrap;flex:0 0 auto}
+.fach-prompt-acts span{flex:1 1 100%}
 .fach-prompt-acts span{font-size:11px;color:var(--ok);line-height:1.35}
 
 .only-mobile{display:none!important}
