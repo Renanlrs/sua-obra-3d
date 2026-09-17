@@ -42,8 +42,25 @@ Tecla `F`. Quatro estilos de partida (Moderno, Clássico, Contemporâneo, Rústi
 ### 5. Orçamento, simulador, apresentação e exportação
 Custo por m² por tipo de ambiente + custo da fachada; simulador de meta; apresentação cinematográfica com passeio 3D dirigido pelo scroll; exporta SVG, PNG, PDF, `.json` e **passeio 3D em HTML** (um arquivo, abre no celular).
 
+### 6. Fusão com o ACQUA BELO — piscina, orçamento por etapa, cenários, camadas, cotas, relatório, renders, versões
+As funções do app da escola de natação passaram a viver no mesmo editor, lendo a mesma planta:
+- **Escola de natação** é um programa pronto (15 × 20 m): rua → corredor → controle de acesso → vestiários → salão com a **piscina 12,50 × 6,00 m e 4 raias** dentro; administração e deck do animador no 2º pavimento.
+- **Aba Piscina**: comprimento, largura, profundidade mín./máx., raias e largura da raia; praias medidas até as paredes do salão (mín. 1,50 m laterais · 0,50 m cabeceiras), volume, área molhada, alertas, aquecimento e filtragem. No 3D a piscina tem a profundidade real, cordas de raia, blocos de partida e o piso do salão recortado.
+- **Orçamento por etapa da obra** (a mesma sequência do slider OBRA): composição em fundação/estrutura/alvenaria/cobertura/instalações/acabamentos, grupos Piscina e Fachada, reserva técnica e faixa −12 %/+18 %.
+- **Simulador de cenários**: cada linha mostra o Δ R$ (acabamento econômico, piscina 11/12,5/15 m, sem 2º andar, sem o menor ambiente…) e aplica com um clique, com desfazer.
+- **Camadas** (visível/bloqueada), **Cotas** (todas as medidas, editáveis; cotas livres), **Relatório técnico** com alertas inteligentes, **Renders** (botão **+ Render** no 3D e na fachada, ou envio de imagem; entram na apresentação), **Versões do estudo** e exportação em CSV/TXT.
+
+### 7. Prático: clique no item para trocar · botão direito para agir
+- Na **Fachada** (e no 3D), passe o mouse: janela, porta, telhado, parede, revestimento, muro, portão, piso da frente, letreiro… viram clicáveis. **Clique** → aparece só o que dá para trocar naquele item; cada escolha aplica na hora e o popover fica aberto para comparar. "Todas as opções" leva ao painel completo.
+- Na **Planta**, **botão direito** em um ambiente (renomear, tipo, mobiliar só ele, duplicar, girar, andar, excluir), em um móvel (girar, espelhar, duplicar, elevar, **trocar por outro**, excluir) ou no vazio (adicionar ambiente aqui, mobiliar, enquadrar, desfazer).
+
 ## Conferir sem clicar
 ```
+index.html?demo=escola-natacao&l=15&p=20&v=planta
+index.html?demo=escola-natacao&l=15&p=20&v=piscina
+index.html?demo=escola-natacao&l=15&p=20&v=tresd&t3=tour&i=6
+index.html?demo=casa-terrea&l=10&p=25&v=planta&ctx=amb
+index.html?demo=loja&l=12&p=25&v=fachada&fpop=janela
 index.html?demo=casa-terrea&l=10&p=25&v=planta&cat=1&catk=quarto&selmov=20
 index.html?demo=casa-terrea&l=10&p=25&v=tresd&teto=0
 index.html?demo=casa-terrea&l=10&p=25&v=tresd&etapa=2

@@ -23,7 +23,7 @@ var PLAN = (function () {
     svg.addEventListener('pointermove', onHover);
     svg.addEventListener('wheel', onWheel, {passive:false});
     svg.addEventListener('dblclick', onDbl);
-    svg.addEventListener('contextmenu', function (e) { e.preventDefault(); onDbl(e); });
+    svg.addEventListener('contextmenu', function (e) { e.preventDefault(); UI.menuContexto(e); });   /* botão direito = menu com as ações do item */
     /* soltar um móvel arrastado do catálogo em cima da planta */
     svg.addEventListener('dragover', function (e) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
     svg.addEventListener('drop', function (e) {

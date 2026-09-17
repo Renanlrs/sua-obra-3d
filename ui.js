@@ -31,6 +31,9 @@ var UI = (function () {
     $('#btn-mob').onclick = function () { toggleCatalogo(); };
     document.querySelectorAll('#pill23 button').forEach(function (b) { b.onclick = function () { irPara(b.getAttribute('data-v')); }; });
     document.addEventListener('pointerdown', function (e) {
+      var fp = document.getElementById('fpop'), cx2 = document.getElementById('ctx');
+      if (fp && !fp.hidden && !fp.contains(e.target) && !(e.target.closest && e.target.closest('canvas'))) fp.hidden = true;
+      if (cx2 && !cx2.hidden && !cx2.contains(e.target)) cx2.hidden = true;
       /* clicar fora do catálogo e do menu radial fecha o radial (o catálogo fica) */
       if (!e.target.closest('#radial') && !e.target.closest('#stage') && !e.target.closest('.t3-canvas')) $('#radial').hidden = true;
     });
@@ -97,6 +100,14 @@ var UI = (function () {
       if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'fachada') { fachPanel(); t3.verFachada(true); } }
       if (q.get('fprompt') && viewAtual === 'fachada') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true, +q.get('fz') || 1); }
       if (q.has('noite') && t3) t3.setNoite(true);
+      /* &fpop=janela abre o popover de troca · &ctx=amb|mov|vazio abre o menu de contexto — conferência e print */
+      if (q.get('fpop')) setTimeout(function () { popFachada(q.get('fpop'), 520, 220); }, 200);
+      if (q.get('ctx') && viewAtual === 'planta') setTimeout(function () {
+        var alvo = q.get('ctx') === 'amb' ? PLAN.svgEl.querySelector('.amb rect') : q.get('ctx') === 'mov' ? PLAN.svgEl.querySelector('.mov') : PLAN.svgEl;
+        var r = alvo.getBoundingClientRect(), ev = {target:alvo, clientX:r.left + r.width / 2, clientY:r.top + r.height / 2};
+        if (q.get('ctx') === 'vazio') { ev.clientX = r.left + 40; ev.clientY = r.top + 60; }
+        menuContexto(ev);
+      }, 200);
       if (q.has('estilos4')) setTimeout(compararEstilos, 100);
       if (q.has('htmlpasseio')) { location.href = URL.createObjectURL(new Blob([htmlPasseio()], {type:'text/html'})) + (q.get('scroll') ? '#s=' + q.get('scroll') : ''); return; }   /* testa o export in loco */
       if (q.has('apres')) { abrirApres(); if (q.has('scroll')) setTimeout(function () { $('#apres').scrollTop = +q.get('scroll'); }, 100); }
@@ -875,7 +886,14 @@ var UI = (function () {
     };
     c.querySelectorAll('[data-cat]').forEach(function (b) { b.onclick = function () { catCat = b.getAttribute('data-cat'); catalogo(); }; });
     c.querySelectorAll('[data-k]').forEach(function (b) {
-      b.onclick = function () { var o = ondeNasce(); addMovel(b.getAttribute('data-k'), o.x, o.y); };
+      b.onclick = function () {
+        if (trocaMovel) {   /* substitui o móvel mantendo lugar e giro */
+          var mv0 = M.movelDe(trocaMovel); trocaMovel = null;
+          if (mv0) { var novo = {id:M.uid(), k:b.getAttribute('data-k'), x:mv0.x, y:mv0.y, rot:mv0.rot || 0}; if (mv0.esp) novo.esp = true; if (mv0.pav) novo.pav = mv0.pav; if (mv0.amb) novo.amb = mv0.amb;
+            M.proj.moveis = M.proj.moveis.map(function (m) { return m.id === mv0.id ? novo : m; }); M.commit('Trocar móvel'); toggleCatalogo(false); selecionarMovel(novo.id); toast('Móvel trocado.', function () { fazerUndo(); }); return; }
+        }
+        var o = ondeNasce(); addMovel(b.getAttribute('data-k'), o.x, o.y);
+      };
       b.ondragstart = function (e) { e.dataTransfer.setData('text/movel', b.getAttribute('data-k')); e.dataTransfer.effectAllowed = 'copy'; };
     });
   }
@@ -1113,6 +1131,8 @@ var UI = (function () {
         return;
       }
       if (e.key === 'Escape') {
+        var fp0 = document.getElementById('fpop'), cx0 = document.getElementById('ctx');
+        if ((fp0 && !fp0.hidden) || (cx0 && !cx0.hidden)) { fecharPop(); return; }
         if (!$('#apres').hidden) { fecharApres(); return; }
         if (!$('#ajuda').hidden) { closeOverlays(); return; }
         if (PLAN.sel) { PLAN.selecionar(null); return; }
@@ -1188,6 +1208,7 @@ var UI = (function () {
       nav.hidden = m !== 'tour'; dica.textContent = DICAS[m] || '';
     }
     t3 = TRES.montar(st, {modo:'orbit', on:{
+      fachadaClique: popFachada, fachadaHover: dicaFachada,
       modo: modos,
       paradas: function (ps) {
         sel.innerHTML = '<option value="">Ir para…</option>' + ps.map(function (p, i) { return '<option value="' + i + '">' + esc(p.titulo) + '</option>'; }).join('');
@@ -1232,10 +1253,12 @@ var UI = (function () {
     pad.classList.add('pad-3d');
     var st = pad.querySelector('#fach-stage');
     t3 = TRES.montar(st, {modo:'orbit', editar:false, on:{
-      noite: function (n) { pad.querySelectorAll('#fach-hora button').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-hora') === 'noite') === n); }); }
+      noite: function (n) { pad.querySelectorAll('#fach-hora button').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-hora') === 'noite') === n); }); },
+      fachadaClique: popFachada, fachadaHover: dicaFachada
     }});
     if (!t3) return;
     t3.verFachada(true);
+    pad.querySelector('.t3-dica').textContent = 'Clique numa janela, porta, parede, telhado, muro ou portão para trocar · arraste para girar';
     pad.querySelectorAll('#fach-hora button').forEach(function (b) { b.onclick = function () { t3.setNoite(b.getAttribute('data-hora') === 'noite'); }; });
     pad.querySelector('#fach-elev').onclick = function () {
       var e = pad.querySelector('#fach-elev-pad'); e.hidden = !e.hidden; this.classList.toggle('on', !e.hidden);
@@ -1352,6 +1375,138 @@ var UI = (function () {
     var e = document.querySelector('#fach-elev-pad'); if (e && !e.hidden) e.innerHTML = VIEWS.fachada();
     if (t3 && r.fachada.letreiroLuz && r.fachada.letreiro) t3.setNoite(true);   /* pediu letreiro aceso: mostra à noite */
   }
+  /* ================= CLICAR NO ITEM PARA TROCAR (fachada) =================
+     O 3D etiqueta cada elemento (userData.fk). Clicou → popover ao lado do clique com SÓ as opções daquele item;
+     cada escolha aplica na hora (com desfazer) e o popover continua aberto para comparar. */
+  var FK_ROT = {janela:'Janela', porta:'Porta de entrada', garagem:'Porta da garagem', cobertura:'Cobertura', parede:'Parede', revestimento:'Revestimento da frente',
+    destaque:'Volume de destaque', portao:'Portão', muro:'Muro', pisoFrente:'Piso da frente', jardim:'Jardim', marquise:'Marquise', letreiro:'Letreiro', vitrine:'Vitrine'};
+  var FK_TOGGLES = ['jardim', 'marquise', 'iluminacao', 'pergolado', 'vitrine', 'letreiroLuz', 'totem', 'moldura', 'gradeJanela', 'brise', 'arandelas', 'vasos'];
+  function dicaFachada(fk, x, y){
+    var d = document.getElementById('fhint');
+    if (!fk) { if (d) d.hidden = true; return; }
+    if (!d) { d = document.createElement('div'); d.id = 'fhint'; d.className = 'fhint'; document.body.appendChild(d); }
+    d.textContent = (FK_ROT[fk] || fk) + ' — clique para trocar'; d.hidden = false;
+    d.style.left = Math.min(window.innerWidth - 220, x + 14) + 'px'; d.style.top = (y + 16) + 'px';
+  }
+  function popFachada(fk, x, y){
+    var F = TRES.fachadaDe(M.proj), h = '';
+    function chips(k, mapa){ return '<div class="chips">' + Object.keys(mapa).map(function (v) { return '<button class="chip' + (F[k] === v ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + v + '">' + mapa[v] + '</button>'; }).join('') + '</div>'; }
+    function tg(k, rot){ return '<button class="chip' + (F[k] ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + (F[k] ? '0' : '1') + '">' + rot + '</button>'; }
+    function cor(k, lista){ var atual = F[k] || '', custom = atual && lista.indexOf(String(atual).toUpperCase()) < 0;
+      return '<div class="swatches">' + lista.map(function (c) { return '<button class="sw-btn' + (String(atual).toUpperCase() === c ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + c + '" style="background:' + c + '" title="' + c + '"></button>'; }).join('') +
+        '<label class="sw-btn sw-custom' + (custom ? ' on' : '') + '" title="Qualquer cor" style="background:' + (custom ? atual : 'conic-gradient(#E4574F,#F2C14E,#4E9A5D,#22B8D6,#6B4E9E,#E4574F)') + '"><input type="color" data-fc="' + k + '" value="' + (atual || '#888888') + '"></label></div>'; }
+    function sec(t, inner){ return '<section><h6>' + t + '</h6>' + inner + '</section>'; }
+    if (fk === 'janela') h += sec('TIPO DE JANELA', chips('janela', TRES.JANELAS)) + sec('VIDRO', chips('vidro', TRES.VIDROS)) + sec('DETALHES', '<div class="chips">' + tg('moldura', 'Moldura') + tg('gradeJanela', 'Grade') + tg('brise', 'Brise') + '</div>') + sec('ESQUADRIA', chips('esquadria', ROT.esquadria) + cor('esquadriaCor', CORES_ESQ));
+    else if (fk === 'porta') h += sec('PORTA · CASA', chips('porta', TRES.PORTAS)) + sec('PORTA · LOJA', chips('porta', TRES.PORTAS_LOJA)) + sec('COR', cor('portaCor', CORES_PORTA)) + sec('NA ENTRADA', '<div class="chips">' + tg('arandelas', 'Arandelas') + tg('vasos', 'Vasos') + tg('marquise', 'Marquise') + tg('pergolado', 'Pergolado') + '</div>');
+    else if (fk === 'garagem') h += sec('PORTA DA GARAGEM', chips('garagem', TRES.GARAGENS)) + sec('COR', cor('portaCor', CORES_PORTA));
+    else if (fk === 'cobertura') h += sec('COBERTURA', chips('cobertura', ROT.cobertura)) + (F.cobertura !== 'platibanda' ? sec('TELHA', chips('telha', ROT.telha)) : sec('COR DA PLATIBANDA', cor('corParede', CORES_PAREDE)));
+    else if (fk === 'parede') h += sec('COR DA PAREDE', cor('corParede', CORES_PAREDE)) + sec('REVESTIMENTO DA FRENTE', chips('revestimento', ROT.revestimento)) + sec('ESTILO', chips('estilo', (function () { var o = {}; Object.keys(TRES.FACHADA_PRESETS).forEach(function (k) { o[k] = TRES.FACHADA_PRESETS[k].rot; }); return o; })()));
+    else if (fk === 'revestimento') h += sec('REVESTIMENTO', chips('revestimento', ROT.revestimento)) + sec('COR DA PAREDE', cor('corParede', CORES_PAREDE));
+    else if (fk === 'destaque') h += sec('COR DE DESTAQUE', cor('corDestaque', CORES_DEST)) + sec('NA ENTRADA', '<div class="chips">' + tg('marquise', 'Marquise') + tg('pergolado', 'Pergolado') + tg('arandelas', 'Arandelas') + '</div>');
+    else if (fk === 'portao') h += sec('PORTÃO', chips('portao', ROT.portao)) + sec('COR', cor('portaoCor', CORES_PORTA)) + sec('LETREIRO', '<div class="chips">' + tg('totem', 'Totem no portão') + '</div>');
+    else if (fk === 'muro') h += sec('MURO', chips('muro', ROT.muro)) + sec('COR', cor('muroCor', CORES_MURO)) + sec('FRENTE', '<div class="chips">' + tg('jardim', 'Jardim') + tg('iluminacao', 'Iluminação') + '</div>');
+    else if (fk === 'pisoFrente') h += sec('PISO DA FRENTE', chips('pisoFrente', TRES.PISOS_FRENTE)) + sec('FRENTE', '<div class="chips">' + tg('jardim', 'Jardim') + tg('vasos', 'Vasos') + '</div>');
+    else if (fk === 'jardim') h += sec('JARDIM', '<div class="chips">' + tg('jardim', 'Jardim') + tg('vasos', 'Vasos') + tg('iluminacao', 'Iluminação') + '</div>') + sec('PISO DA FRENTE', chips('pisoFrente', TRES.PISOS_FRENTE));
+    else if (fk === 'marquise') h += sec('ENTRADA', '<div class="chips">' + tg('marquise', 'Marquise') + tg('pergolado', 'Pergolado') + tg('arandelas', 'Arandelas') + '</div>') + sec('COR DE DESTAQUE', cor('corDestaque', CORES_DEST));
+    else if (fk === 'vitrine') h += sec('VITRINE', '<div class="chips">' + tg('vitrine', 'Vitrine na frente') + '</div>') + sec('VIDRO', chips('vidro', TRES.VIDROS)) + sec('ESQUADRIA', chips('esquadria', ROT.esquadria));
+    else if (fk === 'letreiro') h += sec('TIPO', chips('letreiroEstilo', {placa:'Placa', caixa:'Letra caixa', led:'LED', neon:'Neon', backlight:'Backlight'})) + sec('FORMATO', chips('letreiroFormato', TRES.LETREIRO_FORMATOS)) +
+      sec('TAMANHO', '<div class="chips">' + Object.keys(TRES.LETREIRO_TAMS).map(function (v) { return '<button class="chip' + (F.letreiroTam === v && !F.letreiroLargura ? ' on' : '') + '" data-fk="letreiroTam" data-fv="' + v + '">' + TRES.LETREIRO_TAMS[v] + '</button>'; }).join('') + '</div>') +
+      sec('FONTE', chips('letreiroFonte', TRES.LETREIRO_FONTES)) + sec('COR DAS LETRAS', cor('letreiroCor', ['#22B8D6', '#2F5D8A', '#C4553B', '#E0B44C', '#4E9A5D', '#D96AA0', '#F4F4F1', '#1F2326', '#D9722B', '#6B4E9E', '#C9A227', '#1E7E96'])) +
+      sec('LUZ', '<div class="chips">' + tg('letreiroLuz', 'Acende à noite') + tg('totem', 'Totem') + '</div>');
+    if (!h) return;
+    var pop = document.getElementById('fpop');
+    if (!pop) { pop = document.createElement('div'); pop.id = 'fpop'; pop.className = 'fpop'; document.body.appendChild(pop); }
+    pop.innerHTML = '<div class="fpop-hd"><b>' + (FK_ROT[fk] || fk) + '</b><span>clique para trocar · Esc fecha</span><button class="icon-btn" data-close>' + icon('close') + '</button></div><div class="fpop-bd">' + h + '</div>' +
+      '<div class="fpop-ft"><button class="btn ghost sm" data-undo' + (M.podeUndo() ? '' : ' disabled') + '>↶ Desfazer</button><button class="btn ghost sm" data-panel>Todas as opções</button></div>';
+    pop.hidden = false; pop.dataset.fk = fk;
+    if (x != null) { var W = 340, Hh = Math.min(window.innerHeight - 40, 520); pop.style.left = Math.max(8, Math.min(window.innerWidth - W - 8, x + 12)) + 'px'; pop.style.top = Math.max(8, Math.min(window.innerHeight - Hh - 8, y - 40)) + 'px'; }
+    dicaFachada(null);
+    pop.querySelectorAll('[data-fk]').forEach(function (b) {
+      b.onclick = function () {
+        var k = b.getAttribute('data-fk'), v = b.getAttribute('data-fv');
+        if (FK_TOGGLES.indexOf(k) >= 0) v = v === '1';
+        if (k === 'esquadria') { M.proj.fachada = M.proj.fachada || {}; M.proj.fachada.esquadriaCor = ''; }
+        if (k === 'letreiroTam') { M.proj.fachada = M.proj.fachada || {}; M.proj.fachada.letreiroLargura = 0; M.proj.fachada.letreiroAltura = 0; }
+        setFachada(k, v); popFachada(fk);   /* reabre no mesmo lugar, já com a escolha marcada */
+      };
+    });
+    pop.querySelectorAll('input[data-fc]').forEach(function (inp) { inp.onchange = function () { setFachada(inp.getAttribute('data-fc'), inp.value.toUpperCase()); popFachada(fk); }; inp.onclick = function (e) { e.stopPropagation(); }; });
+    pop.querySelector('[data-close]').onclick = fecharPop;
+    pop.querySelector('[data-undo]').onclick = function () { fazerUndo(); popFachada(fk); };
+    pop.querySelector('[data-panel]').onclick = function () { fecharPop(); if (viewAtual !== 'fachada') irPara('fachada'); var el = document.querySelector('#fach-panel'); if (el) { el.scrollTop = 0; el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 900); } };
+  }
+  function fecharPop(){ var p = document.getElementById('fpop'); if (p) p.hidden = true; var c = document.getElementById('ctx'); if (c) c.hidden = true; }
+
+  /* ================= MENU DE CONTEXTO (botão direito na planta) =================
+     Ambiente: renomear, tipo, mobiliar, duplicar, girar, andar, excluir · Móvel: girar, espelhar, duplicar, trocar, excluir ·
+     Vazio: adicionar ambiente aqui, mobiliar, enquadrar. Tudo o que o inspector faz, a um clique de distância. */
+  function menuContexto(e){
+    var alvoMov = e.target.closest ? e.target.closest('.mov') : null, alvoAmb = e.target.closest ? e.target.closest('.amb') : null;
+    var p = PLAN.toModel(e), itens = [], titulo = '';
+    function it(rot, fn, cls){ itens.push({rot:rot, fn:fn, cls:cls || ''}); }
+    if (alvoMov && !PLAN.bloq('moveis')) {
+      var mid = alvoMov.getAttribute('data-id'), mv = M.movelDe(mid), d = mv && MOVEIS.def(mv.k);
+      if (!mv) return; PLAN.selecionarMovel(mid); titulo = d ? d.nome : 'Móvel';
+      it('Girar 90°', function () { acaoMovel('rot', mid); }); it('Girar −90°', function () { acaoMovel('rotm', mid); }); it('Espelhar', function () { acaoMovel('esp', mid); });
+      it('Duplicar', function () { acaoMovel('dup', mid); }); it('Elevar 10 cm', function () { acaoMovel('up', mid); });
+      it('Trocar por outro…', function () { catCat = d ? d.cat : null; catBusca = ''; toggleCatalogo(true); toast('Escolha o novo móvel no catálogo — ele nasce no mesmo lugar.', null); trocaMovel = mid; });
+      it('Medidas de fábrica', function () { acaoMovel('reset', mid); });
+      it('Excluir', function () { acaoMovel('del', mid); }, 'danger');
+    } else if (alvoAmb) {
+      var id = alvoAmb.getAttribute('data-id'), a = M.proj.ambientes.filter(function (x) { return x.id === id; })[0]; if (!a) return;
+      PLAN.selecionar(id); titulo = a.nome;
+      var bloqA = alvoAmb.classList.contains('bloq');
+      it('Renomear', function () { renomearInline(id, e.clientX, e.clientY); });
+      itens.push({tipos:true});
+      if (!bloqA) {
+        it('Mobiliar só este ambiente', function () { mobiliarAmbiente(id); });
+        it('Duplicar', function () { duplicar(id); });
+        it('Girar 90°', function () { var w = a.w; a.w = a.h; a.h = w; M.commit('Girar ambiente'); PLAN.render(); inspector(); });
+        if (a.tipo === 'agua') it('Piscina: raias e profundidade', function () { irPara('piscina'); });
+        if (M.nPavs() > 1) for (var pv = 0; pv < M.nPavs(); pv++) if (pv !== M.pavDe(a)) (function (pv2) { it('Enviar para ' + M.nomePav(pv2), function () { a.pav = pv2 || undefined; if (!pv2) delete a.pav; (M.proj.moveis || []).forEach(function (m) { if (m.amb === a.id) { if (pv2) m.pav = pv2; else delete m.pav; } }); M.commit('Mudar andar'); M.setPav(pv2); irPara('planta'); }); })(pv);
+        it('Excluir', function () { excluir(id); }, 'danger');
+      } else it('Desbloquear camada', function () { M.setCamada('ambientes', 'bloq', false); M.setCamada('piscina', 'bloq', false); M.salvar(); PLAN.render(); });
+    } else {
+      titulo = 'Aqui (' + M.fmtMs(p.x) + ' ; ' + M.fmtMs(p.y) + ' m)';
+      it('Adicionar ambiente aqui…', function () { escolherAmbiente(e.clientX, e.clientY, p); });
+      it('Mobiliar (catálogo)', function () { toggleCatalogo(true); });
+      it('Mobiliar tudo automaticamente', function () { M.mobiliarAuto(); M.commit('Mobiliar automaticamente'); PLAN.render(); inspector(); });
+      it('Enquadrar', function () { PLAN.enquadrar(); PLAN.render(); });
+      if (M.podeUndo()) it('Desfazer: ' + M.proxUndo(), function () { fazerUndo(); });
+    }
+    var c = document.getElementById('ctx');
+    if (!c) { c = document.createElement('div'); c.id = 'ctx'; c.className = 'ctx'; document.body.appendChild(c); }
+    var h = '<div class="ctx-hd">' + esc(titulo) + '</div>';
+    itens.forEach(function (x, i) {
+      if (x.tipos) { var a2 = PLAN.atual(); h += '<div class="ctx-tipos">' + Object.keys(M.TIPOS).map(function (k) { return '<button class="chip' + (a2 && a2.tipo === k ? ' on' : '') + '" data-tipo="' + k + '" style="--c:' + M.TIPOS[k].cor + '"><i></i>' + M.TIPOS[k].rot + '</button>'; }).join('') + '</div>'; return; }
+      h += '<button class="ctx-it ' + x.cls + '" data-i="' + i + '">' + esc(x.rot) + '</button>';
+    });
+    c.innerHTML = h; c.hidden = false;
+    c.style.left = Math.min(window.innerWidth - 250, e.clientX + 2) + 'px'; c.style.top = Math.min(window.innerHeight - 40 - itens.length * 32, e.clientY + 2) + 'px';
+    c.querySelectorAll('.ctx-it').forEach(function (b) { b.onclick = function () { c.hidden = true; itens[+b.getAttribute('data-i')].fn(); }; });
+    c.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { var a3 = PLAN.atual(); if (a3) { a3.tipo = b.getAttribute('data-tipo'); M.commit('Mudar tipo'); PLAN.render(); inspector(); } c.hidden = true; }; });
+  }
+  var trocaMovel = null;   /* "Trocar por outro…": o próximo item do catálogo substitui este móvel */
+  function mobiliarAmbiente(id){
+    if (!window.MOVEIS) return;
+    var antes = (M.proj.moveis || []).filter(function (m) { var a = M.ambienteDe(m); return !a || a.id !== id; });
+    var todos = M.mobiliarAuto(), novos = todos.filter(function (m) { var a = M.ambienteDe(m); return a && a.id === id; });
+    M.proj.moveis = antes.concat(novos); M.commit('Mobiliar ambiente'); PLAN.render(); inspector();
+    toast(novos.length + (novos.length === 1 ? ' móvel colocado.' : ' móveis colocados.'), function () { fazerUndo(); });
+  }
+  /* mini-biblioteca no ponto clicado: escolhe o ambiente e ele nasce ali */
+  function escolherAmbiente(cx, cy, p){
+    var c = document.getElementById('ctx');
+    var h = '<div class="ctx-hd">Adicionar ambiente aqui</div><div class="ctx-lib">' + M.LIB.map(function (l, i) { return '<button data-lib="' + i + '"><span class="sw" style="background:' + M.TIPOS[l.tipo].cor + '"></span>' + esc(l.nome) + '</button>'; }).join('') + '</div>';
+    c.innerHTML = h; c.hidden = false;
+    c.querySelectorAll('[data-lib]').forEach(function (b) { b.onclick = function () {
+      var l = M.LIB[+b.getAttribute('data-lib')], t = M.proj.terreno;
+      var a = {id:M.uid(), nome:l.nome, tipo:l.tipo, w:l.w, h:l.h, x:Math.max(0, Math.min(t.largura - l.w, Math.round((p.x - l.w / 2) / 5) * 5)), y:Math.max(0, Math.min(t.profundidade - l.h, Math.round((p.y - l.h / 2) / 5) * 5))};
+      if (M.pav) a.pav = M.pav;
+      M.proj.ambientes.push(a); M.commit('Adicionar ' + l.nome); PLAN.render(); PLAN.selecionar(a.id); c.hidden = true;
+    }; });
+  }
+
   function setFachada(k, v){
     if (k === 'estilo') M.proj.fachada = {estilo:v, numero:(M.proj.fachada || {}).numero || ''};   /* trocar de estilo zera as escolhas manuais */
     else { M.proj.fachada = M.proj.fachada || {}; M.proj.fachada[k] = v; }
@@ -1527,7 +1682,7 @@ var UI = (function () {
     editarCota:editarCota, renomearInline:renomearInline, addRoomDefault:addRoomDefault,
     radial:radial, addMovel:addMovel, acaoMovel:acaoMovel, toggleCatalogo:toggleCatalogo, htmlPasseio:htmlPasseio,
     selTap:selTap, fecharInsp:function(){ setInsp(false); },
-    toast:toast, saveState:saveState, zoomLabel:zoomLabel, coord:coord, hud:hud, msg:msg,
+    toast:toast, saveState:saveState, zoomLabel:zoomLabel, coord:coord, hud:hud, msg:msg, menuContexto:menuContexto, fecharPop:fecharPop,
     closeOverlays:closeOverlays, fecharApres:fecharApres, abrirApres:abrirApres, exportar:exportar,
     get shift(){ return shift; }, get alt(){ return alt; }, get espaco(){ return espaco; }
   };
