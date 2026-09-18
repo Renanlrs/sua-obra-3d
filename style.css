@@ -49,7 +49,9 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
   radial-gradient(90% 70% at 78% 8%,#16222B 0%,#0B0E11 55%)}
 .home-in{max-width:920px;margin:0 auto;padding:40px 32px 80px}
 .home-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:72px}
-.logo-img{height:96px;width:auto;display:block}
+.logo-img{height:clamp(120px,16vw,190px);width:auto;display:block;max-width:min(78vw,560px);object-fit:contain}
+/* fundo claro (impressão/PDF): a marca escura, sempre com fundo transparente */
+@media print{.logo-img{content:url("docs/marca.png")}}
 .logo b{display:block;font-size:14px;letter-spacing:.16em;font-weight:600}
 .logo span{display:block;font-size:9px;letter-spacing:.24em;color:var(--txt-3);margin-top:3px}
 .home h1{font-size:clamp(2rem,4.4vw,3.1rem);font-weight:600;letter-spacing:-.03em;line-height:1.08}
@@ -606,7 +608,8 @@ label.btn{cursor:pointer}
   .t3-nav{right:10px;bottom:10px}
   /* tela inicial */
   .home-in{padding:26px 18px 60px}
-  .home-hd{margin-bottom:36px}
+  .home-hd{margin-bottom:28px}
+  .logo-img{height:clamp(96px,30vw,140px)}
   .home-lead{margin-bottom:26px}
   .terreno-row label{flex:1 1 40%}
   .num-wrap input{width:100%}
