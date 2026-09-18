@@ -315,6 +315,38 @@ t('visão/fachada: sem estilo, deduz pelo telhado/revestimento', VISAO.normaliza
 t('visão: limparJson aceita cerca de código e texto em volta', VISAO.limparJson('claro! ```json\n{"a":1}\n``` fim').a === 1);
 M.novo('casa-terrea', 1000, 2500);
 
+/* ---- aberturas decididas parede a parede + placas + estilos novos ---- */
+M.novo('casa-terrea', 1000, 2500);
+var anA = TF.analise(M.proj, 0), pcJ = anA.pecas.filter(function (pc) { return pc.ext && pc.ab.some(function (ab) { return ab.tipo === 'janela'; }) && !pc.ab.some(function (ab) { return ab.tipo !== 'janela'; }); })[0];
+t('toda parede externa tem chave ambiente|lado|índice', anA.pecas.filter(function (pc) { return pc.ext && (pc.A || pc.B); }).every(function (pc) { return /^[a-z0-9]+\|(frente|fundo|esq|dir)\|\d+$/.test(pc.chave); }), pcJ && pcJ.chave);
+M.setAbertura(pcJ.chave, {tipo:'nenhuma'});
+var anB = TF.analise(M.proj, 0), pcB = anB.pecas.filter(function (pc) { return pc.chave === pcJ.chave; })[0];
+t('excluir janela: a parede fica sem janela', pcB && !pcB.ab.some(function (ab) { return ab.tipo === 'janela'; }));
+M.setAbertura(pcJ.chave, {tipo:'janela', n:2, w:60, alt:100, peitoril:120, janela:'guilhotina', vidro:'fume'});
+var anC = TF.analise(M.proj, 0), pcC = anC.pecas.filter(function (pc) { return pc.chave === pcJ.chave; })[0], jsC = pcC.ab.filter(function (ab) { return ab.tipo === 'janela'; });
+t('2 janelas de 0,60 × 1,00 com peitoril 1,20, guilhotina fumê, só nesta parede', jsC.length === 2 && jsC.every(function (ab) { return ab.e - ab.s === 60 && ab.z0 === 120 && ab.z1 === 220 && ab.janela === 'guilhotina' && ab.vidro === 'fume'; }) && jsC[0].e <= jsC[1].s, JSON.stringify(jsC.map(function (ab) { return [ab.s, ab.e, ab.z0, ab.z1]; })));
+t('as caixas da parede descontam as duas janelas', pcC.caixas.length >= 4);
+M.setAbertura(pcJ.chave, {tipo:'porta', n:null, w:null, alt:null, peitoril:null, janela:null, vidro:null});
+var anD = TF.analise(M.proj, 0), pcD = anD.pecas.filter(function (pc) { return pc.chave === pcJ.chave; })[0];
+t('porta nesta parede: vira abertura de entrada secundária, sem janela', pcD.ab.some(function (ab) { return ab.tipo === 'entrada' && ab.secundaria; }) && !pcD.ab.some(function (ab) { return ab.tipo === 'janela'; }));
+M.limparAbertura(pcJ.chave);
+t('limpar volta ao automático', !M.proj.aberturas[pcJ.chave] && TF.analise(M.proj, 0).pecas.filter(function (pc) { return pc.chave === pcJ.chave; })[0].ab.some(function (ab) { return ab.tipo === 'janela'; }));
+var lateral = anA.pecas.filter(function (pc) { return pc.ext && pc.lado === 'esq' && pc.len >= 100; })[0];
+M.proj.entradaEm = lateral.chave;
+var anE = TF.analise(M.proj, 0);
+t('entrada principal escolhida numa parede lateral', anE.entrada && anE.entrada.pc.chave === lateral.chave && anE.entrada.pc.ab.some(function (ab) { return ab.tipo === 'entrada'; }));
+delete M.proj.entradaEm;
+t('8 estilos de fachada, todos com cobertura/revestimento válidos', Object.keys(TF.FACHADA_PRESETS).length === 8 && Object.keys(TF.FACHADA_PRESETS).every(function (k) { var p = TF.FACHADA_PRESETS[k]; return /platibanda|telhado2|telhado4/.test(p.cobertura) && p.rot; }));
+M.proj.fachada = {estilo:'tropical'};
+t('tropical liga pergolado e vasos por padrão; mediterrâneo liga moldura', TF.fachadaDe(M.proj).pergolado && TF.fachadaDe(M.proj).vasos && (M.proj.fachada = {estilo:'mediterraneo'}, TF.fachadaDe(M.proj).moldura));
+var pp = TF.fachadaPorPrompt('loja com letreiro "Bela Vista" no topo, bandeira, placa no muro, faixa "PROMOÇÃO 50%" e adesivo', {});
+t('prompt entende letreiro no topo, bandeira, placa no muro, faixa com texto e adesivo', pp.fachada.letreiroPos === 'topo' && pp.fachada.bandeira && pp.fachada.placaMuro && /PROMOCAO 50%|PROMOÇÃO 50%/.test(pp.fachada.faixa) && pp.fachada.adesivo && pp.fachada.vitrine, JSON.stringify(pp.fachada));
+M.proj.fachada = {estilo:'moderno', letreiro:'X', letreiroPos:'topo', bandeira:true, placaMuro:true, faixa:'OI', vitrine:true, adesivo:true};
+var itF = M.custoFachadaItens().map(function (i) { return i.rot; }).join('|');
+t('placas entram no custo da fachada', /topo/.test(itF) && /bandeira/i.test(itF) && /muro/i.test(itF) && /Faixa/.test(itF) && /Adesivo/.test(itF), itF);
+M.proj.fachada = null;
+M.novo('casa-terrea', 1000, 2500);
+
 var r=document.getElementById('resumo');
 r.textContent = ok+' passaram · '+bad+' falharam';
 r.style.background = bad? '#2A1512':'#0F2A1E';

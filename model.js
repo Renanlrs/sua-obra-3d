@@ -365,11 +365,22 @@ var M = (function () {
     letreiroTam:{p:.7, m:1, g:1.4, gg:1.9},
     garagem:{basculante:0, enrolar:180000, ripado:420000, vidro:650000},
     arandelas:38000, vasos:26000,
+    bandeira:180000, placaMuro:90000, faixa:25000, adesivo:60000, letreiroTopo:220000,   /* placas publicitárias */
     pisoFrente:{concreto:0, pedra:18000, deck:26000, intertravado:9000, grama:-6000}                   /* por m² do caminho */
   };
+  /* ---------- aberturas decididas pelo usuário, parede por parede (chave = ambiente|lado|índice, vinda do TRES.analise) ---------- */
+  function abertura(chave){ return (proj.aberturas || {})[chave] || null; }
+  function setAbertura(chave, patch){
+    if (!proj.aberturas) proj.aberturas = {};
+    var o = proj.aberturas[chave] = proj.aberturas[chave] || {};
+    for (var k in patch) { if (patch[k] === null || patch[k] === undefined) delete o[k]; else o[k] = patch[k]; }
+    if (!Object.keys(o).length) delete proj.aberturas[chave];
+    return o;
+  }
+  function limparAbertura(chave){ if (proj.aberturas) delete proj.aberturas[chave]; if (proj.entradaEm === chave) delete proj.entradaEm; }
   function fachadaCfg(){
     if (window.TRES) return TRES.fachadaDe(proj);
-    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem, janela:f.janela || 'correr', vidro:f.vidro || 'incolor', moldura:!!f.moldura, gradeJanela:!!f.gradeJanela, brise:!!f.brise, porta:f.porta || 'madeira', garagem:f.garagem || 'basculante', arandelas:!!f.arandelas, vasos:!!f.vasos, pisoFrente:f.pisoFrente || 'concreto', portaLargura:f.portaLargura || 0, portaAltura:f.portaAltura || 0, letreiroTam:f.letreiroTam || 'm'};
+    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem, janela:f.janela || 'correr', vidro:f.vidro || 'incolor', moldura:!!f.moldura, gradeJanela:!!f.gradeJanela, brise:!!f.brise, porta:f.porta || 'madeira', garagem:f.garagem || 'basculante', arandelas:!!f.arandelas, vasos:!!f.vasos, pisoFrente:f.pisoFrente || 'concreto', portaLargura:f.portaLargura || 0, portaAltura:f.portaAltura || 0, letreiroTam:f.letreiroTam || 'm', letreiroPos:f.letreiroPos || 'parede', bandeira:!!f.bandeira, placaMuro:!!f.placaMuro, faixa:f.faixa || '', adesivo:!!f.adesivo};
   }
   function testada(){   /* largura da frente construída, em cm */
     var cob = ambientesCobertos(); if (!cob.length) return 0;
@@ -407,6 +418,11 @@ var M = (function () {
     if (f.pisoFrente && f.pisoFrente !== 'concreto') add('Piso da frente ' + f.pisoFrente, Math.max(1, proj.terreno.recuoFrontal / 100 * 3) * (P.pisoFrente[f.pisoFrente] || 0));
     if (f.letreiro) add('Letreiro ' + ({placa:'placa', caixa:'letra caixa', led:'LED', neon:'neon', backlight:'backlight'}[f.letreiroEstilo] || f.letreiroEstilo) + (f.letreiroTam && f.letreiroTam !== 'm' ? ' ' + f.letreiroTam.toUpperCase() : ''), (P.letreiroTam[f.letreiroTam] || 1) * (P.letreiro[f.letreiroEstilo] || P.letreiro.placa));
     if (f.letreiro && f.totem) add('Totem', P.totem);
+    if (f.letreiro && f.letreiroPos === 'topo') add('Estrutura do letreiro no topo', P.letreiroTopo);
+    if (f.letreiro && f.bandeira) add('Placa bandeira', P.bandeira);
+    if (f.letreiro && f.placaMuro) add('Placa no muro', P.placaMuro);
+    if (f.faixa) add('Faixa / banner “' + f.faixa + '”', P.faixa);
+    if (f.letreiro && f.adesivo && f.vitrine) add('Adesivo na vitrine', P.adesivo);
     return itens;
   }
   function custoFachada(){ return custoFachadaItens().reduce(function (s2, i) { return s2 + i.valor; }, 0); }
@@ -757,7 +773,7 @@ var M = (function () {
     custoDe:custoDe, custoTotal:custoTotal, custoPorM2:custoPorM2, custoFachada:custoFachada, custoFachadaItens:custoFachadaItens, custoGeral:custoGeral, fachadaCfg:fachadaCfg, testada:testada, PRECO_FACHADA:PRECO_FACHADA, bbox:bbox, problemas:problemas,
     contem:contem, piscinas:piscinas, salaoDe:salaoDe, piscinaCfg:piscinaCfg, praias:praias, piscinaInfo:piscinaInfo, piscinaAlertas:piscinaAlertas, custoPiscinaItens:custoPiscinaItens, custoPiscina:custoPiscina, PRECO_PISCINA:PRECO_PISCINA,
     COMPOSICAO:COMPOSICAO, ETAPAS_OBRA:ETAPAS_OBRA, orcamento:orcamento, simular:simular, cenarios:cenarios, aplicarCenario:aplicarCenario,
-    CAMADAS:CAMADAS, camada:camada, setCamada:setCamada, cotasLista:cotasLista, setCota:setCota, relatorio:relatorio,
+    CAMADAS:CAMADAS, camada:camada, setCamada:setCamada, abertura:abertura, setAbertura:setAbertura, limparAbertura:limparAbertura, cotasLista:cotasLista, setCota:setCota, relatorio:relatorio,
     addRender:addRender, delRender:delRender, salvarVersao:salvarVersao, carregarVersao:carregarVersao, excluirVersao:excluirVersao, MAX_RENDERS:MAX_RENDERS,
     fmtM:fmtM, fmtMs:fmtMs, fmtM2:fmtM2, fmtPct:fmtPct, fmtBRL:fmtBRL, num:num, parseM:parseM,
     commit:commit, undo:undo, redo:redo, podeUndo:podeUndo, podeRedo:podeRedo, proxUndo:proxUndo,

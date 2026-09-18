@@ -440,7 +440,7 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 .estilos-hd{display:flex;align-items:flex-start;gap:14px;margin-bottom:16px}
 .estilos-hd h3{font-size:20px;font-weight:600;letter-spacing:-.02em}
 .estilos-hd p{color:var(--txt-2);font-size:13px;margin-top:3px;flex:1}
-.estilos-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.estilos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .estilo-foto{position:relative;padding:0;border-radius:10px;overflow:hidden;border:2px solid var(--line);background:var(--bg-2);cursor:pointer;text-align:left;transition:border-color .12s var(--e),transform .12s var(--e)}
 .estilo-foto:hover{border-color:var(--acento);transform:translateY(-2px)}
 .estilo-foto.on{border-color:var(--ok)}
@@ -542,6 +542,10 @@ label.btn{cursor:pointer}
 #visao ol li{margin:2px 0}
 .fach-prompt-acts label.btn{display:inline-flex;align-items:center}
 
+.ab-sec{background:rgba(34,184,214,.07);border-radius:8px;padding:10px 12px!important;margin:8px 0 4px}
+.ab-sec h6 small{font-weight:400;letter-spacing:0;text-transform:none;color:#8FA3B1;margin-left:6px}
+.chip.danger{border-color:#E5533D;color:#FF9583}.chip.danger:hover{background:#E5533D;color:#fff}
+.fpop .f .inp{background:#0F1418;border-color:#2A313A;height:30px}.fpop .f input{color:#E8EDF2;font-size:12px}.fpop .f label{color:#8FA3B1}.fpop .f-row{gap:6px}
 @media (max-width:900px){
   :root{--tab:58px}
   .only-mobile{display:grid!important}

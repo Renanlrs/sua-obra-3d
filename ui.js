@@ -108,7 +108,11 @@ var UI = (function () {
       if (q.get('fprompt') && viewAtual === 'fachada') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true, +q.get('fz') || 1); }
       if (q.has('noite') && t3) t3.setNoite(true);
       /* &fpop=janela abre o popover de troca · &ctx=amb|mov|vazio abre o menu de contexto — conferência e print */
-      if (q.get('fpop')) setTimeout(function () { popFachada(q.get('fpop'), 520, 220); }, 200);
+      if (q.get('fpop')) setTimeout(function () {
+        var fid = null;   /* &fpid=auto acha a primeira abertura/parede daquele tipo (conferência) */
+        if (q.get('fpid') === 'auto' && window.TRES) { var anq = TRES.analise(M.proj); anq.pecas.forEach(function (pc) { if (fid || !pc.ext) return; if (q.get('fpop') === 'parede') fid = pc.chave; else pc.ab.forEach(function (ab) { if (!fid && ((q.get('fpop') === 'janela' && ab.tipo === 'janela') || (q.get('fpop') === 'porta' && ab.tipo === 'entrada'))) fid = ab.chave; }); }); }
+        popFachada(q.get('fpop'), 520, 220, fid);
+      }, 200);
       if (q.has('chave')) { if ((q.get('chave') || '').length > 10) VISAO.setChave(q.get('chave')); else setTimeout(function () { pedirChave(null); }, 200); }   /* &chave=1 abre o diálogo · &chave=AIza… grava (conferência) */
       if (q.get('foto')) fetch(q.get('foto')).then(function (r) { return r.blob(); }).then(function (b) { copiarDeFoto(q.get('modo') || 'planta', new File([b], 'foto.png', {type:b.type || 'image/png'})); });   /* &foto=url&modo=planta|fachada */
       if (q.has('laco') && viewAtual === 'planta') setTimeout(function () { var tudo = M.ambsPav(M.pav).slice(0, +q.get('laco') || 3).map(function (a) { return {t:'amb', id:a.id}; }); PLAN.setMulti(tudo); }, 150);   /* &laco=N seleciona N ambientes como grupo */
@@ -310,7 +314,7 @@ var UI = (function () {
         '<div class="seg" id="fach-hora"><button data-hora="dia" class="on" title="Ver de dia">☀ Dia</button><button data-hora="noite" title="Ver à noite, com as luzes acesas">☾ Noite</button></div>' +
         '<button class="tg" id="fach-elev" title="Elevação frontal em desenho técnico">Elevação</button>' +
         '<span class="grow"></span>' +
-        '<button class="btn solid sm" id="fach-4" title="Fotografa a sua casa nos 4 estilos, lado a lado">✨ Ver os 4 estilos</button>' +
+        '<button class="btn solid sm" id="fach-4" title="Fotografa a sua casa em todos os estilos, lado a lado">✨ Ver os ' + Object.keys(TRES.FACHADA_PRESETS).length + ' estilos</button>' +
         '<button class="btn ghost sm" id="fach-foto" title="Salvar a imagem atual em PNG">Foto</button>' +
         '<button class="btn solid sm" id="fach-render" title="Guarda esta vista na aba Renders (entra na apresentação)">+ Render</button>' +
         '</div>' +
@@ -1386,8 +1390,15 @@ var UI = (function () {
       '<h6 style="margin-top:10px">FONTE</h6>' + chips('letreiroFonte', TRES.LETREIRO_FONTES) +
       '<h6 style="margin-top:10px">COR DAS LETRAS</h6>' + corLivre('letreiroCor', ['#22B8D6', '#2F5D8A', '#C4553B', '#E0B44C', '#4E9A5D', '#D96AA0', '#F4F4F1', '#1F2326', '#D9722B', '#6B4E9E', '#C9A227', '#1E7E96'], F.letreiroCor) +
       (F.letreiroEstilo !== 'caixa' && F.letreiroEstilo !== 'neon' ? '<h6 style="margin-top:10px">COR DO FUNDO</h6>' + corLivre('letreiroFundoCor', ['#14171B', '#FFFFFF', '#F4F4F1', '#2F5D8A', '#C4553B', '#4E9A5D', '#E0B44C', '#1E7E96'], F.letreiroFundoCor) : '') +
-      '<div class="chips" style="margin-top:10px">' + tg('letreiroLuz', 'Acende à noite') + tg('totem', 'Totem no portão') +
-      '<button class="chip' + (F.letreiroPos === 'marquise' ? ' on' : '') + '" data-fk="letreiroPos" data-fv="' + (F.letreiroPos === 'marquise' ? 'parede' : 'marquise') + '">Sobre a marquise</button></div>' : '<div class="ins-empty">Digite o nome para a placa aparecer na frente.</div>') + '</section>';
+      '<h6 style="margin-top:10px">ONDE</h6>' + chips('letreiroPos', TRES.LETREIRO_POS) +
+      '<h6 style="margin-top:10px">PLACAS PUBLICITÁRIAS</h6><div class="chips">' + tg('bandeira', 'Bandeira lateral') + tg('placaMuro', 'Placa no muro') + tg('totem', 'Totem no portão') + tg('adesivo', 'Adesivo na vitrine') + '</div>' +
+      '<div class="f" style="margin-top:8px"><label>FAIXA / BANNER (TEXTO)</label><div class="inp"><input id="fach-faixa" value="' + esc(F.faixa || '') + '" placeholder="ex.: PROMOÇÃO · INAUGURAÇÃO" maxlength="40"></div></div>' + (F.faixa ? '<h6 style="margin-top:8px">COR DA FAIXA</h6>' + corLivre('faixaCor', ['#E4574F', '#E0B44C', '#1E7E96', '#4E9A5D', '#2F5D8A', '#1F2326', '#D96AA0'], F.faixaCor) : '') +
+      '<div class="chips" style="margin-top:10px">' + tg('letreiroLuz', 'Acende à noite') + '</div>' : '<div class="ins-empty">Digite o nome para a placa aparecer na frente.</div>') + '</section>';
+    var abKeys = Object.keys(M.proj.aberturas || {});
+    if (abKeys.length || M.proj.entradaEm) {
+      h += '<section><h6>JANELAS E PORTAS DECIDIDAS NO 3D</h6><div class="ins-empty" style="line-height:1.8">' + abKeys.map(function (k) { var o = M.proj.aberturas[k], pt = k.split('|'), am = M.proj.ambientes.filter(function (a) { return a.id === pt[0]; })[0]; return '• ' + esc(am ? am.nome : '?') + ' · ' + pt[1] + ': ' + (o.tipo === 'nenhuma' ? 'sem janela' : o.tipo === 'porta' ? 'porta' : (o.n || 1) + ' janela(s)' + (o.w ? ' ' + M.fmtMs(o.w) + ' m' : '')) + ' <button class="chip sm" data-ab-clear="' + k + '">↺</button>'; }).join('<br>') +
+        (M.proj.entradaEm ? '<br>★ Entrada principal em ' + esc((M.proj.ambientes.filter(function (a) { return a.id === M.proj.entradaEm.split('|')[0]; })[0] || {}).nome || '?') + ' <button class="chip sm" data-ab-clear="entrada">↺</button>' : '') + '</div></section>';
+    }
     var itens = M.custoFachadaItens();
     h += '<section><h6>QUANTO ESSA FACHADA CUSTA</h6>' + (itens.length ? itens.map(function (it) { return kv(it.rot, M.fmtBRL(it.valor), ''); }).join('') : '<div class="ins-empty">Nada além da alvenaria.</div>') +
       '<div class="kv tot"><span>Fachada</span><b>' + M.fmtBRL(M.custoFachada()) + '</b></div>' +
@@ -1396,7 +1407,7 @@ var UI = (function () {
     el.querySelectorAll('[data-fk]').forEach(function (b) {
       b.onclick = function () {
         var k = b.getAttribute('data-fk'), v = b.getAttribute('data-fv');
-        if (['jardim', 'marquise', 'iluminacao', 'pergolado', 'vitrine', 'letreiroLuz', 'totem', 'moldura', 'gradeJanela', 'brise', 'arandelas', 'vasos'].indexOf(k) >= 0) v = v === '1';
+        if (FK_TOGGLES.indexOf(k) >= 0) v = v === '1';
         if (k === 'esquadria') { M.proj.fachada = M.proj.fachada || {}; M.proj.fachada.esquadriaCor = ''; }   /* chip de esquadria volta à cor padrão */
         if (k === 'letreiroTam') { M.proj.fachada = M.proj.fachada || {}; M.proj.fachada.letreiroLargura = 0; M.proj.fachada.letreiroAltura = 0; }   /* P/M/G/GG volta ao automático */
         setFachada(k, v);
@@ -1409,6 +1420,9 @@ var UI = (function () {
     });
     var fin = el.querySelector('#fach-foto-in');
     if (fin) fin.onchange = function () { if (this.files[0]) copiarDeFoto('fachada', this.files[0]); this.value = ''; };
+    el.querySelectorAll('[data-ab-clear]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-ab-clear'); if (k === 'entrada') delete M.proj.entradaEm; else M.limparAbertura(k); M.commit('Abertura automática'); fachPanel(); }; });
+    var fx = el.querySelector('#fach-faixa');
+    if (fx) { fx.onchange = function () { setFachada('faixa', this.value.trim().toUpperCase()); }; fx.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); }; }
     var num = el.querySelector('#fach-num');
     num.onchange = function () { setFachada('numero', this.value.trim()); };
     num.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); };
@@ -1506,16 +1520,40 @@ var UI = (function () {
      cada escolha aplica na hora (com desfazer) e o popover continua aberto para comparar. */
   var FK_ROT = {janela:'Janela', porta:'Porta de entrada', garagem:'Porta da garagem', cobertura:'Cobertura', parede:'Parede', revestimento:'Revestimento da frente',
     destaque:'Volume de destaque', portao:'Portão', muro:'Muro', pisoFrente:'Piso da frente', jardim:'Jardim', marquise:'Marquise', letreiro:'Letreiro', vitrine:'Vitrine'};
-  var FK_TOGGLES = ['jardim', 'marquise', 'iluminacao', 'pergolado', 'vitrine', 'letreiroLuz', 'totem', 'moldura', 'gradeJanela', 'brise', 'arandelas', 'vasos'];
-  function dicaFachada(fk, x, y){
+  var FK_TOGGLES = ['jardim', 'marquise', 'iluminacao', 'pergolado', 'vitrine', 'letreiroLuz', 'totem', 'moldura', 'gradeJanela', 'brise', 'arandelas', 'vasos', 'bandeira', 'placaMuro', 'adesivo'];
+  function dicaFachada(fk, x, y, id){
     var d = document.getElementById('fhint');
     if (!fk) { if (d) d.hidden = true; return; }
     if (!d) { d = document.createElement('div'); d.id = 'fhint'; d.className = 'fhint'; document.body.appendChild(d); }
-    d.textContent = (FK_ROT[fk] || fk) + ' — clique para trocar'; d.hidden = false;
+    var amb = id ? M.proj.ambientes.filter(function (a) { return a.id === id.split('|')[0]; })[0] : null;
+    d.textContent = (FK_ROT[fk] || fk) + (amb ? ' · ' + amb.nome : '') + ' — clique para ' + (fk === 'janela' || fk === 'porta' ? 'trocar ou excluir' : fk === 'parede' ? 'pôr janela/porta ou trocar' : 'trocar'); d.hidden = false;
     d.style.left = Math.min(window.innerWidth - 220, x + 14) + 'px'; d.style.top = (y + 16) + 'px';
   }
-  function popFachada(fk, x, y){
+  function popFachada(fk, x, y, id){
     var F = TRES.fachadaDe(M.proj), h = '';
+    var ov = id ? (M.abertura(id) || {}) : {}, partes = id ? id.split('|') : [], ambAb = partes[0] ? M.proj.ambientes.filter(function (a) { return a.id === partes[0]; })[0] : null;
+    var LADO = {frente:'frente', fundo:'fundo', esq:'lateral esquerda', dir:'lateral direita'}, ondeAb = ambAb ? esc(ambAb.nome) + ' · parede da ' + (LADO[partes[1]] || partes[1]) : '';
+    function campoAb(k, rot, val){ return '<div class="f"><label>' + rot + '</label><div class="inp"><input data-ab="' + k + '" value="' + (val != null ? M.fmtMs(val) : '') + '" placeholder="auto"><span class="un">m</span></div></div>'; }
+    function abChips(k, mapa){ return '<div class="chips">' + Object.keys(mapa).map(function (v) { return '<button class="chip' + (ov[k] === v ? ' on' : '') + '" data-abk="' + k + '" data-abv="' + v + '">' + mapa[v] + '</button>'; }).join('') + (ov[k] ? '<button class="chip" data-abk="' + k + '" data-abv="">= geral</button>' : '') + '</div>'; }
+    /* ---- o item clicado (só ele) ---- */
+    if (id && fk === 'janela') {
+      h += '<section class="ab-sec"><h6>ESTA JANELA <small>' + ondeAb + '</small></h6>' +
+        '<div class="chips"><button class="chip danger" data-abk="tipo" data-abv="nenhuma">✕ Excluir janela</button>' + (Object.keys(ov).length ? '<button class="chip" data-ab-reset>↺ Automático</button>' : '') + '</div>' +
+        '<h6 style="margin-top:8px">QUANTAS NESTA PAREDE</h6><div class="chips">' + [1, 2, 3, 4].map(function (n) { return '<button class="chip' + ((ov.n || 1) === n ? ' on' : '') + '" data-abk="n" data-abv="' + n + '">' + n + '</button>'; }).join('') + '</div>' +
+        '<div class="f-row" style="margin-top:8px">' + campoAb('w', 'LARGURA', ov.w) + campoAb('alt', 'ALTURA', ov.alt) + campoAb('peitoril', 'PEITORIL', ov.peitoril) + '</div>' +
+        '<h6 style="margin-top:8px">TIPO SÓ DESTA</h6>' + abChips('janela', TRES.JANELAS) + '<h6 style="margin-top:8px">VIDRO SÓ DESTA</h6>' + abChips('vidro', TRES.VIDROS) + '</section>';
+    }
+    if (id && fk === 'parede') {
+      h += '<section class="ab-sec"><h6>ESTA PAREDE <small>' + ondeAb + '</small></h6><div class="chips">' +
+        '<button class="chip" data-abk="tipo" data-abv="janela">+ Janela aqui</button><button class="chip" data-abk="tipo" data-abv="porta">+ Porta aqui</button>' +
+        (M.proj.entradaEm === id ? '<button class="chip on" data-entrada="">★ Entrada principal (voltar ao automático)</button>' : '<button class="chip" data-entrada="' + id + '">★ Entrada principal aqui</button>') +
+        (Object.keys(ov).length ? '<button class="chip" data-ab-reset>↺ Automático</button>' : '') + '</div></section>';
+    }
+    if (id && fk === 'porta') {
+      h += '<section class="ab-sec"><h6>ESTA PORTA <small>' + ondeAb + '</small></h6><div class="chips">' +
+        (ov.tipo === 'porta' ? '<button class="chip danger" data-abk="tipo" data-abv="nenhuma">✕ Excluir porta</button>' : '<span class="dim" style="font-size:11.5px">É a entrada principal. Para movê-la, clique em outra parede e escolha “Entrada principal aqui”.</span>') +
+        (M.proj.entradaEm ? '<button class="chip" data-entrada="">↺ Entrada automática</button>' : '') + '</div></section>';
+    }
     function chips(k, mapa){ return '<div class="chips">' + Object.keys(mapa).map(function (v) { return '<button class="chip' + (F[k] === v ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + v + '">' + mapa[v] + '</button>'; }).join('') + '</div>'; }
     function tg(k, rot){ return '<button class="chip' + (F[k] ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + (F[k] ? '0' : '1') + '">' + rot + '</button>'; }
     function cor(k, lista){ var atual = F[k] || '', custom = atual && lista.indexOf(String(atual).toUpperCase()) < 0;
@@ -1538,7 +1576,10 @@ var UI = (function () {
     else if (fk === 'letreiro') h += sec('TIPO', chips('letreiroEstilo', {placa:'Placa', caixa:'Letra caixa', led:'LED', neon:'Neon', backlight:'Backlight'})) + sec('FORMATO', chips('letreiroFormato', TRES.LETREIRO_FORMATOS)) +
       sec('TAMANHO', '<div class="chips">' + Object.keys(TRES.LETREIRO_TAMS).map(function (v) { return '<button class="chip' + (F.letreiroTam === v && !F.letreiroLargura ? ' on' : '') + '" data-fk="letreiroTam" data-fv="' + v + '">' + TRES.LETREIRO_TAMS[v] + '</button>'; }).join('') + '</div>') +
       sec('FONTE', chips('letreiroFonte', TRES.LETREIRO_FONTES)) + sec('COR DAS LETRAS', cor('letreiroCor', ['#22B8D6', '#2F5D8A', '#C4553B', '#E0B44C', '#4E9A5D', '#D96AA0', '#F4F4F1', '#1F2326', '#D9722B', '#6B4E9E', '#C9A227', '#1E7E96'])) +
-      sec('LUZ', '<div class="chips">' + tg('letreiroLuz', 'Acende à noite') + tg('totem', 'Totem') + '</div>');
+      sec('ONDE', chips('letreiroPos', TRES.LETREIRO_POS)) +
+      sec('PLACAS PUBLICITÁRIAS', '<div class="chips">' + tg('bandeira', 'Bandeira lateral') + tg('placaMuro', 'Placa no muro') + tg('totem', 'Totem') + tg('adesivo', 'Adesivo na vitrine') + '</div>' +
+        '<div class="f" style="margin-top:8px"><label>FAIXA / BANNER (TEXTO)</label><div class="inp"><input data-ftxt="faixa" value="' + esc(F.faixa || '') + '" placeholder="ex.: PROMOÇÃO · INAUGURAÇÃO" maxlength="40"></div></div>' + (F.faixa ? cor('faixaCor', ['#E4574F', '#E0B44C', '#1E7E96', '#4E9A5D', '#2F5D8A', '#1F2326', '#D96AA0']) : '')) +
+      sec('LUZ', '<div class="chips">' + tg('letreiroLuz', 'Acende à noite') + '</div>');
     if (!h) return;
     var pop = document.getElementById('fpop');
     if (!pop) { pop = document.createElement('div'); pop.id = 'fpop'; pop.className = 'fpop'; document.body.appendChild(pop); }
@@ -1553,12 +1594,27 @@ var UI = (function () {
         if (FK_TOGGLES.indexOf(k) >= 0) v = v === '1';
         if (k === 'esquadria') { M.proj.fachada = M.proj.fachada || {}; M.proj.fachada.esquadriaCor = ''; }
         if (k === 'letreiroTam') { M.proj.fachada = M.proj.fachada || {}; M.proj.fachada.letreiroLargura = 0; M.proj.fachada.letreiroAltura = 0; }
-        setFachada(k, v); popFachada(fk);   /* reabre no mesmo lugar, já com a escolha marcada */
+        setFachada(k, v); popFachada(fk, null, null, id);   /* reabre no mesmo lugar, já com a escolha marcada */
       };
     });
-    pop.querySelectorAll('input[data-fc]').forEach(function (inp) { inp.onchange = function () { setFachada(inp.getAttribute('data-fc'), inp.value.toUpperCase()); popFachada(fk); }; inp.onclick = function (e) { e.stopPropagation(); }; });
+    pop.querySelectorAll('input[data-fc]').forEach(function (inp) { inp.onchange = function () { setFachada(inp.getAttribute('data-fc'), inp.value.toUpperCase()); popFachada(fk, null, null, id); }; inp.onclick = function (e) { e.stopPropagation(); }; });
+    pop.querySelectorAll('input[data-ftxt]').forEach(function (inp) { inp.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); }; inp.onchange = function () { setFachada(inp.getAttribute('data-ftxt'), this.value.trim().toUpperCase()); popFachada(fk, null, null, id); }; });
+    /* abertura clicada: excluir, quantidade, tipo/vidro só dela, medidas, porta/janela nesta parede, entrada aqui */
+    pop.querySelectorAll('[data-abk]').forEach(function (b) { b.onclick = function () {
+      var k = b.getAttribute('data-abk'), v = b.getAttribute('data-abv'), patch = {};
+      if (k === 'n') patch.n = +v; else if (k === 'tipo') { patch.tipo = v; if (v === 'janela') { patch.n = ov.n || 1; } } else patch[k] = v || null;
+      if (k === 'tipo' && v === 'nenhuma') { patch.n = null; patch.w = null; patch.alt = null; patch.peitoril = null; patch.janela = null; patch.vidro = null; }
+      M.setAbertura(id, patch); M.commit(v === 'nenhuma' ? 'Excluir abertura' : 'Abertura: ' + k); fachPanel(); popFachada(v === 'nenhuma' ? 'parede' : (v === 'porta' ? 'porta' : (k === 'tipo' ? 'janela' : fk)), null, null, id);
+      toast(v === 'nenhuma' ? 'Abertura excluída.' : 'Aplicado só nesta parede.', function () { fazerUndo(); });
+    }; });
+    pop.querySelectorAll('input[data-ab]').forEach(function (inp) { inp.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); }; inp.onchange = function () {
+      var k = inp.getAttribute('data-ab'), n = inp.value.trim() ? M.parseM(inp.value) : null, patch = {}; patch[k] = n === null ? null : Math.max(k === 'peitoril' ? 0 : 30, n);
+      if (!ov.tipo) patch.tipo = 'janela'; M.setAbertura(id, patch); M.commit('Medida da janela'); fachPanel(); popFachada(fk, null, null, id);
+    }; });
+    var rst = pop.querySelector('[data-ab-reset]'); if (rst) rst.onclick = function () { M.limparAbertura(id); M.commit('Abertura automática'); fachPanel(); popFachada(fk === 'porta' ? 'parede' : fk, null, null, id); };
+    pop.querySelectorAll('[data-entrada]').forEach(function (b) { b.onclick = function () { var v = b.getAttribute('data-entrada'); if (v) M.proj.entradaEm = v; else delete M.proj.entradaEm; M.commit(v ? 'Entrada principal aqui' : 'Entrada automática'); fachPanel(); if (t3) t3.verFachada(true); popFachada(v ? 'porta' : 'parede', null, null, id); toast(v ? 'A entrada principal agora é nesta parede.' : 'Entrada volta ao automático.', function () { fazerUndo(); }); }; });
     pop.querySelector('[data-close]').onclick = fecharPop;
-    pop.querySelector('[data-undo]').onclick = function () { fazerUndo(); popFachada(fk); };
+    pop.querySelector('[data-undo]').onclick = function () { fazerUndo(); popFachada(fk, null, null, id); };
     pop.querySelector('[data-panel]').onclick = function () { fecharPop(); if (viewAtual !== 'fachada') irPara('fachada'); var el = document.querySelector('#fach-panel'); if (el) { el.scrollTop = 0; el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 900); } };
   }
   function fecharPop(){ var p = document.getElementById('fpop'); if (p) p.hidden = true; var c = document.getElementById('ctx'); if (c) c.hidden = true; }
@@ -1661,7 +1717,7 @@ var UI = (function () {
     });
     M.proj.fachada = orig; t3.atualizar(); t3.verFachada(true);
     var ov = $('#estilos'), F = TRES.fachadaDe(M.proj);
-    ov.innerHTML = '<div class="estilos-box"><div class="estilos-hd"><h3>Sua casa nos 4 estilos</h3><p>Mesma planta, mesma rua' + (noiteAntes ? ', à noite' : '') + '. Clique no que mais combina com você.</p><button class="icon-btn" id="estilos-x">✕</button></div><div class="estilos-grid">' +
+    ov.innerHTML = '<div class="estilos-box"><div class="estilos-hd"><h3>Sua casa nos ' + fotos.length + ' estilos</h3><p>Mesma planta, mesma rua' + (noiteAntes ? ', à noite' : '') + '. Clique no que mais combina com você.</p><button class="icon-btn" id="estilos-x">✕</button></div><div class="estilos-grid">' +
       fotos.map(function (f) { return '<button class="estilo-foto' + (F.estilo === f.k ? ' on' : '') + '" data-est="' + f.k + '"><img src="' + f.img + '" alt="' + f.rot + '"><div class="leg"><b>' + f.rot + '</b><span>' + f.desc + '</span><em>' + M.fmtBRL(f.custo) + '</em></div></button>'; }).join('') + '</div></div>';
     ov.hidden = false;
     ov.querySelector('#estilos-x').onclick = function () { ov.hidden = true; };

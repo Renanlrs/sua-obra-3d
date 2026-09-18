@@ -57,6 +57,9 @@ As funções do app da escola de natação passaram a viver no mesmo editor, len
 
 ### 7. Prático: clique no item para trocar · botão direito para agir
 - Na **Fachada** (e no 3D), passe o mouse: janela, porta, telhado, parede, revestimento, muro, portão, piso da frente, letreiro… viram clicáveis. **Clique** → aparece só o que dá para trocar naquele item; cada escolha aplica na hora e o popover fica aberto para comparar. "Todas as opções" leva ao painel completo.
+- **Cada janela/porta/parede é sua**: clique numa janela → excluir, quantas nesta parede (1–4), largura/altura/peitoril, tipo e vidro só dela; clique numa parede → + janela, + porta, ★ entrada principal aqui; clique na porta → excluir (se secundária) ou voltar ao automático. Fica em `proj.aberturas` (chave ambiente|lado|índice) e `proj.entradaEm`; o painel lista tudo o que foi decidido, com ↺.
+- **Placas publicitárias**: letreiro na parede / sobre a marquise / **no topo (outdoor)**, **bandeira lateral**, **placa no muro**, totem, **adesivo na vitrine** e **faixa/banner** com texto e cor próprios — tudo no popover do letreiro, no painel e no prompt ("letreiro no topo, bandeira, faixa \"PROMOÇÃO\"").
+- **8 estilos**: moderno, clássico, contemporâneo, rústico + industrial, minimalista, mediterrâneo, tropical ("Ver os 8 estilos" fotografa todos).
 - Na **Planta**, **arraste no vazio** para laçar: tudo que ficar dentro (ambientes + os móveis deles, móveis avulsos) vira um grupo — arraste qualquer item e todos vão juntos; ⇧ clique adiciona/retira; Ctrl+A seleciona o andar; Del/Ctrl+D/setas agem no grupo; dá para mandar o grupo para outro andar. Mover um ambiente sozinho também leva os móveis dele.
 - Na **Planta**, **botão direito** em um ambiente (renomear, tipo, mobiliar só ele, duplicar, girar, andar, excluir), em um móvel (girar, espelhar, duplicar, elevar, **trocar por outro**, excluir) ou no vazio (adicionar ambiente aqui, mobiliar, enquadrar, desfazer).
 
