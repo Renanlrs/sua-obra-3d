@@ -114,6 +114,7 @@ var UI = (function () {
         popFachada(q.get('fpop'), 520, 220, fid);
       }, 200);
       if (q.has('chave')) { if ((q.get('chave') || '').length > 10) VISAO.setChave(q.get('chave')); else setTimeout(function () { pedirChave(null); }, 200); }   /* &chave=1 abre o diálogo · &chave=AIza… grava (conferência) */
+      if (q.get('logo')) fetch(q.get('logo')).then(function (r) { return r.blob(); }).then(function (b) { lerArte(new File([b], 'logo.png', {type:b.type || 'image/png'}), function (u) { M.proj.logo = u; M.salvar(); if (t3) t3.atualizar(); fachPanel(); }); });   /* &logo=url (conferência) */
       if (q.get('foto')) fetch(q.get('foto')).then(function (r) { return r.blob(); }).then(function (b) { copiarDeFoto(q.get('modo') || 'planta', new File([b], 'foto.png', {type:b.type || 'image/png'})); });   /* &foto=url&modo=planta|fachada */
       if (q.has('laco') && viewAtual === 'planta') setTimeout(function () { var tudo = M.ambsPav(M.pav).slice(0, +q.get('laco') || 3).map(function (a) { return {t:'amb', id:a.id}; }); PLAN.setMulti(tudo); }, 150);   /* &laco=N seleciona N ambientes como grupo */
       if (q.get('ctx') && viewAtual === 'planta') setTimeout(function () {
@@ -1379,9 +1380,9 @@ var UI = (function () {
     h += '<section><h6>EXTRAS</h6><div class="chips">' + tg('jardim', 'Jardim') + tg('marquise', 'Marquise') + tg('pergolado', 'Pergolado') + tg('iluminacao', 'Iluminação') + tg('vitrine', 'Vitrine') + '</div>' +
       '<div class="f" style="margin-top:10px"><label>NÚMERO DA CASA</label><div class="inp"><input id="fach-num" value="' + esc(F.numero) + '" placeholder="ex.: 128" maxlength="5"></div></div></section>';
     /* letreiro comercial */
-    h += '<section><h6>LETREIRO · NOME DO ESTABELECIMENTO</h6>' +
+    h += '<section><h6>LETREIRO · NOME DO ESTABELECIMENTO</h6>' + logoBloco() +
       '<div class="f"><div class="inp"><input id="fach-let" value="' + esc(F.letreiro) + '" placeholder="ex.: ACQUA BELO" maxlength="40"></div></div>' +
-      (F.letreiro ? '<div class="f" style="margin-top:8px"><label>SUBTÍTULO (2ª LINHA)</label><div class="inp"><input id="fach-sub" value="' + esc(F.letreiroSub) + '" placeholder="ex.: Escola de Natação" maxlength="50"></div></div>' +
+      (F.letreiro || M.proj.logo ? '<div class="f" style="margin-top:8px"><label>SUBTÍTULO (2ª LINHA)</label><div class="inp"><input id="fach-sub" value="' + esc(F.letreiroSub) + '" placeholder="ex.: Escola de Natação" maxlength="50"></div></div>' +
       '<h6 style="margin-top:10px">TIPO</h6>' + chips('letreiroEstilo', {placa:'Placa', caixa:'Letra caixa', led:'LED', neon:'Neon', backlight:'Backlight'}) +
       '<h6 style="margin-top:10px">FORMATO</h6>' + chips('letreiroFormato', TRES.LETREIRO_FORMATOS) +
       '<h6 style="margin-top:10px">TAMANHO</h6><div class="chips">' + Object.keys(TRES.LETREIRO_TAMS).map(function (v) { return '<button class="chip' + (F.letreiroTam === v && !F.letreiroLargura ? ' on' : '') + '" data-fk="letreiroTam" data-fv="' + v + '">' + TRES.LETREIRO_TAMS[v] + '</button>'; }).join('') + '</div>' +
@@ -1420,6 +1421,7 @@ var UI = (function () {
     });
     var fin = el.querySelector('#fach-foto-in');
     if (fin) fin.onchange = function () { if (this.files[0]) copiarDeFoto('fachada', this.files[0]); this.value = ''; };
+    ligarLogo(el, null);
     el.querySelectorAll('[data-ab-clear]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-ab-clear'); if (k === 'entrada') delete M.proj.entradaEm; else M.limparAbertura(k); M.commit('Abertura automática'); fachPanel(); }; });
     var fx = el.querySelector('#fach-faixa');
     if (fx) { fx.onchange = function () { setFachada('faixa', this.value.trim().toUpperCase()); }; fx.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); }; }
@@ -1519,7 +1521,7 @@ var UI = (function () {
      O 3D etiqueta cada elemento (userData.fk). Clicou → popover ao lado do clique com SÓ as opções daquele item;
      cada escolha aplica na hora (com desfazer) e o popover continua aberto para comparar. */
   var FK_ROT = {janela:'Janela', porta:'Porta de entrada', garagem:'Porta da garagem', cobertura:'Cobertura', parede:'Parede', revestimento:'Revestimento da frente',
-    destaque:'Volume de destaque', portao:'Portão', muro:'Muro', pisoFrente:'Piso da frente', jardim:'Jardim', marquise:'Marquise', letreiro:'Letreiro', vitrine:'Vitrine'};
+    destaque:'Volume de destaque', portao:'Portão', muro:'Muro', pisoFrente:'Piso da frente', jardim:'Jardim', marquise:'Marquise', letreiro:'Letreiro', vitrine:'Vitrine', portaInt:'Porta interna'};
   var FK_TOGGLES = ['jardim', 'marquise', 'iluminacao', 'pergolado', 'vitrine', 'letreiroLuz', 'totem', 'moldura', 'gradeJanela', 'brise', 'arandelas', 'vasos', 'bandeira', 'placaMuro', 'adesivo'];
   function dicaFachada(fk, x, y, id){
     var d = document.getElementById('fhint');
@@ -1529,10 +1531,34 @@ var UI = (function () {
     d.textContent = (FK_ROT[fk] || fk) + (amb ? ' · ' + amb.nome : '') + ' — clique para ' + (fk === 'janela' || fk === 'porta' ? 'trocar ou excluir' : fk === 'parede' ? 'pôr janela/porta ou trocar' : 'trocar'); d.hidden = false;
     d.style.left = Math.min(window.innerWidth - 220, x + 14) + 'px'; d.style.top = (y + 16) + 'px';
   }
+  /* arte anexada (logo do estabelecimento): vai para o letreiro, outdoor, bandeira, placa do muro, totem e adesivo */
+  function logoBloco(){
+    var lg = M.proj.logo;
+    return '<div class="logo-bloco">' + (lg ? '<img src="' + lg + '" alt="" class="logo-thumb">' : '<span class="dim" style="font-size:11.5px">Nenhuma arte. Anexe o logo (PNG com fundo transparente fica melhor) e ele substitui o texto em todas as placas.</span>') +
+      '<div class="chips"><button class="chip" data-logo-btn>📎 ' + (lg ? 'Trocar arte' : 'Anexar logo / arte') + '</button>' + (lg ? '<button class="chip danger" data-logo-del>✕ Remover</button>' : '') + '</div><input class="logo-in" type="file" accept="image/*" hidden></div>';
+  }
+  function ligarLogo(raiz, depois){
+    var inp = raiz.querySelector('input.logo-in'); if (!inp) return;
+    var btn = raiz.querySelector('[data-logo-btn]'); if (btn) btn.onclick = function () { inp.click(); };
+    inp.onchange = function () { var file = this.files[0]; this.value = ''; if (!file) return; lerArte(file, function (url) { M.proj.logo = url; M.commit('Anexar arte'); M.salvar(); fachPanel(); if (t3) t3.atualizar(); toast('Arte anexada: entra no letreiro e em todas as placas.'); if (depois) depois(); }); };
+    var del = raiz.querySelector('[data-logo-del]'); if (del) del.onclick = function () { delete M.proj.logo; M.commit('Remover arte'); M.salvar(); fachPanel(); if (t3) t3.atualizar(); if (depois) depois(); };
+  }
+  /* reduz a arte a 1024 px; PNG mantém transparência, o resto vira JPEG */
+  function lerArte(file, cb){
+    var rd = new FileReader();
+    rd.onload = function () { var img = new Image(); img.onload = function () {
+      var k = Math.min(1, 1024 / Math.max(img.width, img.height)), cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      var cx = cv.getContext('2d'), png = /png|webp|svg/i.test(file.type); if (!png) { cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); }
+      cx.drawImage(img, 0, 0, cv.width, cv.height); cb(png ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', .88));
+    }; img.onerror = function () { toast('Arquivo não é uma imagem.', null, true); }; img.src = rd.result; };
+    rd.readAsDataURL(file);
+  }
   function popFachada(fk, x, y, id){
     var F = TRES.fachadaDe(M.proj), h = '';
     var ov = id ? (M.abertura(id) || {}) : {}, partes = id ? id.split('|') : [], ambAb = partes[0] ? M.proj.ambientes.filter(function (a) { return a.id === partes[0]; })[0] : null;
     var LADO = {frente:'frente', fundo:'fundo', esq:'lateral esquerda', dir:'lateral direita'}, ondeAb = ambAb ? esc(ambAb.nome) + ' · parede da ' + (LADO[partes[1]] || partes[1]) : '';
+    if (partes[0] === 'int') { var nA = (M.proj.ambientes.filter(function (a) { return a.id === partes[1]; })[0] || {}).nome, nB = (M.proj.ambientes.filter(function (a) { return a.id === partes[2]; })[0] || {}).nome; ondeAb = esc(nA || '?') + ' ↔ ' + esc(nB || '?'); }
+    function campoPorta(){ return '<div class="f-row" style="margin-top:8px">' + campoAb('pw', 'LARGURA DESTA PORTA', ov.pw) + campoAb('palt', 'ALTURA', ov.palt) + '</div><div class="ins-empty" style="margin-top:-2px">Vazio = automático (0,80 × 2,10 interna · 0,90 × 2,10 entrada · garagem até 2,80).</div>'; }
     function campoAb(k, rot, val){ return '<div class="f"><label>' + rot + '</label><div class="inp"><input data-ab="' + k + '" value="' + (val != null ? M.fmtMs(val) : '') + '" placeholder="auto"><span class="un">m</span></div></div>'; }
     function abChips(k, mapa){ return '<div class="chips">' + Object.keys(mapa).map(function (v) { return '<button class="chip' + (ov[k] === v ? ' on' : '') + '" data-abk="' + k + '" data-abv="' + v + '">' + mapa[v] + '</button>'; }).join('') + (ov[k] ? '<button class="chip" data-abk="' + k + '" data-abv="">= geral</button>' : '') + '</div>'; }
     /* ---- o item clicado (só ele) ---- */
@@ -1552,7 +1578,14 @@ var UI = (function () {
     if (id && fk === 'porta') {
       h += '<section class="ab-sec"><h6>ESTA PORTA <small>' + ondeAb + '</small></h6><div class="chips">' +
         (ov.tipo === 'porta' ? '<button class="chip danger" data-abk="tipo" data-abv="nenhuma">✕ Excluir porta</button>' : '<span class="dim" style="font-size:11.5px">É a entrada principal. Para movê-la, clique em outra parede e escolha “Entrada principal aqui”.</span>') +
-        (M.proj.entradaEm ? '<button class="chip" data-entrada="">↺ Entrada automática</button>' : '') + '</div></section>';
+        (M.proj.entradaEm ? '<button class="chip" data-entrada="">↺ Entrada automática</button>' : '') + ((ov.pw || ov.palt) ? '<button class="chip" data-ab-reset>↺ Tamanho automático</button>' : '') + '</div>' + campoPorta() + '</section>';
+    }
+    if (id && fk === 'garagem') {
+      h += '<section class="ab-sec"><h6>ESTE PORTÃO <small>' + ondeAb + '</small></h6>' + campoPorta() + ((ov.pw || ov.palt) ? '<div class="chips"><button class="chip" data-ab-reset>↺ Tamanho automático</button></div>' : '') + '</section>';
+    }
+    if (id && fk === 'portaInt') {
+      h += '<section class="ab-sec"><h6>PORTA INTERNA <small>' + ondeAb + '</small></h6><div class="chips"><button class="chip danger" data-abk="tipo" data-abv="nenhuma">✕ Excluir porta</button>' + (Object.keys(ov).length ? '<button class="chip" data-ab-reset>↺ Automático</button>' : '') + '</div>' + campoPorta() + '</section>' +
+        sec('PORTAS INTERNAS (TODAS)', '<div class="ins-empty">A cor e o material das portas internas seguem a esquadria: ' + chips('esquadria', ROT.esquadria) + '</div>');
     }
     function chips(k, mapa){ return '<div class="chips">' + Object.keys(mapa).map(function (v) { return '<button class="chip' + (F[k] === v ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + v + '">' + mapa[v] + '</button>'; }).join('') + '</div>'; }
     function tg(k, rot){ return '<button class="chip' + (F[k] ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + (F[k] ? '0' : '1') + '">' + rot + '</button>'; }
@@ -1573,7 +1606,7 @@ var UI = (function () {
     else if (fk === 'jardim') h += sec('JARDIM', '<div class="chips">' + tg('jardim', 'Jardim') + tg('vasos', 'Vasos') + tg('iluminacao', 'Iluminação') + '</div>') + sec('PISO DA FRENTE', chips('pisoFrente', TRES.PISOS_FRENTE));
     else if (fk === 'marquise') h += sec('ENTRADA', '<div class="chips">' + tg('marquise', 'Marquise') + tg('pergolado', 'Pergolado') + tg('arandelas', 'Arandelas') + '</div>') + sec('COR DE DESTAQUE', cor('corDestaque', CORES_DEST));
     else if (fk === 'vitrine') h += sec('VITRINE', '<div class="chips">' + tg('vitrine', 'Vitrine na frente') + '</div>') + sec('VIDRO', chips('vidro', TRES.VIDROS)) + sec('ESQUADRIA', chips('esquadria', ROT.esquadria));
-    else if (fk === 'letreiro') h += sec('TIPO', chips('letreiroEstilo', {placa:'Placa', caixa:'Letra caixa', led:'LED', neon:'Neon', backlight:'Backlight'})) + sec('FORMATO', chips('letreiroFormato', TRES.LETREIRO_FORMATOS)) +
+    else if (fk === 'letreiro') h += sec('ARTE / LOGO', logoBloco()) + sec('TIPO', chips('letreiroEstilo', {placa:'Placa', caixa:'Letra caixa', led:'LED', neon:'Neon', backlight:'Backlight'})) + sec('FORMATO', chips('letreiroFormato', TRES.LETREIRO_FORMATOS)) +
       sec('TAMANHO', '<div class="chips">' + Object.keys(TRES.LETREIRO_TAMS).map(function (v) { return '<button class="chip' + (F.letreiroTam === v && !F.letreiroLargura ? ' on' : '') + '" data-fk="letreiroTam" data-fv="' + v + '">' + TRES.LETREIRO_TAMS[v] + '</button>'; }).join('') + '</div>') +
       sec('FONTE', chips('letreiroFonte', TRES.LETREIRO_FONTES)) + sec('COR DAS LETRAS', cor('letreiroCor', ['#22B8D6', '#2F5D8A', '#C4553B', '#E0B44C', '#4E9A5D', '#D96AA0', '#F4F4F1', '#1F2326', '#D9722B', '#6B4E9E', '#C9A227', '#1E7E96'])) +
       sec('ONDE', chips('letreiroPos', TRES.LETREIRO_POS)) +
@@ -1604,15 +1637,18 @@ var UI = (function () {
       var k = b.getAttribute('data-abk'), v = b.getAttribute('data-abv'), patch = {};
       if (k === 'n') patch.n = +v; else if (k === 'tipo') { patch.tipo = v; if (v === 'janela') { patch.n = ov.n || 1; } } else patch[k] = v || null;
       if (k === 'tipo' && v === 'nenhuma') { patch.n = null; patch.w = null; patch.alt = null; patch.peitoril = null; patch.janela = null; patch.vidro = null; }
-      M.setAbertura(id, patch); M.commit(v === 'nenhuma' ? 'Excluir abertura' : 'Abertura: ' + k); fachPanel(); popFachada(v === 'nenhuma' ? 'parede' : (v === 'porta' ? 'porta' : (k === 'tipo' ? 'janela' : fk)), null, null, id);
+      M.setAbertura(id, patch); M.commit(v === 'nenhuma' ? 'Excluir abertura' : 'Abertura: ' + k); fachPanel();
+      if (fk === 'portaInt' && v === 'nenhuma') { fecharPop(); toast('Porta interna excluída — os dois ambientes deixam de se comunicar por ali.', function () { fazerUndo(); }); return; }
+      popFachada(v === 'nenhuma' ? 'parede' : (v === 'porta' ? 'porta' : (k === 'tipo' ? 'janela' : fk)), null, null, id);
       toast(v === 'nenhuma' ? 'Abertura excluída.' : 'Aplicado só nesta parede.', function () { fazerUndo(); });
     }; });
     pop.querySelectorAll('input[data-ab]').forEach(function (inp) { inp.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); }; inp.onchange = function () {
       var k = inp.getAttribute('data-ab'), n = inp.value.trim() ? M.parseM(inp.value) : null, patch = {}; patch[k] = n === null ? null : Math.max(k === 'peitoril' ? 0 : 30, n);
-      if (!ov.tipo) patch.tipo = 'janela'; M.setAbertura(id, patch); M.commit('Medida da janela'); fachPanel(); popFachada(fk, null, null, id);
+      if (!ov.tipo && (k === 'w' || k === 'alt' || k === 'peitoril' || k === 'n')) patch.tipo = 'janela'; M.setAbertura(id, patch); M.commit(k === 'pw' || k === 'palt' ? 'Tamanho da porta' : 'Medida da janela'); fachPanel(); popFachada(fk, null, null, id);
     }; });
     var rst = pop.querySelector('[data-ab-reset]'); if (rst) rst.onclick = function () { M.limparAbertura(id); M.commit('Abertura automática'); fachPanel(); popFachada(fk === 'porta' ? 'parede' : fk, null, null, id); };
     pop.querySelectorAll('[data-entrada]').forEach(function (b) { b.onclick = function () { var v = b.getAttribute('data-entrada'); if (v) M.proj.entradaEm = v; else delete M.proj.entradaEm; M.commit(v ? 'Entrada principal aqui' : 'Entrada automática'); fachPanel(); if (t3) t3.verFachada(true); popFachada(v ? 'porta' : 'parede', null, null, id); toast(v ? 'A entrada principal agora é nesta parede.' : 'Entrada volta ao automático.', function () { fazerUndo(); }); }; });
+    ligarLogo(pop, function () { popFachada(fk, null, null, id); });
     pop.querySelector('[data-close]').onclick = fecharPop;
     pop.querySelector('[data-undo]').onclick = function () { fazerUndo(); popFachada(fk, null, null, id); };
     pop.querySelector('[data-panel]').onclick = function () { fecharPop(); if (viewAtual !== 'fachada') irPara('fachada'); var el = document.querySelector('#fach-panel'); if (el) { el.scrollTop = 0; el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 900); } };

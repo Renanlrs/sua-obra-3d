@@ -546,6 +546,9 @@ label.btn{cursor:pointer}
 .ab-sec h6 small{font-weight:400;letter-spacing:0;text-transform:none;color:#8FA3B1;margin-left:6px}
 .chip.danger{border-color:#E5533D;color:#FF9583}.chip.danger:hover{background:#E5533D;color:#fff}
 .fpop .f .inp{background:#0F1418;border-color:#2A313A;height:30px}.fpop .f input{color:#E8EDF2;font-size:12px}.fpop .f label{color:#8FA3B1}.fpop .f-row{gap:6px}
+.logo-bloco{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.logo-thumb{max-height:64px;max-width:220px;object-fit:contain;background:repeating-conic-gradient(#2A313A 0 25%,#1B2026 0 50%) 0 0/14px 14px;border-radius:6px;padding:4px}
+.chip[for]{cursor:pointer}
 @media (max-width:900px){
   :root{--tab:58px}
   .only-mobile{display:grid!important}

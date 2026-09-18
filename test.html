@@ -345,6 +345,24 @@ M.proj.fachada = {estilo:'moderno', letreiro:'X', letreiroPos:'topo', bandeira:t
 var itF = M.custoFachadaItens().map(function (i) { return i.rot; }).join('|');
 t('placas entram no custo da fachada', /topo/.test(itF) && /bandeira/i.test(itF) && /muro/i.test(itF) && /Faixa/.test(itF) && /Adesivo/.test(itF), itF);
 M.proj.fachada = null;
+/* ---- tamanho de qualquer porta + porta interna excluída + logo fora do undo ---- */
+M.novo('casa-terrea', 1000, 2500);
+var anP = TF.analise(M.proj, 0), pcI = anP.pecas.filter(function (pc) { return !pc.ext && pc.ab.some(function (ab) { return ab.tipo === 'porta'; }); })[0];
+t('porta interna tem chave int|a|b', pcI && /^int\|/.test(pcI.chave));
+M.setAbertura(pcI.chave, {pw:120, palt:240});
+var abI = TF.analise(M.proj, 0).pecas.filter(function (pc) { return pc.chave === pcI.chave; })[0].ab.filter(function (ab) { return ab.tipo === 'porta'; })[0];
+t('porta interna 1,20 × 2,40 só nesta', abI && abI.e - abI.s === 120 && abI.z1 === 240, JSON.stringify(abI));
+M.setAbertura(pcI.chave, {tipo:'nenhuma'});
+t('porta interna excluída some da parede', !TF.analise(M.proj, 0).pecas.filter(function (pc) { return pc.chave === pcI.chave; })[0].ab.some(function (ab) { return ab.tipo === 'porta'; }));
+M.limparAbertura(pcI.chave);
+var pcE = anP.entrada.pc; M.setAbertura(pcE.chave, {pw:140, palt:230});
+var abE = TF.analise(M.proj, 0).entrada.pc.ab.filter(function (ab) { return ab.tipo === 'entrada'; })[0];
+t('entrada principal 1,40 × 2,30 pela abertura (sem mexer no global)', abE.e - abE.s === 140 && abE.z1 === 230 && !M.proj.fachada);
+M.limparAbertura(pcE.chave);
+var pcG = anP.garagem; if (pcG) { M.setAbertura(pcG.chave, {pw:250, palt:200}); var abG = TF.analise(M.proj, 0).garagem.ab.filter(function (ab) { return ab.tipo === 'portao'; })[0]; t('portão da garagem 2,50 × 2,00', abG.e - abG.s === 250 && abG.z1 === 200); M.limparAbertura(pcG.chave); }
+M.proj.logo = 'data:image/png;base64,iVBORw0KGgo='; M.proj.ambientes[0].nome = 'Z'; M.commit('n'); M.undo();
+t('logo fica fora do undo e entra em fachadaDe/custo', M.proj.logo && TF.fachadaDe(M.proj).logo === M.proj.logo && M.custoFachadaItens().some(function (i) { return /arte/i.test(i.rot); }));
+delete M.proj.logo;
 M.novo('casa-terrea', 1000, 2500);
 
 var r=document.getElementById('resumo');

@@ -91,9 +91,13 @@ function TRES_ENGINE(THREE, M){
       if ((s && pc.B.tipo === 'molhado') || (s2 && pc.A.tipo === 'molhado')) portas[k] = true;
     });
     var portaDe = {};   /* id do ambiente → peça da porta "principal" (para posicionar a câmera) */
+    var OVI = proj.aberturas || {};
     Object.keys(portas).forEach(function (k) {
-      var pc = pares[k], m = (pc.p + pc.q) / 2;
-      pc.ab.push({s: m - 40, e: m + 40, z0: 0, z1: 210, tipo: 'porta'});
+      var pc = pares[k], m = (pc.p + pc.q) / 2, oi = OVI['int|' + k];
+      pc.chave = 'int|' + k;
+      if (oi && oi.tipo === 'nenhuma') { delete portas[k]; return; }   /* porta interna excluída pelo usuário */
+      var pw0 = Math.max(60, Math.min(pc.len - 20, (oi && oi.pw) || 80)), ph0 = Math.min(H - 15, Math.max(180, (oi && oi.palt) || 210));
+      pc.ab.push({s: m - pw0 / 2, e: m + pw0 / 2, z0: 0, z1: ph0, tipo: 'porta', chave: pc.chave});
       [pc.A, pc.B].forEach(function (r) {
         var outro = pc.A === r ? pc.B : pc.A;
         if (!portaDe[r.id] || (PREF[outro.tipo] || 0) > portaDe[r.id].pref) portaDe[r.id] = {pc:pc, pref: PREF[outro.tipo] || 0};
@@ -178,7 +182,17 @@ function TRES_ENGINE(THREE, M){
       var passo = span / n;
       for (var i = 0; i < n; i++) { var c = tr[0] + passo * (i + .5); pc.ab.push({s:c - w / 2, e:c + w / 2, z0:z0, z1:z1, tipo:'janela', janela:o.janela, vidro:o.vidro, chave:pc.chave}); }
     });
-    externas.forEach(function (pc) { pc.ab.forEach(function (ab) { if (!ab.chave) ab.chave = pc.chave; }); });
+    externas.forEach(function (pc) {
+      var o = OV[pc.chave];
+      pc.ab.forEach(function (ab) {
+        if (!ab.chave) ab.chave = pc.chave;
+        if (o && (ab.tipo === 'entrada' || ab.tipo === 'portao') && (o.pw || o.palt)) {   /* tamanho só desta porta/portão */
+          var c = (ab.s + ab.e) / 2, w = Math.max(60, Math.min(pc.len - 30, o.pw || (ab.e - ab.s)));
+          ab.s = Math.max(pc.p + 15, c - w / 2); ab.e = ab.s + w; if (ab.e > pc.q - 15) { ab.e = pc.q - 15; ab.s = ab.e - w; }
+          if (o.palt) ab.z1 = Math.min(H - 15, Math.max(180, o.palt));
+        }
+      });
+    });
     /* ambiente isolado (sem vizinho) ganha porta externa na maior peça */
     ambs.forEach(function (r) {
       if (portaDe[r.id] || (entrada && entrada.r === r)) return;
@@ -380,6 +394,7 @@ function TRES_ENGINE(THREE, M){
     var f = proj.fachada || {}, pr = FACHADA_PRESETS[f.estilo] || FACHADA_PRESETS.moderno, out = {estilo: f.estilo || 'moderno'};
     for (var k in pr) out[k] = (k in f) ? f[k] : pr[k];
     for (var k2 in FACHADA_EXTRA) out[k2] = (k2 in f) ? f[k2] : FACHADA_EXTRA[k2];
+    out.logo = proj.logo || '';
     if (!('pergolado' in f) && out.estilo === 'tropical') out.pergolado = true;
     if (!('vasos' in f) && (out.estilo === 'mediterraneo' || out.estilo === 'tropical')) out.vasos = true;
     if (!('moldura' in f) && out.estilo === 'mediterraneo') out.moldura = true;
@@ -856,10 +871,21 @@ function TRES_ENGINE(THREE, M){
   /* letreiro: texto em canvas; `estilo` decide fundo e cor; acende à noite pelo emissiveMap */
   var letCache = {};
   /* opts: {formato, fonte, sub, fundoCor} — letra caixa e neon têm fundo transparente (só as letras) */
+  /* imagem anexada (logo/arte): carrega uma vez; quando fica pronta, avisa quem estiver montado para reconstruir */
+  var imgCache = {}, aoCarregarImg = [];
+  function imagem(src){
+    if (!src) return null;
+    var im = imgCache[src];
+    if (im) return im.complete && im.naturalWidth ? im : null;
+    im = new Image(); imgCache[src] = im;
+    im.onload = function () { aoCarregarImg.slice().forEach(function (fn) { try { fn(); } catch (e) {} }); };
+    im.src = src; return null;
+  }
+  function chaveImg(src){ return src ? src.length + ':' + src.slice(-48) : ''; }
   function letreiroMat(txt, estilo, cor, W, H, opts){
     opts = opts || {};
-    var formato = opts.formato || 'retangular', fonteK = opts.fonte || 'sans', sub = opts.sub || '', fundoCor = opts.fundoCor || '';
-    var k = [txt, estilo, cor, Math.round(W * 10), Math.round(H * 10), formato, fonteK, sub, fundoCor].join('|'); if (letCache[k]) return letCache[k];
+    var formato = opts.formato || 'retangular', fonteK = opts.fonte || 'sans', sub = opts.sub || '', fundoCor = opts.fundoCor || '', logo = opts.logo || null;
+    var k = [txt, estilo, cor, Math.round(W * 10), Math.round(H * 10), formato, fonteK, sub, fundoCor, logo ? chaveImg(logo.src) : ''].join('|'); if (letCache[k]) return letCache[k];
     var pw = 1024, ph = Math.max(128, Math.round(1024 * H / W));
     var semFundo = estilo === 'caixa' || estilo === 'neon';
     var fundo = fundoCor || (estilo === 'placa' ? cor : (estilo === 'backlight' ? '#FFFFFF' : '#14171B'));
@@ -880,6 +906,16 @@ function TRES_ENGINE(THREE, M){
     var peso = estilo === 'neon' ? 'italic 700 ' : (estilo === 'caixa' ? '800 ' : '700 ');
     if (fonteK === 'script') peso = '400 ';
     var areaW = (formato === 'redondo' || formato === 'oval') ? pw * .74 : pw * .88;
+    if (logo) {   /* arte anexada: entra inteira (contain), com respiro; o texto não é desenhado */
+      var areaH = (formato === 'redondo' || formato === 'oval') ? ph * .74 : ph * .86, kk = Math.min(areaW / logo.naturalWidth, areaH / logo.naturalHeight), dw = logo.naturalWidth * kk, dh = logo.naturalHeight * kk;
+      if (estilo === 'led' || estilo === 'neon') { g.shadowColor = cor; g.shadowBlur = ph * .12; }
+      g.drawImage(logo, (pw - dw) / 2, (ph - dh) / 2, dw, dh); g.shadowBlur = 0;
+      g.restore();
+      var texL = new THREE.CanvasTexture(c); texL.colorSpace = THREE.SRGBColorSpace; texL.anisotropy = 4;
+      var mL = new THREE.MeshStandardMaterial({color:'#FFFFFF', map:texL, roughness:.5, emissive:'#FFFFFF', emissiveMap:texL, emissiveIntensity:0, transparent:true, alphaTest:.05, side:THREE.DoubleSide});
+      mL.userData.acende = estilo !== 'placa' && estilo !== 'caixa';
+      letCache[k] = mL; return mL;
+    }
     var fs = ph * (sub ? .46 : .58); g.font = peso + fs + 'px ' + fam;
     while (g.measureText(txt).width > areaW && fs > 20) { fs -= 4; g.font = peso + fs + 'px ' + fam; }
     var cy = sub ? ph * .42 : ph / 2 + fs * .04;
@@ -1016,9 +1052,10 @@ function TRES_ENGINE(THREE, M){
         var vid2 = caixa(G.paredes, lenV, H - .1, .04, Mt.vidro, midV, .1, zV, false); vid2.userData.janela = true; vid2.userData.pronto = Mt.vidro; vid2.userData.cru = Mt.cruParede;
         caixa(G.paredes, lenV, .1, ESP * CM, matEsq, midV, 0, zV); caixa(G.paredes, lenV, .1, ESP * CM, matEsq, midV, H - .1, zV);
         var nB = Math.max(1, Math.round(lenV / 1.6)); for (var bi = 0; bi <= nB; bi++) caixa(G.paredes, .06, H, .1, matEsq, midV - lenV / 2 + lenV * bi / nB, 0, zV);
-        if (F.adesivo && F.letreiro) {   /* adesivo com o nome no vidro da vitrine */
+        if (F.adesivo && (F.letreiro || F.logo)) {   /* adesivo com o nome/arte no vidro da vitrine */
+          if (!F.letreiro) F.letreiro = ' ';
           var adw = Math.min(lenV - .4, Math.max(1.2, F.letreiro.length * .2)), adh = .42;
-          var matAd = letreiroMat(F.letreiro, 'neon', F.letreiroCor, adw, adh, {fonte:F.letreiroFonte});
+          var matAd = letreiroMat(F.letreiro, 'neon', F.letreiroCor, adw, adh, {fonte:F.letreiroFonte, logo:F.logo ? imagem(F.logo) : null});
           var pAd = plano(G.acabamento, adw, adh, matAd, midV, 1.55 + adh / 2, zV - .03, false); pAd.rotation.set(0, Math.PI, 0); pAd.material = pAd.material.clone(); pAd.material.opacity = .9; pAd.material.transparent = true;
         }
         pc.ab.forEach(function (ab) { if (ab.tipo === 'entrada') { var lenE = (ab.e - ab.s) * CM, midE = (ab.s + ab.e) / 2 * CM; caixa(G.paredes, lenE + .1, .08, .12, matEsq, midE, ab.z1 * CM + .02, zV); caixa(G.acabamento, .03, .03, .1, Mt.metal, midE + lenE / 2 - .12, 1.0, zV - .04); } });
@@ -1137,13 +1174,15 @@ function TRES_ENGINE(THREE, M){
             luzes.push({tipo:'ponto', x:cx, y:2.15, z:cz - .5, cor:'#FFD9A0', int:8, dist:6});
           }
         } else {   /* porta interna: aberta a 75° para dentro do ambiente B */
-          fk(null);
+          fk('portaInt', ab.chave || pc.chave);
           peça(.05, alt, .12, Mt.esquadria, -len / 2 + .025, 0, 0); peça(.05, alt, .12, Mt.esquadria, len / 2 - .025, 0, 0); peça(len, .05, .12, Mt.esquadria, 0, alt - .05, 0);
           var folha = new THREE.Mesh(new THREE.BoxGeometry(len - .06, alt - .05, .04), Mt.porta); folha.castShadow = true;
           var piv = new THREE.Group(); piv.position.set(horiz ? cx - len / 2 + .03 : cx, y0 + (alt - .05) / 2, horiz ? cz : cz - len / 2 + .03);
           folha.position.set((len - .06) / 2, 0, 0); piv.add(folha);
           piv.rotation.y = horiz ? -Math.PI * .42 : Math.PI / 2 - Math.PI * .42;
+          folha.userData.fk = 'portaInt'; folha.userData.fkid = ab.chave || pc.chave;
           G.acabamento.add(piv);
+          fk(null);
         }
       });
     });
@@ -1204,10 +1243,12 @@ function TRES_ENGINE(THREE, M){
     }
     /* ---------- letreiro com o nome do estabelecimento + totem ---------- */
     fk('letreiro');
-    if (F.letreiro && an.ambs.length) {
+    var logoImg = F.logo ? imagem(F.logo) : null;
+    if ((F.letreiro || logoImg) && an.ambs.length) {
+      if (!F.letreiro) F.letreiro = ' ';   /* só a arte */
       var lz = frenteCm * CM - ESP * CM / 2, larguraFrente = casaX1 - casaX0, fat = LETREIRO_FATOR[F.letreiroTam] || 1, fmt = F.letreiroFormato || 'retangular';
       var lh = (F.cobertura === 'platibanda' ? .7 : .6) * fat * (F.letreiroSub ? 1.35 : 1), lw, lx;
-      var lwIdeal = Math.max(2.6, F.letreiro.length * .36) * fat;
+      var lwIdeal = Math.max(2.6, logoImg ? Math.min(6, lh * logoImg.naturalWidth / logoImg.naturalHeight) : F.letreiro.length * .36) * fat;
       if (fmt === 'redondo') lwIdeal = Math.max(1.4, lh * 2.2);
       if (fmt === 'faixa') lwIdeal = larguraFrente - .4;
       var trechoEntrada = entradaInfo ? entradaInfo.q2 - entradaInfo.p2 : 0;
@@ -1220,13 +1261,13 @@ function TRES_ENGINE(THREE, M){
       var ly = F.letreiroPos === 'marquise' && (F.marquise || F.pergolado) ? 2.4 : (F.cobertura === 'platibanda' ? Math.min(altTotal + .75 - lh, altTotal + .1) : Math.min(H - lh - .05, 2.32));
       if (F.letreiroPos === 'marquise' && (F.marquise || F.pergolado)) ly = Math.min(2.4, altTotal + .75 - lh);
       var semFundo = F.letreiroEstilo === 'caixa' || F.letreiroEstilo === 'neon';
-      var matL = letreiroMat(F.letreiro, F.letreiroEstilo, F.letreiroCor, lw, lh, {formato:fmt, fonte:F.letreiroFonte, sub:F.letreiroSub, fundoCor:F.letreiroFundoCor}), prof = F.letreiroEstilo === 'caixa' ? .12 : .06;
+      var matL = letreiroMat(F.letreiro, F.letreiroEstilo, F.letreiroCor, lw, lh, {formato:fmt, fonte:F.letreiroFonte, sub:F.letreiroSub, fundoCor:F.letreiroFundoCor, logo:logoImg}), prof = F.letreiroEstilo === 'caixa' ? .12 : .06;
       if (!semFundo && (fmt === 'retangular' || fmt === 'faixa')) caixa(G.acabamento, lw + .1, lh + .1, prof, Mt.letreiroFundo, lx, ly - .05, lz - prof / 2 - .01);
       var placa = plano(G.acabamento, lw, lh, matL, lx, ly + lh / 2, lz - prof - .012, false); placa.rotation.set(0, Math.PI, 0); placa.userData.letreiro = F.letreiroLuz;
       if (F.letreiroEstilo === 'caixa') { var placa2 = plano(G.acabamento, lw, lh, matL, lx, ly + lh / 2, lz - prof - .09, false); placa2.rotation.set(0, Math.PI, 0); placa2.userData.letreiro = F.letreiroLuz; }   /* espessura das letras caixa */
       if (F.letreiroLuz) luzes.push({tipo:'ponto', x:lx, y:ly + lh / 2, z:lz - .5, cor:F.letreiroCor, int:6, dist:4});
       /* ---- placas publicitárias ---- */
-      var optsL = {fonte:F.letreiroFonte, sub:F.letreiroSub, fundoCor:F.letreiroFundoCor};
+      var optsL = {fonte:F.letreiroFonte, sub:F.letreiroSub, fundoCor:F.letreiroFundoCor, logo:logoImg};
       if (F.letreiroPos === 'topo') {   /* outdoor sobre a platibanda/cumeeira, em dois montantes */
         var ty = altTotal + (F.cobertura === 'platibanda' ? .75 : 1.2) + .35, tw = Math.min(larguraFrente - .4, Math.max(2.4, lw)), th2 = Math.max(.9, lh * 1.3), tzz = lz + .6;
         placa.visible = false; if (F.letreiroEstilo === 'caixa' && typeof placa2 !== 'undefined') placa2.visible = false;
@@ -1239,7 +1280,7 @@ function TRES_ENGINE(THREE, M){
       if (F.bandeira) {   /* bandeira: placa perpendicular à fachada, ao lado da entrada, lida por quem passa na calçada */
         var bx = entradaInfo ? Math.max(casaX0 + .3, entradaInfo.cx - (entradaInfo.len / 2) - .55) : casaX0 + .6, by = Math.min(H - .9, 2.2), bw = Math.min(1.2, Math.max(.8, F.letreiro.length * .12)), bh = .5;
         caixa(G.acabamento, .06, .06, .7, Mt.metal, bx, by + bh - .03, lz - .35); caixa(G.acabamento, .06, .06, .7, Mt.metal, bx, by + .03, lz - .35);
-        var matB = letreiroMat(F.letreiro, F.letreiroEstilo === 'neon' ? 'led' : F.letreiroEstilo, F.letreiroCor, bw, bh, {fonte:F.letreiroFonte, fundoCor:F.letreiroFundoCor});
+        var matB = letreiroMat(F.letreiro, F.letreiroEstilo === 'neon' ? 'led' : F.letreiroEstilo, F.letreiroCor, bw, bh, {fonte:F.letreiroFonte, fundoCor:F.letreiroFundoCor, logo:logoImg});
         caixa(G.acabamento, .05, bh, bw, Mt.letreiroFundo, bx, by, lz - .3 - bw / 2);
         var b1 = plano(G.acabamento, bw, bh, matB, bx - .03, by + bh / 2, lz - .3 - bw / 2, false); b1.rotation.set(0, -Math.PI / 2, 0); b1.userData.letreiro = F.letreiroLuz;
         var b2 = plano(G.acabamento, bw, bh, matB, bx + .03, by + bh / 2, lz - .3 - bw / 2, false); b2.rotation.set(0, Math.PI / 2, 0); b2.userData.letreiro = F.letreiroLuz;
@@ -1248,7 +1289,7 @@ function TRES_ENGINE(THREE, M){
       if (F.placaMuro) {   /* placa no muro da frente, ao lado do portão */
         var pmx = x2 + .12 + Math.min(1.1, (TL - x2) / 2), pmw = Math.min(1.6, Math.max(.9, TL - x2 - .3)), pmh = Math.min(.55, muroH - .25);
         if (TL - x2 > .9 && pmh > .25) {
-          var matPM = letreiroMat(F.letreiro, F.letreiroEstilo === 'neon' ? 'placa' : F.letreiroEstilo, F.letreiroCor, pmw, pmh, {fonte:F.letreiroFonte, sub:F.letreiroSub, fundoCor:F.letreiroFundoCor});
+          var matPM = letreiroMat(F.letreiro, F.letreiroEstilo === 'neon' ? 'placa' : F.letreiroEstilo, F.letreiroCor, pmw, pmh, {fonte:F.letreiroFonte, sub:F.letreiroSub, fundoCor:F.letreiroFundoCor, logo:logoImg});
           caixa(G.terreno, pmw + .06, pmh + .06, .04, Mt.letreiroFundo, pmx, muroH / 2 - pmh / 2 + .1, .02);
           var ppm = plano(G.terreno, pmw, pmh, matPM, pmx, muroH / 2 + .1, -.006, false); ppm.rotation.set(0, Math.PI, 0); ppm.userData.letreiro = F.letreiroLuz;
         }
@@ -1262,7 +1303,7 @@ function TRES_ENGINE(THREE, M){
       if (F.totem) {   /* totem ao lado do portão, virado para a rua */
         var tx = Math.min(TL - .5, gx + gw / 2 + .55), tz = .55, th = 2.6;
         caixa(G.terreno, .5, th, .25, matDest, tx, 0, tz);
-        var matT = letreiroMat(F.letreiro, F.letreiroEstilo, F.letreiroCor, .46, .7, {fonte:F.letreiroFonte, sub:F.letreiroSub, fundoCor:F.letreiroFundoCor});
+        var matT = letreiroMat(F.letreiro, F.letreiroEstilo, F.letreiroCor, .46, .7, {fonte:F.letreiroFonte, sub:F.letreiroSub, fundoCor:F.letreiroFundoCor, logo:logoImg});
         var pt = plano(G.terreno, .46, .7, matT, tx, th - .45, tz - .13, false); pt.rotation.set(0, Math.PI, 0); pt.userData.letreiro = F.letreiroLuz;
         if (F.letreiroLuz) luzes.push({tipo:'ponto', x:tx, y:th - .4, z:tz - .5, cor:F.letreiroCor, int:4, dist:3});
       }
@@ -1386,6 +1427,8 @@ function TRES_ENGINE(THREE, M){
     var teclas = {}, ouvintes = [];
     var raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
     var cb = op.on || {};
+    function aoImg(){ if (cena) reconstruir(); }
+    aoCarregarImg.push(aoImg);
 
     function reconstruir(){
       if (cena) { scene.remove(cena.raiz); descartar(cena.raiz); }
@@ -1756,7 +1799,7 @@ function TRES_ENGINE(THREE, M){
       luz:function (a, b, c, d) { luzManual = true; if (a === null) { luzManual = false; aplicarNoite(); return; } sol.intensity = a; hemi.intensity = b; amb.intensity = c; if (d !== undefined) sol.castShadow = !!d; sujo = true; }, _cena:function () { return cena; },
       atualizar:reconstruir,
       foto:function () { renderer.render(scene, camera); return canvas.toDataURL('image/png'); },
-      desmontar:function () {
+      desmontar:function () { var ii = aoCarregarImg.indexOf(aoImg); if (ii >= 0) aoCarregarImg.splice(ii, 1);
         vivo = false; if (ro) ro.disconnect();
         ouvintes.forEach(function (o) { o[0].removeEventListener(o[1], o[2], o[3]); });
         if (caixaSel) scene.remove(caixaSel);

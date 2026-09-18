@@ -380,7 +380,7 @@ var M = (function () {
   function limparAbertura(chave){ if (proj.aberturas) delete proj.aberturas[chave]; if (proj.entradaEm === chave) delete proj.entradaEm; }
   function fachadaCfg(){
     if (window.TRES) return TRES.fachadaDe(proj);
-    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem, janela:f.janela || 'correr', vidro:f.vidro || 'incolor', moldura:!!f.moldura, gradeJanela:!!f.gradeJanela, brise:!!f.brise, porta:f.porta || 'madeira', garagem:f.garagem || 'basculante', arandelas:!!f.arandelas, vasos:!!f.vasos, pisoFrente:f.pisoFrente || 'concreto', portaLargura:f.portaLargura || 0, portaAltura:f.portaAltura || 0, letreiroTam:f.letreiroTam || 'm', letreiroPos:f.letreiroPos || 'parede', bandeira:!!f.bandeira, placaMuro:!!f.placaMuro, faixa:f.faixa || '', adesivo:!!f.adesivo};
+    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem, janela:f.janela || 'correr', vidro:f.vidro || 'incolor', moldura:!!f.moldura, gradeJanela:!!f.gradeJanela, brise:!!f.brise, porta:f.porta || 'madeira', garagem:f.garagem || 'basculante', arandelas:!!f.arandelas, vasos:!!f.vasos, pisoFrente:f.pisoFrente || 'concreto', portaLargura:f.portaLargura || 0, portaAltura:f.portaAltura || 0, letreiroTam:f.letreiroTam || 'm', letreiroPos:f.letreiroPos || 'parede', bandeira:!!f.bandeira, placaMuro:!!f.placaMuro, faixa:f.faixa || '', adesivo:!!f.adesivo, logo:proj.logo || ''};
   }
   function testada(){   /* largura da frente construída, em cm */
     var cob = ambientesCobertos(); if (!cob.length) return 0;
@@ -416,6 +416,8 @@ var M = (function () {
     if (f.arandelas) add('Arandelas da entrada', P.arandelas);
     if (f.vasos) add('Vasos na entrada', P.vasos);
     if (f.pisoFrente && f.pisoFrente !== 'concreto') add('Piso da frente ' + f.pisoFrente, Math.max(1, proj.terreno.recuoFrontal / 100 * 3) * (P.pisoFrente[f.pisoFrente] || 0));
+    if (!f.letreiro && f.logo) f = Object.assign({}, f, {letreiro:'(arte)'});
+    if (f.logo) add('Impressão da arte anexada', 45000);
     if (f.letreiro) add('Letreiro ' + ({placa:'placa', caixa:'letra caixa', led:'LED', neon:'neon', backlight:'backlight'}[f.letreiroEstilo] || f.letreiroEstilo) + (f.letreiroTam && f.letreiroTam !== 'm' ? ' ' + f.letreiroTam.toUpperCase() : ''), (P.letreiroTam[f.letreiroTam] || 1) * (P.letreiro[f.letreiroEstilo] || P.letreiro.placa));
     if (f.letreiro && f.totem) add('Totem', P.totem);
     if (f.letreiro && f.letreiroPos === 'topo') add('Estrutura do letreiro no topo', P.letreiroTopo);
@@ -555,7 +557,7 @@ var M = (function () {
 
   /* ---------- simulador de cenários: calcula num clone, nunca mexe no projeto ---------- */
   function simular(fn){
-    var salvo = proj, copia = JSON.parse(JSON.stringify(salvo, function (k, v) { return k === 'renders' || k === 'versoes' ? undefined : v; }));
+    var salvo = proj, copia = JSON.parse(JSON.stringify(salvo, function (k, v) { return k === 'renders' || k === 'versoes' || k === 'logo' ? undefined : v; }));
     proj = copia;
     try { fn(copia); return {total:orcamento().total, area:areaConstruida(), ocupacao:ocupacao(), problemas:problemas().length, proj:copia}; }
     finally { proj = salvo; }
@@ -657,12 +659,12 @@ var M = (function () {
   var MAX_RENDERS = 8;
   function addRender(r){ if (!proj.renders) proj.renders = []; r.id = uid(); r.quando = Date.now(); proj.renders.push(r); while (proj.renders.length > MAX_RENDERS) proj.renders.shift(); salvar(); emitir(); return r; }
   function delRender(id){ proj.renders = (proj.renders || []).filter(function (r) { return r.id !== id; }); salvar(); emitir(); }
-  function estadoVersao(){ return JSON.parse(JSON.stringify(proj, function (k, v) { return k === 'renders' || k === 'versoes' || k === 'salvo' ? undefined : v; })); }
+  function estadoVersao(){ return JSON.parse(JSON.stringify(proj, function (k, v) { return k === 'renders' || k === 'versoes' || k === 'salvo' || k === 'logo' ? undefined : v; })); }
   function salvarVersao(nome){ if (!proj.versoes) proj.versoes = []; var v = {id:uid(), nome:nome || ('Estudo ' + (proj.versoes.length + 1)), quando:Date.now(), estado:estadoVersao()}; v.resumo = {area:areaConstruida(), total:orcamento().total, ambientes:proj.ambientes.length}; proj.versoes.push(v); salvar(); emitir(); return v; }
   function carregarVersao(id){
     var v = (proj.versoes || []).filter(function (x) { return x.id === id; })[0]; if (!v) return false;
     var renders = proj.renders, versoes = proj.versoes, e = JSON.parse(JSON.stringify(v.estado));
-    e.id = proj.id; e.renders = renders; e.versoes = versoes; proj = e; commit('Carregar versão “' + v.nome + '”'); return true;
+    e.id = proj.id; e.renders = renders; e.versoes = versoes; if (proj.logo) e.logo = proj.logo; proj = e; commit('Carregar versão “' + v.nome + '”'); return true;
   }
   function excluirVersao(id){ proj.versoes = (proj.versoes || []).filter(function (x) { return x.id !== id; }); salvar(); emitir(); }
 
@@ -690,8 +692,8 @@ var M = (function () {
      mudanças são feitas no lugar e o commit vem DEPOIS, é a base que vai para
      o histórico — assim o primeiro Ctrl+Z desfaz de verdade. */
   var base = null;
-  function snap(){ return JSON.stringify(proj, function (k, v) { return k === 'renders' || k === 'versoes' ? undefined : v; }); }
-  function restaurar(json){ var r = proj.renders, vs = proj.versoes; proj = JSON.parse(json); if (r) proj.renders = r; if (vs) proj.versoes = vs; }
+  function snap(){ return JSON.stringify(proj, function (k, v) { return k === 'renders' || k === 'versoes' || k === 'logo' ? undefined : v; }); }
+  function restaurar(json){ var r = proj.renders, vs = proj.versoes, lg = proj.logo; proj = JSON.parse(json); if (r) proj.renders = r; if (vs) proj.versoes = vs; if (lg) proj.logo = lg; }
   function commit(nome){
     hist.push({nome: nome, dado: base || snap()});
     if (hist.length > 100) hist.shift();
