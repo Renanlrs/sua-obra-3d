@@ -174,6 +174,7 @@ var PLAN = (function () {
       s += '</g>';
     }
 
+    if (vis('ambientes')) s += aberturasSvg(esc, pav);
     if (vis('moveis')) s += moveisSvg(esc);
     if (vis('cotas')) s += cotas(esc);
     guias.forEach(function (g) {
@@ -195,6 +196,44 @@ var PLAN = (function () {
     }
 
     svg.innerHTML = s;
+  }
+
+  /* ---------- portas e janelas na planta: saem do TRES.analise (a mesma fonte do 3D); clicáveis → mesmo popover ---------- */
+  function aberturasSvg(esc, pav){
+    if (!window.TRES || !M.proj.ambientes.length) return '';
+    var an; try { an = TRES.analise(M.proj, pav); } catch (e) { return ''; }
+    var s = '', sw = 1.4 * esc;
+    an.pecas.forEach(function (pc) {
+      pc.ab.forEach(function (ab) {
+        var w = ab.e - ab.s, aLado = pc.A ? PAREDE : 0, bLado = pc.B ? PAREDE : 0;   /* espessura da parede de cada lado da linha */
+        var fk = ab.tipo === 'janela' ? 'janela' : ab.tipo === 'portao' ? 'garagem' : ab.tipo === 'entrada' ? 'porta' : 'portaInt';
+        var horiz = pc.o === 'h', x, y, rw, rh;
+        if (horiz) { x = ab.s; y = pc.c - aLado; rw = w; rh = aLado + bLado; } else { x = pc.c - aLado; y = ab.s; rw = aLado + bLado; rh = w; }
+        if (rw <= 0 || rh <= 0) return;
+        s += '<g class="ab" data-fk="' + fk + '" data-id="' + (ab.chave || pc.chave || '') + '" style="cursor:pointer">';
+        /* abre o vão na parede */
+        s += '<rect x="' + x + '" y="' + y + '" width="' + rw + '" height="' + rh + '" fill="#FFFFFF"/>';
+        if (ab.tipo === 'janela') {   /* janela: duas linhas finas no vão + vidro azul */
+          s += '<rect x="' + x + '" y="' + y + '" width="' + rw + '" height="' + rh + '" fill="#BFE4F0"/>';
+          if (horiz) { s += '<line x1="' + x + '" y1="' + (y + rh * .35) + '" x2="' + (x + rw) + '" y2="' + (y + rh * .35) + '" stroke="#1B2229" stroke-width="' + sw + '"/><line x1="' + x + '" y1="' + (y + rh * .65) + '" x2="' + (x + rw) + '" y2="' + (y + rh * .65) + '" stroke="#1B2229" stroke-width="' + sw + '"/>'; }
+          else { s += '<line x1="' + (x + rw * .35) + '" y1="' + y + '" x2="' + (x + rw * .35) + '" y2="' + (y + rh) + '" stroke="#1B2229" stroke-width="' + sw + '"/><line x1="' + (x + rw * .65) + '" y1="' + y + '" x2="' + (x + rw * .65) + '" y2="' + (y + rh) + '" stroke="#1B2229" stroke-width="' + sw + '"/>'; }
+          s += '<rect x="' + x + '" y="' + y + '" width="' + rw + '" height="' + rh + '" fill="none" stroke="#1B2229" stroke-width="' + sw + '"/>';
+        } else if (ab.tipo === 'portao') {   /* portão da garagem: traço tracejado no vão */
+          if (horiz) s += '<line x1="' + x + '" y1="' + (pc.c) + '" x2="' + (x + rw) + '" y2="' + (pc.c) + '" stroke="#1B2229" stroke-width="' + (2 * esc) + '" stroke-dasharray="' + (14 * esc) + ' ' + (8 * esc) + '"/>';
+          else s += '<line x1="' + pc.c + '" y1="' + y + '" x2="' + pc.c + '" y2="' + (y + rh) + '" stroke="#1B2229" stroke-width="' + (2 * esc) + '" stroke-dasharray="' + (14 * esc) + ' ' + (8 * esc) + '"/>';
+        } else {   /* porta: folha + arco de abertura, para dentro do ambiente (B, ou o único que existe) */
+          var dentro = pc.B ? 1 : -1;   /* +1 = lado maior (baixo/direita) */
+          var hx, hy, fx, fy, ex, ey, sweep;
+          if (horiz) { hx = ab.s; hy = pc.c + dentro * bLado * (dentro > 0 ? 1 : 0) - (dentro < 0 ? aLado : 0); hy = pc.c; fx = hx; fy = hy + dentro * w; ex = hx + w; ey = hy; sweep = dentro > 0 ? 0 : 1; }
+          else { hx = pc.c; hy = ab.s; fx = hx + dentro * w; fy = hy; ex = hx; ey = hy + w; sweep = dentro > 0 ? 1 : 0; }
+          s += '<line x1="' + hx + '" y1="' + hy + '" x2="' + fx + '" y2="' + fy + '" stroke="#1B2229" stroke-width="' + (1.6 * esc) + '"/>';
+          s += '<path d="M' + fx + ' ' + fy + ' A' + w + ' ' + w + ' 0 0 ' + sweep + ' ' + ex + ' ' + ey + '" fill="none" stroke="#6B7885" stroke-width="' + (0.9 * esc) + '" stroke-dasharray="' + (4 * esc) + ' ' + (3 * esc) + '"/>';
+          if (ab.tipo === 'entrada' && !ab.secundaria) s += '<circle cx="' + (horiz ? ab.s + w / 2 : pc.c) + '" cy="' + (horiz ? pc.c : ab.s + w / 2) + '" r="' + (3.2 * esc) + '" fill="#22B8D6"/>';
+        }
+        s += '</g>';
+      });
+    });
+    return s;
   }
 
   /* ---------- móveis: figurinhas de cima, giradas no lugar ---------- */
@@ -379,6 +418,9 @@ var PLAN = (function () {
     if (pinch) return;
     var p = toModel(e);
 
+    /* porta/janela na planta → mesmo popover do 3D (trocar, excluir, medidas) */
+    var alvoAb = e.target.closest ? e.target.closest('.ab') : null;
+    if (alvoAb && tool === 'sel' && !UI.espaco && e.button === 0) { UI.popFachada(alvoAb.getAttribute('data-fk'), e.clientX, e.clientY, alvoAb.getAttribute('data-id') || null); return; }
     /* cota → edição no lugar */
     var alvoCota = e.target.closest ? e.target.closest('[data-cota]') : null;
     if (alvoCota) { UI.editarCota(alvoCota.getAttribute('data-cota'), e.clientX, e.clientY); return; }

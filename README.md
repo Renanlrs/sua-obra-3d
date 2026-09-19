@@ -57,6 +57,7 @@ As funções do app da escola de natação passaram a viver no mesmo editor, len
 
 ### 7. Prático: clique no item para trocar · botão direito para agir
 - Na **Fachada** (e no 3D), passe o mouse: janela, porta, telhado, parede, revestimento, muro, portão, piso da frente, letreiro… viram clicáveis. **Clique** → aparece só o que dá para trocar naquele item; cada escolha aplica na hora e o popover fica aberto para comparar. "Todas as opções" leva ao painel completo.
+- **Portas e janelas na planta 2D**: desenhadas da mesma análise do 3D (folha + arco de abertura, janelas nas paredes externas, portão tracejado, ponto azul = entrada principal); clique ou botão direito nelas abre o mesmo popover de trocar/excluir/medidas.
 - **Cada janela/porta/parede é sua**: clique numa janela → excluir, quantas nesta parede (1–4), largura/altura/peitoril, tipo e vidro só dela; clique numa parede → + janela, + porta, ★ entrada principal aqui; clique na porta → excluir (se secundária) ou voltar ao automático. Fica em `proj.aberturas` (chave ambiente|lado|índice) e `proj.entradaEm`; o painel lista tudo o que foi decidido, com ↺.
 - **Arte / logo anexada**: 📎 no letreiro (popover ou painel) — PNG com transparência fica melhor; a arte substitui o texto no letreiro, outdoor, bandeira, placa do muro, totem e adesivo da vitrine (`proj.logo`, fora do undo).
 - **Tamanho de qualquer porta**: clique na porta (entrada, adicionada, interna entre cômodos ou portão da garagem) → largura/altura só dela; porta interna também pode ser excluída.

@@ -14,7 +14,7 @@ var UI = (function () {
     stage = $('#stage'); insp = $('#insp'); canvasWrap = $('#canvas-wrap');
     montarHome();
     ligarAtalhos();
-    M.onChange(function () { refreshTop(); if (t3) t3.atualizar(); });
+    M.onChange(function () { refreshTop(); if (t3) t3.atualizar(); if (viewAtual === 'planta' && M.proj) PLAN.render(); });
 
     $('#btn-criar').onclick = criarDaHome;
     $('#btn-home').onclick = voltarHome;
@@ -1659,6 +1659,8 @@ var UI = (function () {
      Ambiente: renomear, tipo, mobiliar, duplicar, girar, andar, excluir · Móvel: girar, espelhar, duplicar, trocar, excluir ·
      Vazio: adicionar ambiente aqui, mobiliar, enquadrar. Tudo o que o inspector faz, a um clique de distância. */
   function menuContexto(e){
+    var alvoAbx = e.target.closest ? e.target.closest('.ab') : null;
+    if (alvoAbx) { popFachada(alvoAbx.getAttribute('data-fk'), e.clientX, e.clientY, alvoAbx.getAttribute('data-id') || null); return; }
     var alvoMov = e.target.closest ? e.target.closest('.mov') : null, alvoAmb = e.target.closest ? e.target.closest('.amb') : null;
     var p = PLAN.toModel(e), itens = [], titulo = '';
     function it(rot, fn, cls){ itens.push({rot:rot, fn:fn, cls:cls || ''}); }
@@ -1777,7 +1779,7 @@ var UI = (function () {
       '.stats div{background:#041D31;padding:22px 20px}.stats b{display:block;font-family:ui-monospace,monospace;font-size:1.4rem;color:#fff}.stats span{display:block;font-size:10px;letter-spacing:.2em;color:#7FA3B5;margin-top:6px}' +
       'footer{padding:40px 6vw;border-top:1px solid rgba(127,214,232,.15);font-size:12px;line-height:1.7;color:#8FA3B1}footer b{display:block;font-family:ui-monospace,monospace;font-size:10.5px;letter-spacing:.16em;color:#FFC24D;margin-bottom:8px}' +
       '@media(prefers-reduced-motion:reduce){*{transition:none!important}}';
-    var shim = 'var M={proj:' + JSON.stringify(p) + ',TIPOS:' + JSON.stringify(M.TIPOS) + ',' +
+    var shim = 'var M={proj:' + JSON.stringify(p, function (k, v) { return k === 'renders' || k === 'versoes' ? undefined : v; }) + ',TIPOS:' + JSON.stringify(M.TIPOS) + ',' +
       'movelDe:function(id){return (M.proj.moveis||[]).filter(function(m){return m.id===id})[0]||null},' +
       'escada:function(){return ' + JSON.stringify(M.escada()) + '},' +
       'areaOf:function(a){return a.w*a.h},num:function(n){return Number(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})},' +
@@ -1909,7 +1911,7 @@ var UI = (function () {
     editarCota:editarCota, renomearInline:renomearInline, addRoomDefault:addRoomDefault,
     radial:radial, addMovel:addMovel, acaoMovel:acaoMovel, toggleCatalogo:toggleCatalogo, htmlPasseio:htmlPasseio,
     selTap:selTap, fecharInsp:function(){ setInsp(false); },
-    toast:toast, saveState:saveState, zoomLabel:zoomLabel, coord:coord, hud:hud, msg:msg, menuContexto:menuContexto, fecharPop:fecharPop, copiarDeFoto:copiarDeFoto, pedirChave:pedirChave,
+    toast:toast, saveState:saveState, zoomLabel:zoomLabel, coord:coord, hud:hud, msg:msg, menuContexto:menuContexto, fecharPop:fecharPop, copiarDeFoto:copiarDeFoto, pedirChave:pedirChave, popFachada:popFachada,
     closeOverlays:closeOverlays, fecharApres:fecharApres, abrirApres:abrirApres, exportar:exportar,
     get shift(){ return shift; }, get alt(){ return alt; }, get espaco(){ return espaco; }
   };
