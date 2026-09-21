@@ -349,8 +349,8 @@ var M = (function () {
   /* ---------- fachada: custo do que foi escolhido (centavos), separado do custo dos ambientes ---------- */
   var PRECO_FACHADA = {
     revestimento:{nenhum:0, ripado:42000, pedra:38000, tijolo:26000, cimento:14000},   /* por m² de testada */
-    cobertura:{platibanda:0, telhado2:18000, telhado4:23000},                            /* por m² construído */
-    telha:{ceramica:0, concreto:3000, metalica:-4000},                                   /* ajuste por m² construído */
+    cobertura:{platibanda:0, telhado2:18000, telhado4:23000, galpao:29000, arco:34000, shed:38000},   /* por m² construído (galpão/arco/shed incluem a estrutura metálica) */
+    telha:{ceramica:0, concreto:3000, metalica:-4000, fibrocimento:-7000, sanduiche:9000},           /* ajuste por m² construído */
     portao:{grade:350000, ripado:650000, chapa:480000},
     muro:{baixo:0, alto:26000, vidro:90000},                                             /* alto: por m linear de testada */
     jardim:180000, marquise:320000, iluminacao:240000,
@@ -380,7 +380,7 @@ var M = (function () {
   function limparAbertura(chave){ if (proj.aberturas) delete proj.aberturas[chave]; if (proj.entradaEm === chave) delete proj.entradaEm; }
   function fachadaCfg(){
     if (window.TRES) return TRES.fachadaDe(proj);
-    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem, janela:f.janela || 'correr', vidro:f.vidro || 'incolor', moldura:!!f.moldura, gradeJanela:!!f.gradeJanela, brise:!!f.brise, porta:f.porta || 'madeira', garagem:f.garagem || 'basculante', arandelas:!!f.arandelas, vasos:!!f.vasos, pisoFrente:f.pisoFrente || 'concreto', portaLargura:f.portaLargura || 0, portaAltura:f.portaAltura || 0, letreiroTam:f.letreiroTam || 'm', letreiroPos:f.letreiroPos || 'parede', bandeira:!!f.bandeira, placaMuro:!!f.placaMuro, faixa:f.faixa || '', adesivo:!!f.adesivo, logo:proj.logo || ''};
+    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem, janela:f.janela || 'correr', vidro:f.vidro || 'incolor', moldura:!!f.moldura, gradeJanela:!!f.gradeJanela, brise:!!f.brise, porta:f.porta || 'madeira', garagem:f.garagem || 'basculante', arandelas:!!f.arandelas, vasos:!!f.vasos, pisoFrente:f.pisoFrente || 'concreto', portaLargura:f.portaLargura || 0, portaAltura:f.portaAltura || 0, letreiroTam:f.letreiroTam || 'm', letreiroPos:f.letreiroPos || 'parede', bandeira:!!f.bandeira, placaMuro:!!f.placaMuro, faixa:f.faixa || '', adesivo:!!f.adesivo, logo:proj.logo || '', inclinacao:f.inclinacao || '', beiral:f.beiral || 0, estruturaCor:f.estruturaCor || '#3A3F45', letreiroX:f.letreiroX || 0, letreiroY:f.letreiroY || 0, logoEscala:f.logoEscala || 1, logoX:f.logoX || 0, logoY:f.logoY || 0, logoComTexto:!!f.logoComTexto};
   }
   function testada(){   /* largura da frente construída, em cm */
     var cob = ambientesCobertos(); if (!cob.length) return 0;
@@ -392,8 +392,10 @@ var M = (function () {
     var f = fachadaCfg(), P = PRECO_FACHADA, ac = areaConstruida() / 10000, tf = testada() / 100 * proj.peDireito / 100, itens = [];
     function add(rot, v){ if (v) itens.push({rot:rot, valor:Math.round(v)}); }
     add('Revestimento ' + f.revestimento + ' (' + num(tf) + ' m²)', tf * (P.revestimento[f.revestimento] || 0));
-    add('Cobertura ' + (f.cobertura === 'platibanda' ? 'platibanda' : (f.cobertura === 'telhado2' ? '2 águas' : '4 águas')), ac * (P.cobertura[f.cobertura] || 0));
-    if (f.cobertura !== 'platibanda') add('Telha ' + f.telha, ac * (P.telha[f.telha] || 0));
+    var ROT_COB = {platibanda:'platibanda', telhado2:'2 águas', telhado4:'4 águas', galpao:'galpão metálico (tesouras)', arco:'arco metálico', shed:'shed (dente de serra)'};
+    add('Cobertura ' + (ROT_COB[f.cobertura] || f.cobertura), ac * (P.cobertura[f.cobertura] || 0));
+    if (f.cobertura !== 'platibanda') add('Telha ' + ({sanduiche:'termoacústica', fibrocimento:'fibrocimento'}[f.telha] || f.telha), ac * (P.telha[f.telha] || 0));
+    if (f.cobertura !== 'platibanda' && f.beiral > .8) add('Beiral de ' + num(f.beiral) + ' m', ac * 1500 * (f.beiral - .5));
     add('Portão ' + f.portao, P.portao[f.portao] || 0);
     if (f.muro === 'alto') add('Muro alto', proj.terreno.largura / 100 * P.muro.alto);
     if (f.muro === 'vidro') add('Muro com vidro', P.muro.vidro);
