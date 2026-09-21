@@ -308,7 +308,7 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 
 /* ============ 3D ============ */
 .view-pad.pad-3d{padding:0;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-1);color:var(--txt-1)}
-.t3-bar{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;flex:none;
+.t3-bar{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;flex:none;overflow-x:auto;scrollbar-width:none;white-space:nowrap;
   background:var(--bg-1);border-bottom:1px solid var(--line)}
 .t3-bar .seg{display:flex;gap:2px;padding:3px;background:var(--bg-2);border-radius:7px}
 .t3-bar .seg button{height:26px;padding:0 12px;border:none;border-radius:5px;background:transparent;
@@ -316,13 +316,16 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 .t3-bar .seg button:hover{color:var(--txt-1)}
 .t3-bar .seg button.on{background:var(--acento);color:#06222E;font-weight:600}
 .t3-bar .sep{width:1px;height:20px;background:var(--line)}
-.t3-bar .grow{flex:1}
+.t3-bar .grow{flex:1;min-width:6px}
+.t3-bar>*{flex:none}
+.t3-bar .btn,.t3-bar .tg,.t3-bar select{white-space:nowrap}
+.t3-bar::-webkit-scrollbar{display:none}
 .t3-bar .tg{height:26px;padding:0 10px;border:1px solid var(--line);border-radius:5px;background:transparent;color:var(--txt-3);cursor:pointer;font-size:12px}
 .t3-bar .tg.on{color:var(--txt-1);border-color:var(--line-forte);background:var(--bg-2)}
 .t3-bar .etapa{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.14em;color:var(--txt-3)}
-.t3-bar .etapa input{width:110px;accent-color:var(--acento)}
-.t3-bar .etapa b{font-family:var(--mono);font-size:11px;color:var(--txt-1);font-weight:500;min-width:96px;letter-spacing:0}
-.t3-bar select{height:26px;padding:0 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg-2);color:var(--txt-1);font-size:12px;max-width:180px}
+.t3-bar .etapa input{width:96px;accent-color:var(--acento)}
+.t3-bar .etapa b{font-family:var(--mono);font-size:11px;color:var(--txt-1);font-weight:500;min-width:84px;letter-spacing:0}
+.t3-bar select{height:26px;padding:0 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg-2);color:var(--txt-1);font-size:12px;max-width:150px}
 .t3-stage{flex:1;position:relative;min-height:0;background:#D9E7F2}
 .t3-canvas{display:block;width:100%;height:100%;outline:none;touch-action:none;cursor:grab}
 .t3-canvas:active{cursor:grabbing}
@@ -404,7 +407,7 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 @media(prefers-reduced-motion:reduce){.radial button{transition:none}}
 /* no 3D a barra ocupa o topo: pill desce, dica vai para o rodapé do palco */
 .app[data-view=tresd] .pill23{top:56px}
-.app[data-view=tresd] .t3-dica,.app[data-view=fachada] .t3-dica{top:auto;bottom:18px}
+.app[data-view=tresd] .t3-dica{top:auto;bottom:18px}
 .app[data-view=tresd] .catalogo{top:100px}
 
 /* ============ FACHADA (designer) ============ */
@@ -413,7 +416,16 @@ svg.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.5;fill:none;
 .fach-body .t3-stage{flex:1}
 .fach-elev{position:absolute;inset:0;z-index:3;background:#fff;padding:24px;display:grid;place-items:center}
 .fach-elev svg{width:100%;height:100%}
-.fach-panel{width:330px;flex:none;overflow:auto;background:var(--bg-1);border-left:1px solid var(--line);padding:14px 16px 24px}
+.fach-panel{width:330px;flex:none;overflow:auto;background:var(--bg-1);border-left:1px solid var(--line);padding:14px 16px 24px;position:relative;display:none}
+.pad-3d.panel-on .fach-panel{display:block}
+.fach-panel-close{position:absolute;top:8px;right:8px;z-index:2}
+.fach-jump{position:sticky;top:-14px;z-index:1;display:flex;flex-wrap:wrap;gap:4px;margin:-14px -16px 12px;padding:10px 40px 8px 16px;background:var(--bg-1);border-bottom:1px solid var(--line)}
+.fach-jump button{height:22px;padding:0 8px;border:1px solid var(--line);border-radius:11px;background:transparent;color:var(--txt-3);font-size:10.5px;letter-spacing:.04em;cursor:pointer}
+.fach-jump button:hover{color:var(--txt-1);border-color:var(--line-forte)}
+.fach-panel section.flash{animation:flash .9s ease}
+.app.fach-on[data-view=tresd] .insp{display:none}
+.t3-bar .fach-tg.on{color:#06222E;background:var(--acento);border-color:var(--acento);font-weight:600}
+@media (max-width:1180px){ .fach-panel{width:300px} }
 .fach-panel section{border-top:1px solid var(--line);padding:14px 0}
 .fach-panel section:first-of-type{border-top:none;padding-top:0}
 .fach-panel h6{font-size:9.5px;letter-spacing:.18em;color:var(--txt-3);margin-bottom:10px}
@@ -585,6 +597,9 @@ label.btn{cursor:pointer}
   .insp::before{content:'';position:absolute;top:8px;left:50%;width:38px;height:4px;margin-left:-19px;border-radius:2px;background:var(--line-forte)}
   .insp-close{position:absolute;top:6px;right:6px;width:30px;height:30px}
   .app.insp-on .insp{display:block}
+  /* painel da fachada no 3D → folha de baixo (fecha no ✕ ou no botão 🎨 Fachada) */
+  .pad-3d .fach-panel{position:fixed;left:0;right:0;bottom:var(--tab);width:auto;max-height:42vh;z-index:34;border-left:none;border-top:1px solid var(--line-forte);border-radius:14px 14px 0 0;padding-top:12px;box-shadow:0 -16px 34px -14px rgba(0,0,0,.85)}
+  .fach-jump{top:-12px;margin-top:-12px}
   /* ferramentas descem para o polegar; o 2D/3D fica em cima */
   .tools{top:auto;bottom:12px;left:50%;transform:translateX(-50%);padding:3px;max-width:calc(100vw - 16px)}
   .tools button{width:36px;height:36px}

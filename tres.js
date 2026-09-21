@@ -1561,7 +1561,7 @@ function TRES_ENGINE(THREE, M){
     var fill = new THREE.DirectionalLight('#EAF2FF', .55); fill.position.set(6, 4, -8); scene.add(fill);   /* dá volume onde o sol não entra */
 
     var cena = null, modo = op.modo || 'orbit', etapa = 5, teto = true, vivo = true, sujo = true, luzManual = false;
-    var sel3 = null, caixaSel = null, arrastoMov = null;   /* móvel selecionado / arrastado no 3D */
+    var sel3 = null, caixaSel = null, arrastoMov = null, ultimaDistMov = Infinity;   /* móvel selecionado / arrastado no 3D */
     var noite = !!op.noite, grupoLuz = new THREE.Group(); scene.add(grupoLuz);
     var CEU_DIA = '#D9E7F2', CEU_NOITE = '#0B1522';
     var pos = new THREE.Vector3(), alvo = new THREE.Vector3();          /* pose atual */
@@ -1726,6 +1726,8 @@ function TRES_ENGINE(THREE, M){
       /* pegou um móvel com o botão esquerdo → arrasta o móvel pelo piso, não a câmera */
       if (op.editar !== false && e.button === 0 && !e.shiftKey && modo !== 'tour') {
         var hm = sobMovel(e);
+        /* móvel atrás de uma parede/fachada não é pego através dela: vale o que está mais perto da câmera */
+        if (hm && op.arrastar !== false) { var fa0 = sobFachada(e); if (fa0 && fa0.dist < ultimaDistMov) hm = null; }
         if (hm) {
           var mv = M.movelDe ? M.movelDe(hm) : null, g = cena.moveis[hm];
           if (mv && g) {
@@ -1872,7 +1874,8 @@ function TRES_ENGINE(THREE, M){
       ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       raycaster.setFromCamera(ndc, camera);
       var hits = raycaster.intersectObjects(cena.movMeshes, false);
-      return hits.length ? hits[0].object.userData.mid : null;
+      if (!hits.length) return null;
+      ultimaDistMov = hits[0].distance; return hits[0].object.userData.mid;
     }
     function noPlano(e, y){
       var r = canvas.getBoundingClientRect();
@@ -1926,7 +1929,7 @@ function TRES_ENGINE(THREE, M){
       raycaster.setFromCamera(ndc, camera);
       if (!fkCache || fkCache.cena !== cena) { fkCache = []; fkCache.cena = cena; cena.raiz.traverse(function (o) { if (o.isMesh && o.userData.fk) fkCache.push(o); }); }
       var hits = raycaster.intersectObjects(fkCache, false);
-      for (var i = 0; i < hits.length; i++) { var o = hits[i].object, vis = true, p = o; while (p) { if (p.visible === false) { vis = false; break; } p = p.parent; } if (vis) return {fk:o.userData.fk, id:o.userData.fkid || null}; }
+      for (var i = 0; i < hits.length; i++) { var o = hits[i].object, vis = true, p = o; while (p) { if (p.visible === false) { vis = false; break; } p = p.parent; } if (vis) return {fk:o.userData.fk, id:o.userData.fkid || null, dist:hits[i].distance}; }
       return null;
     }
     function sob(e){
@@ -2027,7 +2030,7 @@ function TRES_ENGINE(THREE, M){
       get auto(){ return tour.auto; }, setAuto:function (v) { tour.auto = !!v; tour.autoT = 0; sujo = true; },
       setProgresso:setProgresso,
       luz:function (a, b, c, d) { luzManual = true; if (a === null) { luzManual = false; aplicarNoite(); return; } sol.intensity = a; hemi.intensity = b; amb.intensity = c; if (d !== undefined) sol.castShadow = !!d; sujo = true; }, _cena:function () { return cena; },
-      atualizar:reconstruir,
+      atualizar:reconstruir, _dbg:function () { return {ptr:Object.keys(ptr), let:!!arrastoLet, ab:!!arrastoAb, mov:!!arrastoMov, modo:modo}; },
       telaDe:function (x, y, z) { var v = new THREE.Vector3(x, y, z).project(camera), r = canvas.getBoundingClientRect(); return {x:(v.x + 1) / 2 * r.width + r.left, y:(1 - v.y) / 2 * r.height + r.top}; },   /* ponto do mundo → tela (conferência e menus) */
       foto:function () { renderer.render(scene, camera); return canvas.toDataURL('image/png'); },
       desmontar:function () { var ii = aoCarregarImg.indexOf(aoImg); if (ii >= 0) aoCarregarImg.splice(ii, 1);

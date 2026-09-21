@@ -104,9 +104,10 @@ var UI = (function () {
         var mvq = M.proj.moveis[+q.get('selmov') || 0];
         if (mvq) { var ambq = M.ambienteDe(mvq); if (ambq && viewAtual === 'planta') PLAN.enquadrarAmb(ambq); selecionarMovel(mvq.id); }
       }
-      if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'fachada') { fachPanel(); t3.verFachada(true); } }
-      if (q.get('fprompt') && viewAtual === 'fachada') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true, +q.get('fz') || 1); }
-      if (q.get('fach')) { try { M.proj.fachada = Object.assign(M.proj.fachada || {}, JSON.parse(q.get('fach'))); } catch (e) {} if (t3) t3.atualizar(); if (viewAtual === 'fachada') { fachPanel(); t3.verFachada(true, +q.get('fz') || 1); } }   /* &fach={"cobertura":"galpao"} (conferência) */
+      if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true); } }
+      if (q.get('fprompt') && viewAtual === 'tresd') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true, +q.get('fz') || 1); }
+      if (q.get('fach')) { try { M.proj.fachada = Object.assign(M.proj.fachada || {}, JSON.parse(q.get('fach'))); } catch (e) {} if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true, +q.get('fz') || 1); } }   /* &fach={"cobertura":"galpao"} (conferência) */
+      if (q.has('painel') && viewAtual === 'tresd') { var ptg = document.querySelector('#fach-tg'); if (ptg) { var quer = q.get('painel') !== '0'; if (quer !== ptg.classList.contains('on')) ptg.click(); } }   /* &painel=1|0 força o painel da fachada */
       if (q.has('noite') && t3) t3.setNoite(true);
       /* &fpop=janela abre o popover de troca · &ctx=amb|mov|vazio abre o menu de contexto — conferência e print */
       if (q.get('fpop')) setTimeout(function () {
@@ -204,7 +205,9 @@ var UI = (function () {
   }
 
   /* ================= NAVEGAÇÃO ================= */
+  var abrirFachada = false;   /* irPara('fachada') = a tela 3D com o painel da fachada aberto e a câmera na frente da casa */
   function irPara(v){
+    if (v === 'fachada') { v = 'tresd'; abrirFachada = true; }
     viewAtual = v;
     if (t3) { t3.desmontar(); t3 = null; }
     document.querySelectorAll('.side a').forEach(function (a) { a.classList.toggle('on', a.getAttribute('data-view') === v); });
@@ -287,41 +290,29 @@ var UI = (function () {
       hp += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' + (n < 4 ? '<button class="btn solid" data-pav-add="copia">+ Adicionar andar copiando o de baixo</button><button class="btn" data-pav-add="vazio">+ Adicionar andar vazio</button>' : '') + '</div>';
       return hp;
     }
-    if (v === 'tresd') {
-      if (!window.TRES) return '<h2>3D</h2><p class="vsub">O motor 3D não carregou (three.min.js ausente).</p><div style="height:60%">' + VIEWS.iso() + '</div>';
+    if (v === 'tresd') {   /* 3D + fachada numa tela só: passeio, obra 4D, móveis, dia/noite, estilos, prompt, foto e o painel de design à direita */
+      if (!window.TRES) return '<h2>3D</h2><p class="vsub">O motor 3D não carregou (three.min.js ausente).</p><div style="height:60%">' + VIEWS.iso() + '</div><div style="height:40%">' + VIEWS.fachada() + '</div>';
       return '<div class="t3-bar">' +
         '<div class="seg" id="t3-modos"><button data-modo="orbit" class="on" title="Arraste para girar · roda para aproximar · botão direito move">Girar</button>' +
         '<button data-modo="walk" title="W A S D anda · arraste para olhar">Andar</button>' +
         '<button data-modo="tour" title="Cômodo a cômodo · setas ou roda do mouse">Passeio</button></div>' +
-        '<span class="sep"></span>' +
-        '<button class="tg on" id="t3-teto" title="Mostrar ou esconder a laje">Teto</button>' +
+        '<div class="seg" id="fach-hora" title="Hora do dia"><button data-hora="dia" class="on" title="Ver de dia">☀</button><button data-hora="noite" title="Ver à noite, com as luzes e o letreiro acesos">☾</button></div>' +
+        '<button class="tg on" id="t3-teto" title="Mostrar ou esconder a laje e o telhado">Teto</button>' +
         '<span class="sep"></span>' +
         '<label class="etapa" title="Etapas da obra (4D)">OBRA <input type="range" id="t3-etapa" min="0" max="5" step="1" value="5"><b id="t3-etapa-v">Acabamento</b></label>' +
-        '<span class="grow"></span>' +
+        '<span class="sep"></span>' +
+        '<button class="tg fach-tg" id="fach-tg" title="Painel da fachada: estilo, prompt, cobertura, cores, janelas, porta, letreiro (F)">🎨 Fachada</button>' +
         '<button class="tg" id="t3-mob" title="Catálogo de móveis (M)">Mobiliar</button>' +
-        '<select id="t3-amb" title="Ir para um ambiente"><option value="">Ir para…</option></select>' +
-        '<button class="btn ghost sm" id="t3-foto" title="Salvar a imagem atual em PNG">Foto</button>' +
+        '<span class="grow"></span>' +
+        '<select id="t3-amb" title="Levar a câmera para…"><option value="">Ir para…</option></select>' +
         '<button class="btn solid sm" id="t3-render" title="Guarda esta vista na aba Renders (entra na apresentação)">+ Render</button>' +
+        '<button class="tg" id="t3-mais" title="Mais: elevação, estilos, foto">⋯</button>' +
         '</div>' +
-        '<div class="t3-stage" id="t3-stage">' +
+        '<div class="fach-body"><div class="t3-stage" id="t3-stage">' +
+        '<div class="fach-elev" id="fach-elev-pad" hidden></div>' +
         '<div class="t3-nav" id="t3-nav" hidden><button id="t3-ant" title="Anterior (←)">‹</button><button id="t3-auto" title="Passeio automático">▶</button><button id="t3-prox" title="Próximo (→)">›</button></div>' +
         '<div class="t3-dica" id="t3-dica">Arraste para girar · roda para aproximar · duplo clique num ambiente para entrar</div>' +
-        '</div>';
-    }
-    if (v === 'fachada') {
-      if (!window.TRES) return '<h2>Fachada frontal</h2><p class="vsub">Montada dos ambientes que fazem frente para a rua.</p><div style="height:calc(100% - 90px);min-height:360px">' + VIEWS.fachada() + '</div>';
-      return '<div class="t3-bar">' +
-        '<b class="fach-titulo">Fachada</b>' +
-        '<span class="sep"></span>' +
-        '<div class="seg" id="fach-hora"><button data-hora="dia" class="on" title="Ver de dia">☀ Dia</button><button data-hora="noite" title="Ver à noite, com as luzes acesas">☾ Noite</button></div>' +
-        '<button class="tg" id="fach-elev" title="Elevação frontal em desenho técnico">Elevação</button>' +
-        '<span class="grow"></span>' +
-        '<button class="btn solid sm" id="fach-4" title="Fotografa a sua casa em todos os estilos, lado a lado">✨ Ver os ' + Object.keys(TRES.FACHADA_PRESETS).length + ' estilos</button>' +
-        '<button class="btn ghost sm" id="fach-foto" title="Salvar a imagem atual em PNG">Foto</button>' +
-        '<button class="btn solid sm" id="fach-render" title="Guarda esta vista na aba Renders (entra na apresentação)">+ Render</button>' +
-        '</div>' +
-        '<div class="fach-body"><div class="t3-stage" id="fach-stage"><div class="fach-elev" id="fach-elev-pad" hidden></div><div class="t3-dica">Arraste para girar · roda para aproximar</div></div>' +
-        '<aside class="fach-panel" id="fach-panel"></aside></div>';
+        '</div><aside class="fach-panel" id="fach-panel"><button class="icon-btn fach-panel-close" id="fach-close" title="Fechar painel">' + icon('close') + '</button></aside></div>';
     }
     if (v === 'corte')   return '<h2>Corte longitudinal</h2><p class="vsub">Seção no meio do terreno, no sentido da profundidade.</p><div style="height:calc(100% - 90px);min-height:360px">' + VIEWS.corte() + '</div>';
 
@@ -515,7 +506,6 @@ var UI = (function () {
 
   function ligarView(v, pad){
     if (v === 'tresd' && window.TRES) { ligar3D(pad); return; }
-    if (v === 'fachada' && window.TRES) { ligarFachada(pad); return; }
     if (v === 'piscina') {
       var addP = pad.querySelector('#pis-add'); if (addP) addP.onclick = function () { var i2 = M.LIB.map(function (l) { return l.nome; }).indexOf('Piscina'); addDaLib(i2); irPara('piscina'); };
       M.piscinas().forEach(function (a) {
@@ -1100,13 +1090,13 @@ var UI = (function () {
   var COMANDOS = [
     {n:'Planta',              g:'P',      f:function(){ irPara('planta'); }},
     {n:'Ambientes',           g:'A',      f:function(){ irPara('ambientes'); }},
-    {n:'3D / volumetria',     g:'3',      f:function(){ irPara('tresd'); }},
+    {n:'3D e fachada',        g:'3',      f:function(){ irPara('tresd'); }},
     {n:'Passeio 3D pela casa', g:'',       f:function(){ irPara('tresd'); if (t3) t3.setModo('tour'); }},
     {n:'Exportar passeio 3D (.html)', g:'', f:function(){ exportar('html'); }},
     {n:'Mobiliar (catálogo de móveis)', g:'M', f:function(){ if (viewAtual !== 'planta' && viewAtual !== 'tresd') irPara('planta'); toggleCatalogo(true); }},
     {n:'Mobiliar automaticamente', g:'', f:function(){ M.mobiliarAuto(); M.commit('Mobiliar automaticamente'); if (viewAtual === 'planta') PLAN.render(); inspector(); toast(M.proj.moveis.length + ' móveis colocados.'); }},
     {n:'Ver em 2D (planta)',   g:'2',      f:function(){ irPara('planta'); }},
-    {n:'Fachada',             g:'F',      f:function(){ irPara('fachada'); }},
+    {n:'Fachada (painel de design no 3D)', g:'F', f:function(){ irPara('fachada'); }},
     {n:'Fachada à noite',     g:'',       f:function(){ irPara('fachada'); if (t3) t3.setNoite(true); }},
     {n:'Criar fachada por prompt', g:'',  f:function(){ irPara('fachada'); setTimeout(function(){ var p = document.querySelector('#fach-prompt'); if (p) p.focus(); }, 60); }},
     {n:'Copiar planta de uma foto', g:'', f:function(){ irPara('planta'); $('#foto-in').click(); }},
@@ -1232,7 +1222,7 @@ var UI = (function () {
       if (k === 'p') irPara('planta');
       if (k === 'a') irPara('ambientes');
       if (k === '3') irPara('tresd');
-      if (k === 'f') irPara('fachada');
+      if (k === 'f') { if (viewAtual === 'tresd') { var ftg = document.querySelector('#fach-tg'); if (ftg) ftg.click(); } else irPara('fachada'); }
       if (k === 'o') irPara('orcamento');
       if (k === 's') irPara('simulador');
       /* setas movem o selecionado (ou o grupo) */
@@ -1282,9 +1272,10 @@ var UI = (function () {
     t3 = TRES.montar(st, {modo:'orbit', on:{
       fachadaClique: popFachada, fachadaHover: dicaFachada,
       abMove: abMove3d, abFim: abFim3d, abCancel: abCancel3d, letreiroMove: letreiroMove3d, letreiroFim: letreiroFim3d, letreiroCancel: letreiroCancel3d,
+      noite: function (n) { pad.querySelectorAll('#fach-hora button').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-hora') === 'noite') === n); }); },
       modo: modos,
       paradas: function (ps) {
-        sel.innerHTML = '<option value="">Ir para…</option>' + ps.map(function (p, i) { return '<option value="' + i + '">' + esc(p.titulo) + '</option>'; }).join('');
+        sel.innerHTML = '<option value="">Ir para…</option><option value="fachada">🏠 Frente da casa</option><option value="entrada">🚪 Entrada (perto)</option><option disabled>── ambientes ──</option>' + ps.map(function (p, i) { return '<option value="' + i + '">' + esc(p.titulo) + '</option>'; }).join('');
       },
       parada: function (i) { sel.value = String(i); },
       clique: function (id) { PLAN.selecionar(id); inspector(); },
@@ -1303,15 +1294,46 @@ var UI = (function () {
     var rg = pad.querySelector('#t3-etapa'), rv = pad.querySelector('#t3-etapa-v');
     rg.oninput = function () { t3.setEtapa(+this.value); rv.textContent = TRES.ETAPAS[+this.value]; };
     rv.textContent = TRES.ETAPAS[t3.etapa]; rg.value = t3.etapa;
-    sel.onchange = function () { if (this.value !== '') t3.irParada(+this.value); };
+    sel.onchange = function () { if (this.value === 'fachada') t3.verFachada(); else if (this.value === 'entrada') t3.verFachada(false, .5); else if (this.value !== '') t3.irParada(+this.value); this.value = ''; };
     pad.querySelector('#t3-ant').onclick = function () { t3.anterior(); };
     pad.querySelector('#t3-prox').onclick = function () { t3.proxima(); };
     pad.querySelector('#t3-auto').onclick = function () { t3.setAuto(!t3.auto); this.textContent = t3.auto ? '❚❚' : '▶'; };
-    pad.querySelector('#t3-foto').onclick = function () {
-      var a = document.createElement('a'); a.href = t3.foto(); a.download = slug() + '-3d.png'; a.click(); toast('Imagem salva.');
+    pad.querySelector('#t3-render').onclick = function () { guardarRender(t3.foto(), t3.modo === 'tour' ? 'Passeio' : (t3.noite ? 'Fachada à noite' : 'Vista 3D')); };
+    /* ---- fachada, na mesma tela ---- */
+    pad.querySelectorAll('#fach-hora button').forEach(function (b) { b.onclick = function () { t3.setNoite(b.getAttribute('data-hora') === 'noite'); }; });
+    function elevacao(){ var e = pad.querySelector('#fach-elev-pad'); e.hidden = !e.hidden; if (!e.hidden) e.innerHTML = VIEWS.fachada(); }
+    pad.querySelector('#t3-mais').onclick = function (ev) {   /* ⋯ = o que não precisa estar sempre à vista */
+      ev.stopPropagation();
+      var c = document.getElementById('ctx'); if (!c) { c = document.createElement('div'); c.id = 'ctx'; c.className = 'ctx'; document.body.appendChild(c); }
+      var elev = !pad.querySelector('#fach-elev-pad').hidden;
+      c.innerHTML = '<div class="ctx-hd">3D e fachada</div>' +
+        '<button class="ctx-it" data-m="elev">' + (elev ? '✓ ' : '') + 'Elevação frontal (desenho técnico)</button>' +
+        '<button class="ctx-it" data-m="estilos">✨ Ver a casa nos ' + Object.keys(TRES.FACHADA_PRESETS).length + ' estilos</button>' +
+        '<button class="ctx-it" data-m="frente">🏠 Câmera na frente da casa</button>' +
+        '<button class="ctx-it" data-m="foto">📷 Salvar imagem (PNG)</button>' +
+        '<button class="ctx-it" data-m="apres">▶ Apresentar ao cliente</button>';
+      var r = this.getBoundingClientRect(); c.style.left = Math.max(8, Math.min(window.innerWidth - 268, r.right - 260)) + 'px'; c.style.top = (r.bottom + 6) + 'px'; c.hidden = false;
+      c.querySelectorAll('[data-m]').forEach(function (b) { b.onclick = function () {
+        var m = b.getAttribute('data-m'); c.hidden = true;
+        if (m === 'elev') elevacao(); else if (m === 'estilos') compararEstilos(); else if (m === 'frente') t3.verFachada();
+        else if (m === 'foto') { var a = document.createElement('a'); a.href = t3.foto(); a.download = slug() + '-3d.png'; a.click(); toast('Imagem salva.'); }
+        else if (m === 'apres') { var ap = document.getElementById('btn-apresentar'); if (ap) ap.click(); }
+      }; });
     };
-    pad.querySelector('#t3-render').onclick = function () { guardarRender(t3.foto(), t3.modo === 'tour' ? 'Passeio' : 'Vista 3D'); };
+    function painel(abrir){
+      painelFachada = abrir === undefined ? !painelFachada : !!abrir;
+      pad.classList.toggle('panel-on', painelFachada); pad.querySelector('#fach-tg').classList.toggle('on', painelFachada); $('#app').classList.toggle('fach-on', painelFachada);   /* painel aberto esconde o inspector: o 3D fica largo */
+      if (painelFachada) fachPanel(pad);
+      try { localStorage.setItem('so3d-painel-fachada', painelFachada ? '1' : '0'); } catch (e) {}
+    }
+    pad.querySelector('#fach-tg').onclick = function () { painel(); };
+    pad.querySelector('#fach-close').onclick = function () { painel(false); };
+    var lembrado = null; try { lembrado = localStorage.getItem('so3d-painel-fachada'); } catch (e) {}
+    painel(abrirFachada || (lembrado === null ? window.innerWidth > 900 : lembrado === '1'));
+    if (abrirFachada) { t3.verFachada(true); dica.textContent = 'Clique numa janela, porta, parede, telhado, muro ou portão para trocar · arraste a janela ou o letreiro para mover'; }
+    abrirFachada = false;
   }
+  var painelFachada = false;
 
   /* ================= FACHADA (designer) ================= */
   var CORES_PAREDE = ['#F2EFE8', '#F6F1E4', '#D9D9D4', '#EFE3CF', '#C9D3D9', '#B9C4B0', '#F0D9C2', '#8E9BA6', '#E8D7B5', '#D6C7B0', '#A9B7A2', '#9FB4C4', '#DCC5C0', '#6B7885', '#3D4A56', '#2B2F33'];
@@ -1322,30 +1344,10 @@ var UI = (function () {
   var ROT = {cobertura:{platibanda:'Platibanda', telhado2:'2 águas', telhado4:'4 águas'}, telha:{ceramica:'Cerâmica', concreto:'Concreto', metalica:'Metálica'},
     revestimento:{nenhum:'Nenhum', ripado:'Ripado', pedra:'Pedra', tijolo:'Tijolinho', cimento:'Cimento'}, esquadria:{preto:'Preto', branco:'Branco', madeira:'Madeira'},
     portao:{grade:'Grade', ripado:'Ripado', chapa:'Chapa'}, muro:{baixo:'Baixo', alto:'Alto', vidro:'Vidro'}};
-  function ligarFachada(pad){
-    pad.classList.add('pad-3d');
-    var st = pad.querySelector('#fach-stage');
-    t3 = TRES.montar(st, {modo:'orbit', editar:false, on:{
-      noite: function (n) { pad.querySelectorAll('#fach-hora button').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-hora') === 'noite') === n); }); },
-      fachadaClique: popFachada, fachadaHover: dicaFachada,
-      abMove: abMove3d, abFim: abFim3d, abCancel: abCancel3d, letreiroMove: letreiroMove3d, letreiroFim: letreiroFim3d, letreiroCancel: letreiroCancel3d
-    }});
-    if (!t3) return;
-    t3.verFachada(true);
-    pad.querySelector('.t3-dica').textContent = 'Clique numa janela, porta, parede, telhado, muro ou portão para trocar · arraste para girar';
-    pad.querySelectorAll('#fach-hora button').forEach(function (b) { b.onclick = function () { t3.setNoite(b.getAttribute('data-hora') === 'noite'); }; });
-    pad.querySelector('#fach-elev').onclick = function () {
-      var e = pad.querySelector('#fach-elev-pad'); e.hidden = !e.hidden; this.classList.toggle('on', !e.hidden);
-      if (!e.hidden) e.innerHTML = VIEWS.fachada();
-    };
-    pad.querySelector('#fach-foto').onclick = function () { var a = document.createElement('a'); a.href = t3.foto(); a.download = slug() + '-fachada.png'; a.click(); toast('Imagem da fachada salva.'); };
-    pad.querySelector('#fach-render').onclick = function () { guardarRender(t3.foto(), 'Fachada' + (t3.noite ? ' à noite' : '')); };
-    pad.querySelector('#fach-4').onclick = compararEstilos;
-    fachPanel(pad);
-  }
   function fachPanel(pad){
     pad = pad || canvasWrap.querySelector('.view-pad'); if (!pad) return;
-    var el = pad.querySelector('#fach-panel'); if (!el) return;
+    var el = pad.querySelector('#fach-panel'); if (!el || !pad.classList.contains('panel-on')) return;   /* painel fechado: monta quando abrir */
+    var scrollAntes = el.scrollTop;
     var F = TRES.fachadaDe(M.proj), h = '';
     function chips(k, mapa){ return '<div class="chips">' + Object.keys(mapa).map(function (v) { return '<button class="chip' + (F[k] === v ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + v + '">' + mapa[v] + '</button>'; }).join('') + '</div>'; }
     function cores(k, lista){ return '<div class="swatches">' + lista.map(function (c) { return '<button class="sw-btn' + (F[k].toUpperCase() === c ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + c + '" style="background:' + c + '" title="' + c + '"></button>'; }).join('') + '</div>'; }
@@ -1408,7 +1410,15 @@ var UI = (function () {
     h += '<section><h6>QUANTO ESSA FACHADA CUSTA</h6>' + (itens.length ? itens.map(function (it) { return kv(it.rot, M.fmtBRL(it.valor), ''); }).join('') : '<div class="ins-empty">Nada além da alvenaria.</div>') +
       '<div class="kv tot"><span>Fachada</span><b>' + M.fmtBRL(M.custoFachada()) + '</b></div>' +
       '<div class="kv derived" title="ambientes ' + M.fmtBRL(M.custoTotal()) + ' + fachada ' + M.fmtBRL(M.custoFachada()) + '"><span>Investimento total</span><b>' + M.fmtBRL(M.custoGeral()) + '</b></div></section>';
-    el.innerHTML = h;
+    /* atalhos no topo: pulam para a seção (o painel é longo) */
+    var JUMP = [['PROMPT', 'CRIAR POR PROMPT'], ['Estilo', 'ESTILO'], ['Cobertura', 'COBERTURA'], ['Cores', 'COR DA PAREDE'], ['Janelas', 'JANELAS'], ['Porta', 'PORTA DE ENTRADA'], ['Muro', 'MURO'], ['Letreiro', 'LETREIRO'], ['Custo', 'QUANTO ESSA FACHADA']];
+    el.innerHTML = '<button class="icon-btn fach-panel-close" id="fach-close" title="Fechar painel">' + icon('close') + '</button><nav class="fach-jump">' + JUMP.map(function (j) { return '<button data-jump="' + j[1] + '">' + j[0] + '</button>'; }).join('') + '</nav>' + h;
+    el.scrollTop = scrollAntes;
+    el.querySelector('#fach-close').onclick = function () { pad.classList.remove('panel-on'); $('#app').classList.remove('fach-on'); painelFachada = false; var tg2 = pad.querySelector('#fach-tg'); if (tg2) tg2.classList.remove('on'); try { localStorage.setItem('so3d-painel-fachada', '0'); } catch (e) {} };
+    el.querySelectorAll('[data-jump]').forEach(function (b) { b.onclick = function () {
+      var alvo = null, t = b.getAttribute('data-jump'); el.querySelectorAll('section h6').forEach(function (h6) { if (!alvo && h6.textContent.toUpperCase().indexOf(t) === 0) alvo = h6.closest('section'); });
+      if (alvo) { el.scrollTo({top:alvo.offsetTop - 44, behavior:'smooth'}); alvo.classList.add('flash'); setTimeout(function () { alvo.classList.remove('flash'); }, 900); }
+    }; });
     el.querySelectorAll('[data-fk]').forEach(function (b) {
       b.onclick = function () {
         var k = b.getAttribute('data-fk'), v = b.getAttribute('data-fv');
@@ -1493,7 +1503,7 @@ var UI = (function () {
         var nf = VISAO.normalizarFachada(r.bruto), atual = M.proj.fachada || {};
         var f = nf.fachada; if (!f.numero && atual.numero) f.numero = atual.numero;
         M.proj.fachada = f; M.commit('Copiar fachada da foto');
-        if (viewAtual !== 'fachada') irPara('fachada'); else { fachPanel(); if (t3) t3.verFachada(true); }
+        if (viewAtual !== 'tresd') irPara('fachada'); else { fachPanel(); if (t3) t3.verFachada(true); }
         var m2 = document.querySelector('#fach-prompt-msg'); if (m2) m2.textContent = 'Entendi: ' + (nf.descricao || nf.lidos.join(', '));
         toast('Fachada copiada da foto: ' + (nf.descricao || nf.lidos.slice(0, 5).join(', ')), function () { fazerUndo(); });
       }
@@ -1711,7 +1721,7 @@ var UI = (function () {
     ligarAjustes(pop, function () { popFachada(fk, null, null, id); });
     pop.querySelector('[data-close]').onclick = fecharPop;
     pop.querySelector('[data-undo]').onclick = function () { fazerUndo(); popFachada(fk, null, null, id); };
-    pop.querySelector('[data-panel]').onclick = function () { fecharPop(); if (viewAtual !== 'fachada') irPara('fachada'); var el = document.querySelector('#fach-panel'); if (el) { el.scrollTop = 0; el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 900); } };
+    pop.querySelector('[data-panel]').onclick = function () { fecharPop(); var pad3 = canvasWrap.querySelector('.view-pad.pad-3d'); if (viewAtual !== 'tresd') irPara('fachada'); else if (pad3 && !pad3.classList.contains('panel-on')) { var tgb = pad3.querySelector('#fach-tg'); if (tgb) tgb.click(); } var el = document.querySelector('#fach-panel'); if (el) { el.scrollTop = 0; el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 900); } };
   }
   function fecharPop(){ var p = document.getElementById('fpop'); if (p) p.hidden = true; var c = document.getElementById('ctx'); if (c) c.hidden = true; }
 

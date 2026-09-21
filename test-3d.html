@@ -28,6 +28,10 @@ f.onload = function () {
         var ab2 = TRES.analise(M.proj, 0).entrada.pc.ab.filter(function (a) { return a.tipo === 'janela'; })[0];
         t('janela andou ~50 cm para a esquerda (±15 cm), sem invadir a porta', ab2 && Math.abs(((ab2.s + ab2.e) / 2) - ((ab.s + ab.e) / 2 - 50)) <= 15 && !TRES.analise(M.proj, 0).entrada.pc.ab.some(function (a) { return a.tipo === 'entrada' && a.e + 15 > ab2.s; }), ab2 ? ((ab2.s + ab2.e) / 2) + ' vs ' + ((ab.s + ab.e) / 2 - 50) : '-');
         t('undo desfaz o arrasto num passo', (function () { M.undo(); return !M.abertura(pc.chave); })());
+        ev(canvas, 'pointerdown', p0.x, p0.y); ev(canvas, 'pointerup', p0.x, p0.y);
+        var popJ = f.contentDocument.getElementById('fpop');
+        t('clique na janela abre o popover dela', popJ && !popJ.hidden && popJ.dataset.fk === 'janela', popJ ? popJ.dataset.fk + ' hidden=' + popJ.hidden : 'sem popover');
+        var fp0 = f.contentDocument.getElementById('fpop'); if (fp0) fp0.hidden = true;
         /* letreiro: precisa existir */
         M.proj.fachada = {letreiro:'ACQUA BELO'}; M.commit('let'); t3.verFachada(true, .9);
         setTimeout(function () {
@@ -41,7 +45,8 @@ f.onload = function () {
             t('letreiro foi 1,5 m para a esquerda e 0,3 m para baixo (±10 cm)', Math.abs(F.letreiroX - (L.x - 1.5)) <= .1 && Math.abs(F.letreiroY - (L.y - .3)) <= .1, F.letreiroX + ',' + F.letreiroY + ' vs ' + (L.x - 1.5) + ',' + (L.y - .3));
             /* clique sem mover abre o popover */
             var L2 = t3._cena().letreiro, r0 = t3.telaDe(L2.x, L2.y + L2.h * .85, L2.z - .1);   /* parte de cima da placa (a marquise pode cobrir a de baixo) */
-            ev(canvas, 'pointerdown', r0.x, r0.y); ev(canvas, 'pointerup', r0.x, r0.y);
+            ev(canvas, 'pointerdown', r0.x, r0.y); var dMov = t3._dbg().mov; ev(canvas, 'pointerup', r0.x, r0.y);
+            t('clicar na fachada não pega um móvel escondido atrás da parede', !dMov);
             var pop = f.contentDocument.getElementById('fpop');
             t('clique sem arrastar abre o popover do letreiro', pop && !pop.hidden && pop.dataset.fk === 'letreiro', pop ? pop.dataset.fk + ' hidden=' + pop.hidden : 'sem popover');
             fim();
