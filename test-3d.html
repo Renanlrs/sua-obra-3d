@@ -49,7 +49,49 @@ f.onload = function () {
             t('clicar na fachada não pega um móvel escondido atrás da parede', !dMov);
             var pop = f.contentDocument.getElementById('fpop');
             t('clique sem arrastar abre o popover do letreiro', pop && !pop.hidden && pop.dataset.fk === 'letreiro', pop ? pop.dataset.fk + ' hidden=' + pop.hidden : 'sem popover');
-            fim();
+            if (fp0) fp0.hidden = true; var fpX = f.contentDocument.getElementById('fpop'); if (fpX) fpX.hidden = true;
+            /* ---- cobertura independente: nasce, aparece no 3D, arrasta e é clicável ---- */
+            var c1 = W.UI.novaCobertura({nome:'Área da piscina', w:500, h:500, tipo:'duas', pilarMat:'metalico'});
+            setTimeout(function () {
+              var cena2 = t3._cena(), achou = [];
+              cena2.raiz.traverse(function (o) { if (o.userData && o.userData.fk === 'cobAvulsa' && o.userData.fkid === c1.id) achou.push(o); });
+              t('a cobertura aparece no 3D com peças clicáveis', achou.length > 0, achou.length + ' peças');
+              var alvoY = (c1.alt || 280) * .01 + .3, pz = t3.telaDe((c1.x + c1.w / 2) * .01, alvoY, (c1.y + c1.h / 2) * .01);
+              var pz2 = t3.telaDe((c1.x + c1.w / 2) * .01 + 1.5, alvoY, (c1.y + c1.h / 2) * .01);
+              var x0c = c1.x;
+              ev(canvas, 'pointerdown', pz.x, pz.y); ev(canvas, 'pointermove', pz2.x, pz2.y);
+              setTimeout(function () {
+                ev(canvas, 'pointerup', pz2.x, pz2.y);
+                var c2 = W.M.coberturaDe(c1.id);
+                t('arrastar a cobertura no 3D anda ~1,5 m e grava', c2 && Math.abs(c2.x - (x0c + 150)) <= 20, c2 ? c2.x + ' vs ' + (x0c + 150) : 'sumiu');
+                t('undo devolve a cobertura para o lugar', (function () { W.M.undo(); return W.M.coberturaDe(c1.id).x === x0c; })());
+                var c3 = W.M.coberturaDe(c1.id), pz3 = t3.telaDe((c3.x + c3.w / 2) * .01, alvoY, (c3.y + c3.h / 2) * .01);
+                ev(canvas, 'pointerdown', pz3.x, pz3.y); ev(canvas, 'pointerup', pz3.x, pz3.y);
+                var popC = f.contentDocument.getElementById('fpop');
+                t('clique sem arrastar abre o painel da cobertura (tipo, telha, pilares)', popC && !popC.hidden && popC.dataset.fk === 'cobAvulsa' && /PILARES/.test(popC.textContent), popC ? popC.dataset.fk : 'sem popover');
+                var nAntes = W.M.nPilares(c3);
+                var btn6 = popC && popC.querySelector('[data-ck="nx"][data-cv="4"]'); if (btn6) btn6.click();
+                t('trocar o número de pilares pelo painel muda o projeto e o 3D', W.M.nPilares(W.M.coberturaDe(c1.id)) > nAntes);
+                var btnMat = f.contentDocument.querySelector('#fpop [data-ck="pilarMat"][data-cv="madeira"]'); if (btnMat) btnMat.click();
+                t('trocar o material do pilar aplica (e a seção volta ao padrão do material)', W.M.cobCfg(W.M.coberturaDe(c1.id)).pilarMat === 'madeira' && W.M.cobCfg(W.M.coberturaDe(c1.id)).pilarEsp === W.M.PILAR_MATS.madeira.esp);
+                /* ---- pilar da estrutura não passa do andar que existe naquele ponto (bug do print: pilares soltos) ---- */
+                W.M.novo('casa-terrea', 1200, 2500);
+                var ambs = W.M.proj.ambientes, bloco = ambs[ambs.length - 1];
+                bloco.pav = 1;   /* um bloco vira 2º pavimento; o resto continua térreo */
+                W.M.commit('sobrado parcial'); t3.atualizar();
+                setTimeout(function () {
+                  var cena3 = t3._cena(), H3 = cena3.H, andarH3 = cena3.andarH, altos = [];
+                  cena3.G.estrutura.traverse(function (o) {
+                    if (!o.isMesh || !o.geometry || !o.geometry.parameters || o.geometry.parameters.width !== .2 || o.geometry.parameters.depth !== .2) return;
+                    if (o.geometry.parameters.height < H3 + 1) return;   /* pilar de um andar só: ok */
+                    var sobreBloco = o.position.x >= bloco.x * .01 - .3 && o.position.x <= (bloco.x + bloco.w) * .01 + .3 && o.position.z >= bloco.y * .01 - .3 && o.position.z <= (bloco.y + bloco.h) * .01 + .3;
+                    if (!sobreBloco) altos.push([o.position.x.toFixed(1), o.position.z.toFixed(1), o.geometry.parameters.height.toFixed(1)].join(','));
+                  });
+                  t('pilar de bloco térreo não sobe até o andar de cima (nenhum pilar solto no ar)', altos.length === 0, altos.slice(0, 4).join(' | '));
+                  fim();
+                }, 700);
+              }, 200);
+            }, 500);
           }, 150);
         }, 400);
       }, 150);

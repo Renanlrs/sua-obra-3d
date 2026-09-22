@@ -16,6 +16,7 @@ var ICONS = {
   chev:    '<path d="m15 18-6-6 6-6"/>',
   cursor:  '<path d="m4 3 7 17 2.5-6.5L20 11z"/>',
   addroom: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 9v6M9 12h6"/>',
+  cobertura: '<path d="m2 11 10-6 10 6"/><path d="M5 11v9M19 11v9"/><path d="M5 20h14" stroke-dasharray="3 2"/>',   /* telhado sobre dois pilares */
   hand:    '<path d="M8 13V5a1.5 1.5 0 0 1 3 0v6"/><path d="M11 11V4a1.5 1.5 0 0 1 3 0v7"/><path d="M14 11V6a1.5 1.5 0 0 1 3 0v7"/><path d="M17 11a1.5 1.5 0 0 1 3 0v3a7 7 0 0 1-7 7h-1a7 7 0 0 1-7-7v-1a1.5 1.5 0 0 1 3 0"/>',
   fit:     '<path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/>',
   grid:    '<path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',

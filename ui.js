@@ -107,6 +107,10 @@ var UI = (function () {
       if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true); } }
       if (q.get('fprompt') && viewAtual === 'tresd') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true, +q.get('fz') || 1); }
       if (q.get('fach')) { try { M.proj.fachada = Object.assign(M.proj.fachada || {}, JSON.parse(q.get('fach'))); } catch (e) {} if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true, +q.get('fz') || 1); } }   /* &fach={"cobertura":"galpao"} (conferência) */
+      if (q.get('cob')) {   /* &cob=garagem|piscina|pergolado|quadra|1 (conferência) */
+        var ks = q.get('cob').split(','); ks.forEach(function (k2) { novaCobertura(COB_PRESETS[k2] || {}); });
+        if (viewAtual === 'planta') { PLAN.render(); } if (t3) t3.atualizar();
+      }
       if (q.has('painel') && viewAtual === 'tresd') { var ptg = document.querySelector('#fach-tg'); if (ptg) { var quer = q.get('painel') !== '0'; if (quer !== ptg.classList.contains('on')) ptg.click(); } }   /* &painel=1|0 força o painel da fachada */
       if (q.has('noite') && t3) t3.setNoite(true);
       /* &fpop=janela abre o popover de troca · &ctx=amb|mov|vazio abre o menu de contexto — conferência e print */
@@ -628,12 +632,13 @@ var UI = (function () {
   function selTap(){ if (isMobile() && (PLAN.atual() || PLAN.movAtual())) setInsp(true, true); }
 
   function inspector(){
-    var a = PLAN.atual(), p = M.proj, h = '', mv = PLAN.movAtual();
+    var a = PLAN.atual(), p = M.proj, h = '', mv = PLAN.movAtual(), cb2 = PLAN.cobAtual();
     if (PLAN.multi.length > 1) { inspectorGrupo(); return; }
     if (isMobile()) {
-      if (!a && !mv && inspPorSel) setInsp(false);
+      if (!a && !mv && !cb2 && inspPorSel) setInsp(false);
       h += '<button class="icon-btn insp-close" onclick="UI.fecharInsp()" title="Fechar">' + icon('close') + '</button>';
     }
+    if (cb2) { insp.innerHTML = h + htmlCobertura(cb2); ligarCobertura(cb2, insp); return; }
     if (mv && window.MOVEIS) {
       var d = MOVEIS.def(mv.k) || {nome:'Móvel', cat:''}, dm = MOVEIS.dims(mv), amb = M.ambienteDe(mv);
       var cat = MOVEIS.CATS.filter(function (c) { return c.k === d.cat; })[0];
@@ -712,6 +717,110 @@ var UI = (function () {
     }
     insp.innerHTML = h;
     ligarInspector(a);
+  }
+  /* ================= COBERTURA INDEPENDENTE (telhado à parte, sobre os próprios pilares) =================
+     O mesmo bloco serve ao inspector da planta e ao popover do 3D — uma fonte, dois lugares. */
+  function htmlCobertura(c, compacto){
+    var f = M.cobCfg(c), h = '';
+    function chips(k, mapa, atual){ return '<div class="chips">' + Object.keys(mapa).map(function (v) { var r = mapa[v]; return '<button class="chip' + (atual === v ? ' on' : '') + '" data-ck="' + k + '" data-cv="' + v + '" title="' + esc((r.desc || '')) + '">' + esc(r.rot || r) + '</button>'; }).join('') + '</div>'; }
+    function campoC(k, rot, val, un){ return '<div class="f"><label>' + rot + '</label><div class="inp"><input data-cm="' + k + '" value="' + val + '"><span class="un">' + (un || 'm') + '</span></div></div>'; }
+    if (!compacto) h += '<h4><span style="width:9px;height:9px;border-radius:2px;background:#8B5E3C;display:inline-block"></span>' + esc(c.nome) + '</h4><div class="sub">Cobertura independente · pilares próprios</div>' +
+      '<section><h6>NOME</h6><div class="f"><div class="inp"><input data-cnome value="' + esc(c.nome) + '"></div></div></section>';
+    h += '<section><h6>TIPO DE COBERTURA</h6>' + chips('tipo', M.COB_TIPOS, f.tipo) + '</section>';
+    if (f.tipo !== 'plana' && f.tipo !== 'pergolado' && f.tipo !== 'sombrite') h += '<section><h6>TELHA</h6>' + chips('telha', M.COB_TELHAS, f.telha) + '</section>';
+    if (f.tipo !== 'plana' && f.tipo !== 'pergolado' && f.tipo !== 'sombrite') h += '<section><h6>INCLINAÇÃO</h6>' + chips('incl', {baixa:'Baixa (12%)', media:'Média (30%)', alta:'Alta (45%)'}, f.incl) + '</section>';
+    h += '<section><h6>PILARES</h6>' + chips('pilarMat', M.PILAR_MATS, f.pilarMat) +
+      '<div class="f-row" style="margin-top:8px">' + campoC('pilarEsp', 'SEÇÃO', M.fmtMs(f.pilarEsp)) + campoC('alt', 'PÉ-DIREITO', M.fmtMs(f.alt)) + '</div>' +
+      '<h6 style="margin-top:10px">QUANTOS PILARES</h6><div class="f-row">' +
+      '<div class="f"><label>NA LARGURA</label><div class="chips">' + [2, 3, 4, 5, 6].map(function (n) { return '<button class="chip' + (Math.max(2, f.nx | 0) === n ? ' on' : '') + '" data-ck="nx" data-cv="' + n + '">' + n + '</button>'; }).join('') + '</div></div>' +
+      '<div class="f"><label>NA PROFUNDIDADE</label><div class="chips">' + [2, 3, 4, 5, 6].map(function (n) { return '<button class="chip' + (Math.max(2, f.ny | 0) === n ? ' on' : '') + '" data-ck="ny" data-cv="' + n + '">' + n + '</button>'; }).join('') + '</div></div></div>' +
+      '<div class="ins-empty">' + M.nPilares(c) + ' pilares no contorno (o miolo fica livre). Vão máximo entre eles: ' + M.fmtMs(Math.max(c.w / Math.max(1, Math.max(2, f.nx | 0) - 1), c.h / Math.max(1, Math.max(2, f.ny | 0) - 1))) + ' m.' +
+      (Math.max(c.w / Math.max(1, Math.max(2, f.nx | 0) - 1), c.h / Math.max(1, Math.max(2, f.ny | 0) - 1)) > 600 ? ' <b style="color:#FF9583">Vão acima de 6 m pede viga calculada — acrescente pilares.</b>' : '') + '</div></section>';
+    h += '<section><h6>MEDIDAS</h6><div class="f-row">' + campoC('w', 'LARGURA', M.fmtMs(c.w)) + campoC('h', 'PROFUND.', M.fmtMs(c.h)) + '</div>' +
+      '<div class="f-row">' + campoC('x', 'X', M.fmtMs(c.x)) + campoC('y', 'Y', M.fmtMs(c.y)) + '</div>' +
+      '<div class="f-row">' + campoC('beiral', 'BEIRAL', M.fmtMs(f.beiral)) + '</div>' +
+      '<div class="kv derived"><span>Área coberta</span><b>' + M.fmtM2(M.areaCob(c) * 10000) + '</b></div></section>';
+    h += '<section><h6>DETALHES</h6><div class="chips">' +
+      '<button class="chip' + (f.calha ? ' on' : '') + '" data-ck="calha" data-cv="' + (f.calha ? '0' : '1') + '">Calha e rufo</button>' +
+      '<button class="chip' + (f.forro ? ' on' : '') + '" data-ck="forro" data-cv="' + (f.forro ? '0' : '1') + '">Forro</button></div>' +
+      '<h6 style="margin-top:10px">COR</h6><div class="swatches">' +
+      ['', '#3A3F45', '#B5533A', '#6F6E6B', '#E4E6E3', '#2F5D8A', '#4E9A5D', '#7A5230'].map(function (cor) {
+        return '<button class="sw-btn' + ((f.cor || '') === cor ? ' on' : '') + '" data-ck="cor" data-cv="' + cor + '" style="background:' + (cor || 'repeating-linear-gradient(45deg,#8FA3B1,#8FA3B1 4px,#5C6B78 4px,#5C6B78 8px)') + '" title="' + (cor || 'Cor do material') + '"></button>';
+      }).join('') + '<label class="sw-btn sw-custom" title="Qualquer cor" style="background:conic-gradient(#E4574F,#F2C14E,#4E9A5D,#22B8D6,#6B4E9E,#E4574F)"><input type="color" data-ccor value="' + (f.cor || '#888888') + '"></label></div></section>';
+    if (M.nPavs() > 1) {
+      h += '<section><h6>PAVIMENTO</h6><div class="chips">';
+      for (var pv3 = 0; pv3 < M.nPavs(); pv3++) h += '<button class="chip' + ((c.pav || 0) === pv3 ? ' on' : '') + '" data-ck="pav" data-cv="' + pv3 + '">' + M.nomePav(pv3) + '</button>';
+      h += '</div></section>';
+    }
+    var itens = M.custoCoberturaItens(c);
+    h += '<section><h6>QUANTO CUSTA</h6>' + itens.map(function (i) { return kv(i.rot, M.fmtBRL(i.valor), ''); }).join('') +
+      '<div class="kv tot"><span>Esta cobertura</span><b>' + M.fmtBRL(itens.reduce(function (s2, i) { return s2 + i.valor; }, 0)) + '</b></div></section>';
+    h += '<section><h6>AÇÕES</h6><div class="acts">' +
+      '<button class="btn" data-cact="dup">Duplicar <kbd style="margin-left:auto">Ctrl D</kbd></button>' +
+      '<button class="btn" data-cact="girar">Girar 90°</button>' +
+      '<button class="btn danger" data-cact="del">Excluir <kbd style="margin-left:auto">Del</kbd></button></div>' +
+      '<div class="ins-empty" style="margin-top:6px">Arraste no 3D ou na planta para mudar de lugar; as alças redimensionam.</div></section>';
+    return h;
+  }
+  function ligarCobertura(c, raiz, depois){
+    function mudou(nome){ M.commit(nome); if (t3) t3.atualizar(true); PLAN.render(); refreshTop(); if (depois) depois(); else inspector(); }
+    raiz.querySelectorAll('[data-ck]').forEach(function (b) { b.onclick = function () {
+      var k = b.getAttribute('data-ck'), v = b.getAttribute('data-cv');
+      if (k === 'calha' || k === 'forro') c[k] = v === '1';
+      else if (k === 'nx' || k === 'ny' || k === 'pav') c[k] = +v;
+      else c[k] = v;
+      if (k === 'pilarMat') delete c.pilarEsp;   /* seção volta ao padrão do material escolhido */
+      mudou('Cobertura: ' + k);
+    }; });
+    raiz.querySelectorAll('input[data-cm]').forEach(function (inp) {
+      inp.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); };
+      inp.onchange = function () {
+        var k = inp.getAttribute('data-cm'), n = M.parseM(this.value); if (n === null) { inspector(); return; }
+        var min = {w:100, h:100, alt:180, pilarEsp:8, beiral:0, x:-500, y:-500}[k];
+        c[k] = Math.max(min, Math.round(n));
+        mudou('Medida da cobertura');
+      };
+    });
+    var nm = raiz.querySelector('[data-cnome]');
+    if (nm) { nm.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); }; nm.onchange = function () { c.nome = this.value.trim() || 'Cobertura'; mudou('Renomear cobertura'); }; }
+    var cc = raiz.querySelector('input[data-ccor]');
+    if (cc) { cc.onchange = function () { c.cor = this.value.toUpperCase(); mudou('Cor da cobertura'); }; cc.onclick = function (e) { e.stopPropagation(); }; }
+    raiz.querySelectorAll('[data-cact]').forEach(function (b) { b.onclick = function () { acaoCobertura(c, b.getAttribute('data-cact')); }; });
+  }
+  function acaoCobertura(c, act){
+    if (act === 'del') { M.removerCobertura(c.id); M.commit('Excluir cobertura'); PLAN.selecionarCob(null); if (t3) t3.atualizar(true); PLAN.render(); inspector(); refreshTop(); fecharPop(); toast('Cobertura excluída.', function () { fazerUndo(); }); return; }
+    if (act === 'dup') { var n = M.addCobertura(JSON.parse(JSON.stringify(Object.assign({}, c, {id:undefined, x:c.x + 60, y:c.y + 60, nome:c.nome + ' (cópia)'})))); M.commit('Duplicar cobertura'); PLAN.selecionarCob(n.id); }
+    else if (act === 'girar') { var w = c.w; c.w = c.h; c.h = w; var nx = c.nx; c.nx = c.ny || 2; c.ny = nx || 2; M.commit('Girar cobertura'); }
+    if (t3) t3.atualizar(true); PLAN.render(); inspector(); refreshTop();
+  }
+  /* atalhos prontos: o que a maioria das pessoas quer cobrir */
+  var COB_PRESETS = {
+    garagem:   {nome:'Garagem coberta',   w:600, h:520, tipo:'uma',       telha:'metalica', alt:250, pilarMat:'metalico', nx:2, ny:2, sobre:'garagem'},
+    piscina:   {nome:'Área da piscina',   w:800, h:600, tipo:'duas',      telha:'policarbonato', alt:280, pilarMat:'metalico', nx:3, ny:2, sobre:'agua'},
+    pergolado: {nome:'Pergolado',         w:400, h:400, tipo:'pergolado', alt:260, pilarMat:'madeira', nx:2, ny:2, calha:false, sobre:'externo'},
+    quadra:    {nome:'Quadra coberta',    w:1800, h:3000, tipo:'duas',    telha:'sanduiche', incl:'baixa', alt:600, pilarMat:'metalico', nx:3, ny:5, beiral:80}
+  };
+  /* preset com `sobre`: nasce em volta do ambiente daquele tipo (piscina sobre a lâmina, garagem sobre a vaga) */
+  function lugarPreset(op){
+    if (!op.sobre) return null;
+    var alvos = M.ambsPav(M.pav).filter(function (a) { return a.tipo === op.sobre || (op.sobre === 'garagem' && /garagem|vaga/i.test(a.nome)); })
+      .sort(function (a, b) { return b.w * b.h - a.w * a.h; });
+    var a = alvos[0]; if (!a) return null;
+    var folga = op.sobre === 'agua' ? 120 : 40, t = M.proj.terreno;
+    var w = Math.min(t.largura, a.w + folga * 2), h = Math.min(t.profundidade, a.h + folga * 2);
+    return {x:Math.max(0, Math.min(t.largura - w, a.x - folga)), y:Math.max(0, Math.min(t.profundidade - h, a.y - folga)), w:w, h:h, alvo:a.nome};
+  }
+  /* cria uma cobertura no lugar livre mais próximo e seleciona */
+  function novaCobertura(op){
+    op = op || {};
+    var sobre = lugarPreset(op), w = sobre ? sobre.w : (op.w || 500), h = sobre ? sobre.h : (op.h || 700);
+    var pos = sobre || M.lugarLivreCob(w, h, M.pav);
+    var dados = Object.assign({}, op, {w:w, h:h, x:pos.x, y:pos.y, pav:M.pav}); delete dados.sobre;
+    var c = M.addCobertura(dados);
+    M.commit('Criar cobertura');
+    if (t3) t3.atualizar(true); PLAN.selecionarCob(c.id); PLAN.render(); inspector(); refreshTop();
+    toast(sobre ? c.nome + ' criada sobre ' + sobre.alvo + ' — telhado à parte, sobre os próprios pilares.' : 'Cobertura independente criada: telhado à parte sobre os próprios pilares. Arraste para posicionar.', function () { fazerUndo(); });
+    return c;
   }
   /* grupo selecionado pelo laço: N itens, ações em bloco */
   function inspectorGrupo(){
@@ -1094,6 +1203,11 @@ var UI = (function () {
     {n:'Passeio 3D pela casa', g:'',       f:function(){ irPara('tresd'); if (t3) t3.setModo('tour'); }},
     {n:'Exportar passeio 3D (.html)', g:'', f:function(){ exportar('html'); }},
     {n:'Mobiliar (catálogo de móveis)', g:'M', f:function(){ if (viewAtual !== 'planta' && viewAtual !== 'tresd') irPara('planta'); toggleCatalogo(true); }},
+    {n:'Cobertura independente (telhado à parte)', g:'T', f:function(){ novaCobertura(); }},
+    {n:'Cobrir a garagem',    g:'', f:function(){ novaCobertura(COB_PRESETS.garagem); }},
+    {n:'Cobrir a área da piscina', g:'', f:function(){ novaCobertura(COB_PRESETS.piscina); }},
+    {n:'Pergolado',           g:'', f:function(){ novaCobertura(COB_PRESETS.pergolado); }},
+    {n:'Quadra / galpão coberto', g:'', f:function(){ novaCobertura(COB_PRESETS.quadra); }},
     {n:'Mobiliar automaticamente', g:'', f:function(){ M.mobiliarAuto(); M.commit('Mobiliar automaticamente'); if (viewAtual === 'planta') PLAN.render(); inspector(); toast(M.proj.moveis.length + ' móveis colocados.'); }},
     {n:'Ver em 2D (planta)',   g:'2',      f:function(){ irPara('planta'); }},
     {n:'Fachada (painel de design no 3D)', g:'F', f:function(){ irPara('fachada'); }},
@@ -1200,7 +1314,7 @@ var UI = (function () {
       if (e.key === ' ') { espaco = true; e.preventDefault(); }
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? fazerRedo() : fazerUndo(); return; }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); if (PLAN.multi.length > 1) acaoGrupo('dup'); else if (PLAN.movAtual()) acaoMovel('dup', PLAN.sel); else if (PLAN.sel) duplicar(PLAN.sel); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); if (PLAN.multi.length > 1) acaoGrupo('dup'); else if (PLAN.cobAtual()) acaoCobertura(PLAN.cobAtual(), 'dup'); else if (PLAN.movAtual()) acaoMovel('dup', PLAN.sel); else if (PLAN.sel) duplicar(PLAN.sel); return; }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && viewAtual === 'planta') {   /* Ctrl+A: seleciona tudo do andar */
         e.preventDefault(); var tudo = M.ambsPav(M.pav).map(function (a) { return {t:'amb', id:a.id}; }); if (tudo.length > 1) { PLAN.setMulti(tudo); toast(tudo.length + ' ambientes selecionados (os móveis vão junto).'); } return;
       }
@@ -1208,7 +1322,7 @@ var UI = (function () {
       if (e.ctrlKey || e.metaKey) return;
 
       var k = e.key.toLowerCase();
-      if (k === 'delete' || k === 'backspace') { if (PLAN.multi.length > 1) { e.preventDefault(); acaoGrupo('del'); } else if (PLAN.movAtual()) { e.preventDefault(); acaoMovel('del', PLAN.sel); } else if (PLAN.sel) { e.preventDefault(); excluir(PLAN.sel); } return; }
+      if (k === 'delete' || k === 'backspace') { if (PLAN.multi.length > 1) { e.preventDefault(); acaoGrupo('del'); } else if (PLAN.cobAtual()) { e.preventDefault(); acaoCobertura(PLAN.cobAtual(), 'del'); } else if (PLAN.movAtual()) { e.preventDefault(); acaoMovel('del', PLAN.sel); } else if (PLAN.sel) { e.preventDefault(); excluir(PLAN.sel); } return; }
       if (k === 'm') { if (viewAtual === 'planta' || viewAtual === 'tresd') toggleCatalogo(); return; }
       if (k === '2') { irPara('planta'); return; }
       if (k === 'r' && e.shiftKey && PLAN.movAtual()) { acaoMovel('rot', PLAN.sel); return; }
@@ -1217,6 +1331,7 @@ var UI = (function () {
       if (k === '[') { document.getElementById('app').classList.toggle('side-off'); PLAN.render(); return; }
       if (k === 'v') setTool('sel');
       if (k === 'r') setTool('room');
+      if (k === 't' && viewAtual === 'planta') setTool('cob');   /* T = telhado à parte */
       if (k === 'g') $('#btn-grid').click();
       if (k === 'c') $('#btn-cotas').click();
       if (k === 'p') irPara('planta');
@@ -1230,6 +1345,13 @@ var UI = (function () {
         e.preventDefault();
         var pg = e.shiftKey ? 50 : 5, gdx = k === 'arrowleft' ? -pg : k === 'arrowright' ? pg : 0, gdy = k === 'arrowup' ? -pg : k === 'arrowdown' ? pg : 0;
         PLAN.moverGrupo(PLAN.itensGrupo(), gdx, gdy); M.commit('Mover grupo'); PLAN.render(); inspector(); return;
+      }
+      if (k.indexOf('arrow') === 0 && PLAN.cobAtual()) {
+        e.preventDefault();
+        var cc4 = PLAN.cobAtual(), pc4 = e.shiftKey ? 50 : 5;
+        if (k === 'arrowleft') cc4.x -= pc4; if (k === 'arrowright') cc4.x += pc4;
+        if (k === 'arrowup') cc4.y -= pc4;   if (k === 'arrowdown') cc4.y += pc4;
+        M.commit('Mover cobertura'); if (t3) t3.atualizar(true); PLAN.render(); inspector(); return;
       }
       if (k.indexOf('arrow') === 0 && PLAN.movAtual()) {
         e.preventDefault();
@@ -1255,7 +1377,8 @@ var UI = (function () {
   function setTool(t){
     PLAN.setTool(t);
     document.querySelectorAll('#tools [data-tool]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tool') === t); });
-    if (stage) stage.style.cursor = t === 'pan' ? 'grab' : (t === 'room' ? 'crosshair' : 'default');
+    if (stage) stage.style.cursor = t === 'pan' ? 'grab' : (t === 'room' || t === 'cob' ? 'crosshair' : 'default');
+    if (t === 'cob') toast('Arraste na planta para desenhar a área coberta — ou solte e ajuste depois.');
   }
 
   /* ================= 3D ================= */
@@ -1272,6 +1395,7 @@ var UI = (function () {
     t3 = TRES.montar(st, {modo:'orbit', on:{
       fachadaClique: popFachada, fachadaHover: dicaFachada,
       abMove: abMove3d, abFim: abFim3d, abCancel: abCancel3d, letreiroMove: letreiroMove3d, letreiroFim: letreiroFim3d, letreiroCancel: letreiroCancel3d,
+      cobMove: cobMove3d, cobFim: cobFim3d, cobCancel: cobCancel3d,
       noite: function (n) { pad.querySelectorAll('#fach-hora button').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-hora') === 'noite') === n); }); },
       modo: modos,
       paradas: function (ps) {
@@ -1310,12 +1434,14 @@ var UI = (function () {
         '<button class="ctx-it" data-m="elev">' + (elev ? '✓ ' : '') + 'Elevação frontal (desenho técnico)</button>' +
         '<button class="ctx-it" data-m="estilos">✨ Ver a casa nos ' + Object.keys(TRES.FACHADA_PRESETS).length + ' estilos</button>' +
         '<button class="ctx-it" data-m="frente">🏠 Câmera na frente da casa</button>' +
+        '<button class="ctx-it" data-m="cob">⛱ Nova cobertura independente</button>' +
         '<button class="ctx-it" data-m="foto">📷 Salvar imagem (PNG)</button>' +
         '<button class="ctx-it" data-m="apres">▶ Apresentar ao cliente</button>';
       var r = this.getBoundingClientRect(); c.style.left = Math.max(8, Math.min(window.innerWidth - 268, r.right - 260)) + 'px'; c.style.top = (r.bottom + 6) + 'px'; c.hidden = false;
       c.querySelectorAll('[data-m]').forEach(function (b) { b.onclick = function () {
         var m = b.getAttribute('data-m'); c.hidden = true;
         if (m === 'elev') elevacao(); else if (m === 'estilos') compararEstilos(); else if (m === 'frente') t3.verFachada();
+        else if (m === 'cob') { var nc2 = novaCobertura(); t3.olharPara((nc2.x + nc2.w / 2) * .01, (nc2.y + nc2.h / 2) * .01, Math.max(nc2.w, nc2.h) * .01 * 1.6 + 6); }
         else if (m === 'foto') { var a = document.createElement('a'); a.href = t3.foto(); a.download = slug() + '-3d.png'; a.click(); toast('Imagem salva.'); }
         else if (m === 'apres') { var ap = document.getElementById('btn-apresentar'); if (ap) ap.click(); }
       }; });
@@ -1362,6 +1488,20 @@ var UI = (function () {
     });
     h += '</div></section>';
     h += '<section><h6>COBERTURA</h6>' + chips('cobertura', TRES.COBERTURAS) + coberturaExtra(F, chips, function (k, lista) { return corLivre(k, lista, F[k]); }) + '</section>';
+    /* coberturas independentes: telhado à parte sobre os próprios pilares (garagem, área da piscina, quadra, pergolado) */
+    var cobs = M.coberturas();
+    h += '<section><h6>COBERTURA INDEPENDENTE (TELHADO À PARTE)</h6>' +
+      (cobs.length ? '<div class="cob-lista">' + cobs.map(function (c) {
+        var fc = M.cobCfg(c), tot = M.custoCoberturaItens(c).reduce(function (s2, i) { return s2 + i.valor; }, 0);
+        return '<button class="cob-item" data-cob-sel="' + c.id + '"><b>' + esc(c.nome) + '</b><small>' + (M.COB_TIPOS[fc.tipo] || {}).rot + ' · ' + M.fmtMs(c.w) + ' × ' + M.fmtMs(c.h) + ' m · ' + M.nPilares(c) + ' pilares ' + (M.PILAR_MATS[fc.pilarMat] || {}).rot.toLowerCase() + (M.nPavs() > 1 ? ' · ' + M.nomePav(c.pav || 0) : '') + '</small><span>' + M.fmtBRL(tot) + '</span></button>';
+      }).join('') + '</div>' : '<div class="ins-empty">Nenhuma ainda. Uma cobertura independente tem pilares próprios e telhado à parte — garagem coberta, área da piscina, quadra, galpão, pergolado.</div>') +
+      '<div class="chips" style="margin-top:8px">' +
+        '<button class="chip" data-cob-nova="garagem">+ Garagem coberta</button>' +
+        '<button class="chip" data-cob-nova="piscina">+ Área da piscina</button>' +
+        '<button class="chip" data-cob-nova="pergolado">+ Pergolado</button>' +
+        '<button class="chip" data-cob-nova="quadra">+ Quadra / galpão</button>' +
+        '<button class="chip" data-cob-nova="">+ Vazia</button></div>' +
+      '<div class="ins-empty" style="margin-top:6px">Na planta, a ferramenta <b>telhado</b> (T) desenha a área arrastando. No 3D, clique na cobertura para editar e arraste para mover.</div></section>';
     h += '<section><h6>COR DA PAREDE</h6>' + corLivre('corParede', CORES_PAREDE, F.corParede) + '<h6 style="margin-top:10px">COR DE DESTAQUE</h6>' + corLivre('corDestaque', CORES_DEST, F.corDestaque) + '</section>';
     h += '<section><h6>REVESTIMENTO DA FRENTE</h6>' + chips('revestimento', ROT.revestimento) + '</section>';
     /* cor livre: paleta + seletor de qualquer cor (o chip "Outra" abre o seletor nativo) */
@@ -1444,6 +1584,13 @@ var UI = (function () {
     num.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); };
     /* medidas em metros (vazio = automático) */
     ligarAjustes(el, null);
+    el.querySelectorAll('[data-cob-sel]').forEach(function (b) { b.onclick = function () {
+      var c = M.coberturaDe(b.getAttribute('data-cob-sel')); if (!c) return;
+      PLAN.selecionarCob(c.id);
+      if (t3) { t3.setModo('orbit'); t3.olharPara((c.x + c.w / 2) * 0.01, (c.y + c.h / 2) * 0.01, Math.max(c.w, c.h) * 0.01 * 1.6 + 6); }
+      popFachada('cobAvulsa', window.innerWidth / 2 - 180, 120, c.id);
+    }; });
+    el.querySelectorAll('[data-cob-nova]').forEach(function (b) { b.onclick = function () { novaCobertura(COB_PRESETS[b.getAttribute('data-cob-nova')] || {}); fachPanel(); }; });
     [['fach-pl', 'portaLargura', .7, 6], ['fach-pa', 'portaAltura', 2, 4]].forEach(function (d) {
       var inp = el.querySelector('#' + d[0]); if (!inp) return;
       inp.onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') this.blur(); };
@@ -1535,7 +1682,7 @@ var UI = (function () {
   /* ================= CLICAR NO ITEM PARA TROCAR (fachada) =================
      O 3D etiqueta cada elemento (userData.fk). Clicou → popover ao lado do clique com SÓ as opções daquele item;
      cada escolha aplica na hora (com desfazer) e o popover continua aberto para comparar. */
-  var FK_ROT = {janela:'Janela', porta:'Porta de entrada', garagem:'Porta da garagem', cobertura:'Cobertura', parede:'Parede', revestimento:'Revestimento da frente',
+  var FK_ROT = {janela:'Janela', porta:'Porta de entrada', garagem:'Porta da garagem', cobertura:'Cobertura', cobAvulsa:'Cobertura independente', parede:'Parede', revestimento:'Revestimento da frente',
     destaque:'Volume de destaque', portao:'Portão', muro:'Muro', pisoFrente:'Piso da frente', jardim:'Jardim', marquise:'Marquise', letreiro:'Letreiro', vitrine:'Vitrine', portaInt:'Porta interna'};
   var FK_TOGGLES = ['jardim', 'marquise', 'iluminacao', 'pergolado', 'vitrine', 'letreiroLuz', 'totem', 'moldura', 'gradeJanela', 'brise', 'arandelas', 'vasos', 'bandeira', 'placaMuro', 'adesivo', 'logoComTexto'];
   function dicaFachada(fk, x, y, id){
@@ -1543,8 +1690,10 @@ var UI = (function () {
     if (!fk) { if (d) d.hidden = true; return; }
     if (!d) { d = document.createElement('div'); d.id = 'fhint'; d.className = 'fhint'; document.body.appendChild(d); }
     var amb = id ? M.proj.ambientes.filter(function (a) { return a.id === id.split('|')[0]; })[0] : null;
-    var arrasta = (id && (fk === 'janela' || fk === 'porta' || fk === 'garagem' || fk === 'portaInt')) || fk === 'letreiro';
-    d.textContent = (FK_ROT[fk] || fk) + (amb ? ' · ' + amb.nome : '') + ' — ' + (arrasta ? 'arraste para mover · clique para ' : 'clique para ') + (fk === 'janela' || fk === 'porta' ? 'trocar ou excluir' : fk === 'parede' ? 'pôr janela/porta ou trocar' : fk === 'letreiro' ? 'tamanho, arte e tipo' : 'trocar'); d.hidden = false;
+    var arrasta = (id && (fk === 'janela' || fk === 'porta' || fk === 'garagem' || fk === 'portaInt' || fk === 'cobAvulsa')) || fk === 'letreiro';
+    var cobH = fk === 'cobAvulsa' && id ? M.coberturaDe(id) : null;
+    if (cobH) arrasta = true;
+    d.textContent = (cobH ? cobH.nome : (FK_ROT[fk] || fk)) + (amb ? ' · ' + amb.nome : '') + ' — ' + (arrasta ? 'arraste para mover · clique para ' : 'clique para ') + (fk === 'janela' || fk === 'porta' ? 'trocar ou excluir' : fk === 'parede' ? 'pôr janela/porta ou trocar' : fk === 'letreiro' ? 'tamanho, arte e tipo' : cobH ? 'tipo, telha e pilares' : 'trocar'); d.hidden = false;
     d.style.left = Math.min(window.innerWidth - 220, x + 14) + 'px'; d.style.top = (y + 16) + 'px';
   }
   /* ---- arrasto no 3D: janela/porta/portão pela parede (pos/ppos em cm a partir do início da parede) e letreiro pela fachada (m) ---- */
@@ -1560,6 +1709,9 @@ var UI = (function () {
   function letreiroMove3d(v){ M.proj.fachada = M.proj.fachada || {}; if (!dragAntes) dragAntes = {let:true, x:M.proj.fachada.letreiroX, y:M.proj.fachada.letreiroY}; M.proj.fachada.letreiroX = v.x; M.proj.fachada.letreiroY = v.y; if (t3) t3.atualizar(true); }
   function letreiroFim3d(){ dragAntes = null; M.commit('Mover letreiro'); fachPanel(); fecharPop(); toast('Letreiro movido. Clique nele para tamanho e arte.', function () { fazerUndo(); }); }
   function letreiroCancel3d(){ if (dragAntes && dragAntes.let) { M.proj.fachada.letreiroX = dragAntes.x; M.proj.fachada.letreiroY = dragAntes.y; } dragAntes = null; if (t3) t3.atualizar(true); }
+  function cobMove3d(id, x, y){ var c = M.coberturaDe(id); if (!c) return; if (!dragAntes) dragAntes = {cob:id, x:c.x, y:c.y}; c.x = x; c.y = y; if (t3) t3.atualizar(true); }
+  function cobFim3d(id){ dragAntes = null; M.commit('Mover cobertura'); PLAN.selecionarCob(id); PLAN.render(); inspector(); refreshTop(); fecharPop(); toast('Cobertura movida. Clique nela para tipo, telha e pilares.', function () { fazerUndo(); }); }
+  function cobCancel3d(id){ var c = M.coberturaDe(id); if (c && dragAntes && dragAntes.cob === id) { c.x = dragAntes.x; c.y = dragAntes.y; } dragAntes = null; if (t3) t3.atualizar(true); }
   /* campos compartilhados pelo painel e pelo popover: cobertura (tipo, telha, inclinação, beiral, cor da estrutura), posição/tamanho do letreiro e arte dentro dele */
   var CORES_ESTR = ['#3A3F45', '#1F2326', '#A6ACB2', '#F4F4F1', '#C4553B', '#2F5D8A', '#4E9A5D', '#E0B44C', '#D9722B', '#6B4E9E'];
   function telhasDe(F){ if (!TRES.SEM_LAJE[F.cobertura]) return TRES.TELHAS; return {metalica:TRES.TELHAS.metalica, fibrocimento:TRES.TELHAS.fibrocimento, sanduiche:TRES.TELHAS.sanduiche}; }
@@ -1675,6 +1827,7 @@ var UI = (function () {
     else if (fk === 'jardim') h += sec('JARDIM', '<div class="chips">' + tg('jardim', 'Jardim') + tg('vasos', 'Vasos') + tg('iluminacao', 'Iluminação') + '</div>') + sec('PISO DA FRENTE', chips('pisoFrente', TRES.PISOS_FRENTE));
     else if (fk === 'marquise') h += sec('ENTRADA', '<div class="chips">' + tg('marquise', 'Marquise') + tg('pergolado', 'Pergolado') + tg('arandelas', 'Arandelas') + '</div>') + sec('COR DE DESTAQUE', cor('corDestaque', CORES_DEST));
     else if (fk === 'vitrine') h += sec('VITRINE', '<div class="chips">' + tg('vitrine', 'Vitrine na frente') + '</div>') + sec('VIDRO', chips('vidro', TRES.VIDROS)) + sec('ESQUADRIA', chips('esquadria', ROT.esquadria));
+    else if (fk === 'cobAvulsa') { var cAv = M.coberturaDe(id); if (cAv) h += '<section class="ab-sec"><h6>' + esc(cAv.nome).toUpperCase() + ' <small>cobertura independente</small></h6><div class="ins-empty">Arraste no 3D para mudar de lugar.</div></section>' + htmlCobertura(cAv, true); }
     else if (fk === 'letreiro') h += sec('POSIÇÃO E MEDIDA', letreiroPosHtml(F)) + sec('ARTE / LOGO', logoBloco() + logoAjusteHtml(F)) + sec('TIPO', chips('letreiroEstilo', {placa:'Placa', caixa:'Letra caixa', led:'LED', neon:'Neon', backlight:'Backlight'})) + sec('FORMATO', chips('letreiroFormato', TRES.LETREIRO_FORMATOS)) +
       sec('TAMANHO', '<div class="chips">' + Object.keys(TRES.LETREIRO_TAMS).map(function (v) { return '<button class="chip' + (F.letreiroTam === v && !F.letreiroLargura ? ' on' : '') + '" data-fk="letreiroTam" data-fv="' + v + '">' + TRES.LETREIRO_TAMS[v] + '</button>'; }).join('') + '</div>') +
       sec('FONTE', chips('letreiroFonte', TRES.LETREIRO_FONTES)) + sec('COR DAS LETRAS', cor('letreiroCor', ['#22B8D6', '#2F5D8A', '#C4553B', '#E0B44C', '#4E9A5D', '#D96AA0', '#F4F4F1', '#1F2326', '#D9722B', '#6B4E9E', '#C9A227', '#1E7E96'])) +
@@ -1719,6 +1872,7 @@ var UI = (function () {
     pop.querySelectorAll('[data-entrada]').forEach(function (b) { b.onclick = function () { var v = b.getAttribute('data-entrada'); if (v) M.proj.entradaEm = v; else delete M.proj.entradaEm; M.commit(v ? 'Entrada principal aqui' : 'Entrada automática'); fachPanel(); if (t3) t3.verFachada(true); popFachada(v ? 'porta' : 'parede', null, null, id); toast(v ? 'A entrada principal agora é nesta parede.' : 'Entrada volta ao automático.', function () { fazerUndo(); }); }; });
     ligarLogo(pop, function () { popFachada(fk, null, null, id); });
     ligarAjustes(pop, function () { popFachada(fk, null, null, id); });
+    if (fk === 'cobAvulsa') { var cAv2 = M.coberturaDe(id); if (cAv2) ligarCobertura(cAv2, pop, function () { popFachada(fk, null, null, id); }); }
     pop.querySelector('[data-close]').onclick = fecharPop;
     pop.querySelector('[data-undo]').onclick = function () { fazerUndo(); popFachada(fk, null, null, id); };
     pop.querySelector('[data-panel]').onclick = function () { fecharPop(); var pad3 = canvasWrap.querySelector('.view-pad.pad-3d'); if (viewAtual !== 'tresd') irPara('fachada'); else if (pad3 && !pad3.classList.contains('panel-on')) { var tgb = pad3.querySelector('#fach-tg'); if (tgb) tgb.click(); } var el = document.querySelector('#fach-panel'); if (el) { el.scrollTop = 0; el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 900); } };
@@ -1732,6 +1886,7 @@ var UI = (function () {
     var alvoAbx = e.target.closest ? e.target.closest('.ab') : null;
     if (alvoAbx) { popFachada(alvoAbx.getAttribute('data-fk'), e.clientX, e.clientY, alvoAbx.getAttribute('data-id') || null); return; }
     var alvoMov = e.target.closest ? e.target.closest('.mov') : null, alvoAmb = e.target.closest ? e.target.closest('.amb') : null;
+    var alvoCob = e.target.closest ? e.target.closest('.cob') : null;
     var p = PLAN.toModel(e), itens = [], titulo = '';
     function it(rot, fn, cls){ itens.push({rot:rot, fn:fn, cls:cls || ''}); }
     var noGrupo = PLAN.multi.length > 1 && ((alvoMov && PLAN.multi.some(function (m) { return m.t === 'mov' && m.id === alvoMov.getAttribute('data-id'); })) || (alvoAmb && PLAN.multi.some(function (m) { return m.t === 'amb' && m.id === alvoAmb.getAttribute('data-id'); })));
@@ -1749,6 +1904,13 @@ var UI = (function () {
       it('Trocar por outro…', function () { catCat = d ? d.cat : null; catBusca = ''; toggleCatalogo(true); toast('Escolha o novo móvel no catálogo — ele nasce no mesmo lugar.', null); trocaMovel = mid; });
       it('Medidas de fábrica', function () { acaoMovel('reset', mid); });
       it('Excluir', function () { acaoMovel('del', mid); }, 'danger');
+    } else if (alvoCob && !PLAN.bloq('coberturas')) {
+      var cc5 = M.coberturaDe(alvoCob.getAttribute('data-id')); if (!cc5) return;
+      PLAN.selecionarCob(cc5.id); titulo = cc5.nome + ' (cobertura)';
+      it('Girar 90°', function () { acaoCobertura(cc5, 'girar'); });
+      it('Duplicar', function () { acaoCobertura(cc5, 'dup'); });
+      Object.keys(M.COB_TIPOS).forEach(function (k) { if (k !== M.cobCfg(cc5).tipo) it('Virar ' + M.COB_TIPOS[k].rot.toLowerCase(), function () { cc5.tipo = k; M.commit('Cobertura: tipo'); if (t3) t3.atualizar(true); PLAN.render(); inspector(); }); });
+      it('Excluir', function () { acaoCobertura(cc5, 'del'); }, 'danger');
     } else if (alvoAmb) {
       var id = alvoAmb.getAttribute('data-id'), a = M.proj.ambientes.filter(function (x) { return x.id === id; })[0]; if (!a) return;
       PLAN.selecionar(id); titulo = a.nome;
@@ -1766,6 +1928,7 @@ var UI = (function () {
     } else {
       titulo = 'Aqui (' + M.fmtMs(p.x) + ' ; ' + M.fmtMs(p.y) + ' m)';
       it('Adicionar ambiente aqui…', function () { escolherAmbiente(e.clientX, e.clientY, p); });
+      it('Cobertura independente aqui (telhado à parte)', function () { novaCobertura({x:Math.round(p.x) - 250, y:Math.round(p.y) - 350}); });
       it('Copiar planta de uma foto…', function () { $('#foto-in').click(); });
       it('Mobiliar (catálogo)', function () { toggleCatalogo(true); });
       it('Mobiliar tudo automaticamente', function () { M.mobiliarAuto(); M.commit('Mobiliar automaticamente'); PLAN.render(); inspector(); });
@@ -1980,7 +2143,7 @@ var UI = (function () {
     boot:boot, irPara:irPara, inspector:inspector, refreshTop:refreshTop, setTool:setTool,
     editarCota:editarCota, renomearInline:renomearInline, addRoomDefault:addRoomDefault,
     radial:radial, addMovel:addMovel, acaoMovel:acaoMovel, toggleCatalogo:toggleCatalogo, htmlPasseio:htmlPasseio,
-    selTap:selTap, fecharInsp:function(){ setInsp(false); }, get t3(){ return t3; },
+    selTap:selTap, fecharInsp:function(){ setInsp(false); }, get t3(){ return t3; }, novaCobertura:novaCobertura, acaoCobertura:acaoCobertura,
     toast:toast, saveState:saveState, zoomLabel:zoomLabel, coord:coord, hud:hud, msg:msg, menuContexto:menuContexto, fecharPop:fecharPop, copiarDeFoto:copiarDeFoto, pedirChave:pedirChave, popFachada:popFachada,
     closeOverlays:closeOverlays, fecharApres:fecharApres, abrirApres:abrirApres, exportar:exportar,
     get shift(){ return shift; }, get alt(){ return alt; }, get espaco(){ return espaco; }

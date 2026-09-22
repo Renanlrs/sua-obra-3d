@@ -714,6 +714,7 @@ function TRES_ENGINE(THREE, M){
       telhaCeramica: mapa(T.telhaCeramica, 1, {side:THREE.DoubleSide}), telhaConcreto: mapa(T.telhaConcreto, 1, {side:THREE.DoubleSide}), telhaMetal: mapa(T.telhaMetal, 1, {side:THREE.DoubleSide}),
       telhaFibro: mapa(T.telhaFibro, 1, {side:THREE.DoubleSide}), telhaSand: mapa(T.telhaSand, 1, {side:THREE.DoubleSide, roughness:.55, metalness:.15}),
       policarbonato: std('#CFE9F2', {transparent:true, opacity:.45, roughness:.2, side:THREE.DoubleSide}),
+      sombrite: std('#3E4A42', {transparent:true, opacity:.72, roughness:.95, side:THREE.DoubleSide}),
       esqBranca: std('#F4F4F1', {roughness:.5}), esqMadeira: std('#7A5230', {roughness:.6}),
       vidroNoite: new THREE.MeshStandardMaterial({color:'#FFE3A6', emissive:'#FFD27A', emissiveIntensity:.9, transparent:true, opacity:.85, roughness:.2, side:THREE.DoubleSide}),
       letreiroFundo: std('#1B1F24', {roughness:.6}), letreiroBranco: std('#F4F4F1', {roughness:.5}),
@@ -1379,6 +1380,135 @@ function TRES_ENGINE(THREE, M){
       var cal1 = alongX ? caixa(G.cobertura, W, .1, .12, matEstr, (X0 + X1) / 2, y0 - .1, Z0 + .06, false) : caixa(G.cobertura, .12, .1, D, matEstr, X0 + .06, y0 - .1, (Z0 + Z1) / 2, false);
       var cal2 = alongX ? caixa(G.cobertura, W, .1, .12, matEstr, (X0 + X1) / 2, y0 - .1, Z1 - .06, false) : caixa(G.cobertura, .12, .1, D, matEstr, X1 - .06, y0 - .1, (Z0 + Z1) / 2, false);
     }
+    /* barra fina entre dois pontos (tesoura/terça das coberturas independentes) */
+    function barraCob(a, b, sc, mat){
+      var L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]); if (L < .05) return null;
+      var m = new THREE.Mesh(new THREE.BoxGeometry(sc, sc, L), mat); m.castShadow = true;
+      m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); m.lookAt(b[0], b[1], b[2]);
+      G.cobertura.add(m); return m;
+    }
+    /* ---------- coberturas independentes (proj.coberturas): telhado à parte sobre os próprios pilares ----------
+       Garagem coberta, área da piscina, quadra, galpão separado, pergolado. Cada uma tem pilares (material à
+       escolha), frechais/terças e um telhado próprio; nada depende das paredes da casa. */
+    (proj.coberturas || []).forEach(function (c) {
+      fk('cobAvulsa', c.id);
+      var f = M.cobCfg ? M.cobCfg(c) : c, PM = (M.PILAR_MATS || {})[f.pilarMat] || {esp:20, cor:'#CFCBC2'};
+      var x0 = c.x * CM, z0 = c.y * CM, W = c.w * CM, D = c.h * CM, yb = (c.pav || 0) * andarH, alt = Math.max(1.8, (f.alt || 280) * CM);
+      var esp = Math.max(.08, (f.pilarEsp || PM.esp) * CM), bei = Math.max(0, (f.beiral || 0) * CM);
+      var matPil = f.pilarMat === 'metalico' ? (f.cor ? corMat(f.cor, {roughness:.4, metalness:.6}) : Mt.metal)
+        : f.pilarMat === 'madeira' ? Mt.esqMadeira
+        : f.pilarMat === 'pedra' ? Mt.pedra
+        : f.pilarMat === 'tubo' ? Mt.metal
+        : corMat(PM.cor, {roughness:.85});
+      var matVig = f.pilarMat === 'madeira' ? Mt.esqMadeira : (f.pilarMat === 'metalico' || f.pilarMat === 'tubo' ? Mt.metal : corMat('#CFCBC2', {roughness:.85}));
+      var matCob = f.tipo === 'sombrite' ? Mt.sombrite
+        : f.tipo === 'plana' ? Mt.laje
+        : f.telha === 'ceramica' ? Mt.telhaCeramica : f.telha === 'concreto' ? Mt.telhaConcreto
+        : f.telha === 'fibrocimento' ? Mt.telhaFibro : f.telha === 'sanduiche' ? Mt.telhaSand
+        : f.telha === 'policarbonato' || f.telha === 'vidro' ? Mt.policarbonato : Mt.telhaMetal;
+      if (f.cor && f.tipo !== 'sombrite' && f.telha !== 'policarbonato' && f.telha !== 'vidro') matCob = corMat(f.cor, {roughness:.6, side:THREE.DoubleSide});
+      /* ---- pilares: grade nx × ny nas bordas (canto sempre tem) ---- */
+      var nx = Math.max(2, (f.nx | 0) || 2), ny = Math.max(2, (f.ny | 0) || 2), pilares = [];
+      for (var i = 0; i < nx; i++) for (var j = 0; j < ny; j++) {
+        if (i > 0 && i < nx - 1 && j > 0 && j < ny - 1) continue;   /* miolo vazio: pilar só na borda */
+        var px = x0 + (nx === 1 ? W / 2 : esp / 2 + i * (W - esp) / (nx - 1)), pz = z0 + (ny === 1 ? D / 2 : esp / 2 + j * (D - esp) / (ny - 1));
+        pilares.push([px, pz]);
+        if (f.pilarMat === 'tubo') { var tb = cil(G.cobertura, esp / 2, alt, matPil, px, yb, pz, 14); tb.userData.fk = 'cobAvulsa'; tb.userData.fkid = c.id; }
+        else caixa(G.cobertura, esp, alt, esp, matPil, px, yb, pz);
+        if (f.pilarMat === 'concreto' || f.pilarMat === 'alvenaria' || f.pilarMat === 'pedra') caixa(G.cobertura, esp + .12, .08, esp + .12, matPil, px, yb, pz, false);   /* base alargada */
+      }
+      /* ---- frechais no topo dos pilares (viga de borda) ---- */
+      var vy = yb + alt, vh = .18;
+      caixa(G.cobertura, W, vh, esp * .8, matVig, x0 + W / 2, vy, z0 + esp / 2);
+      caixa(G.cobertura, W, vh, esp * .8, matVig, x0 + W / 2, vy, z0 + D - esp / 2);
+      caixa(G.cobertura, esp * .8, vh, D, matVig, x0 + esp / 2, vy, z0 + D / 2);
+      caixa(G.cobertura, esp * .8, vh, D, matVig, x0 + W - esp / 2, vy, z0 + D / 2);
+      /* ---- cobertura: águas, arco, laje, pergolado ou tela ---- */
+      var X0 = x0 - bei, X1 = x0 + W + bei, Z0 = z0 - bei, Z1 = z0 + D + bei, y0 = vy + vh, alongX = (X1 - X0) >= (Z1 - Z0);
+      var fator = {baixa:.12, media:.3, alta:.45}[f.incl] || .3, meia = (alongX ? Z1 - Z0 : X1 - X0) / 2, sobe = meia * fator, tri = [];
+      function q(a, b, cc, d){ tri.push(a, b, cc, a, cc, d); }
+      if (f.tipo === 'plana') {
+        var lj = caixa(G.cobertura, X1 - X0, .18, Z1 - Z0, matCob, (X0 + X1) / 2, y0, (Z0 + Z1) / 2); lj.userData.fk = 'cobAvulsa'; lj.userData.fkid = c.id;
+        caixa(G.cobertura, X1 - X0, .12, .1, corMat('#E8E4DC'), (X0 + X1) / 2, y0 + .18, Z0 + .05, false);   /* platibandinha da frente */
+      } else if (f.tipo === 'pergolado') {
+        var nV = Math.max(3, Math.round((alongX ? X1 - X0 : Z1 - Z0) / .4));
+        for (var v = 0; v <= nV; v++) {
+          var t2 = v / nV;
+          if (alongX) caixa(G.cobertura, .06, .16, Z1 - Z0, matVig, X0 + (X1 - X0) * t2, y0, (Z0 + Z1) / 2, false);
+          else caixa(G.cobertura, X1 - X0, .16, .06, matVig, (X0 + X1) / 2, y0, Z0 + (Z1 - Z0) * t2, false);
+        }
+        if (alongX) { caixa(G.cobertura, X1 - X0, .1, .12, matVig, (X0 + X1) / 2, y0 + .16, Z0 + .3, false); caixa(G.cobertura, X1 - X0, .1, .12, matVig, (X0 + X1) / 2, y0 + .16, Z1 - .3, false); }
+        else { caixa(G.cobertura, .12, .1, Z1 - Z0, matVig, X0 + .3, y0 + .16, (Z0 + Z1) / 2, false); caixa(G.cobertura, .12, .1, Z1 - Z0, matVig, X1 - .3, y0 + .16, (Z0 + Z1) / 2, false); }
+      } else if (f.tipo === 'sombrite') {
+        var tela = caixa(G.cobertura, X1 - X0, .02, Z1 - Z0, matCob, (X0 + X1) / 2, y0 + .1, (Z0 + Z1) / 2, false); tela.userData.fk = 'cobAvulsa'; tela.userData.fkid = c.id;
+        [[X0, Z0], [X1, Z0], [X0, Z1], [X1, Z1]].forEach(function (p2) { caixa(G.cobertura, .06, .3, .06, matVig, p2[0], y0 - .1, p2[1], false); });
+      } else if (f.tipo === 'arco') {
+        var N = 12, prof2 = [];
+        for (var a2 = 0; a2 <= N; a2++) { var vv = 2 * meia * a2 / N, tt = (vv - meia) / meia; prof2.push([vv, y0 + Math.max(.9, meia * .5) * Math.sqrt(Math.max(0, 1 - tt * tt))]); }
+        prof2[0][1] = y0; prof2[N][1] = y0;
+        for (var s2 = 0; s2 < N; s2++) {
+          var A = prof2[s2], B = prof2[s2 + 1];
+          if (alongX) q([X0, A[1], Z0 + A[0]], [X1, A[1], Z0 + A[0]], [X1, B[1], Z0 + B[0]], [X0, B[1], Z0 + B[0]]);
+          else q([X0 + A[0], A[1], Z1], [X0 + A[0], A[1], Z0], [X0 + B[0], B[1], Z0], [X0 + B[0], B[1], Z1]);
+        }
+      } else if (f.tipo === 'uma') {   /* caimento único: sobe do fundo para a frente */
+        var y1u = y0 + 2 * meia * fator * .5;
+        if (alongX) { q([X0, y0, Z1], [X1, y0, Z1], [X1, y1u, Z0], [X0, y1u, Z0]); }
+        else { q([X0, y1u, Z0], [X0, y1u, Z1], [X1, y0, Z1], [X1, y0, Z0]); }
+      } else if (f.tipo === 'quatro') {
+        var y1q = y0 + sobe;
+        if (alongX) { var rx0 = X0 + meia, rx1 = X1 - meia, zm = (Z0 + Z1) / 2;
+          q([X0, y0, Z0], [X1, y0, Z0], [rx1, y1q, zm], [rx0, y1q, zm]); q([X1, y0, Z1], [X0, y0, Z1], [rx0, y1q, zm], [rx1, y1q, zm]);
+          tri.push([X0, y0, Z1], [X0, y0, Z0], [rx0, y1q, zm], [X1, y0, Z0], [X1, y0, Z1], [rx1, y1q, zm]);
+        } else { var rz0 = Z0 + meia, rz1 = Z1 - meia, xm = (X0 + X1) / 2;
+          q([X0, y0, Z1], [X0, y0, Z0], [xm, y1q, rz0], [xm, y1q, rz1]); q([X1, y0, Z0], [X1, y0, Z1], [xm, y1q, rz1], [xm, y1q, rz0]);
+          tri.push([X0, y0, Z0], [X1, y0, Z0], [xm, y1q, rz0], [X1, y0, Z1], [X0, y0, Z1], [xm, y1q, rz1]);
+        }
+      } else {   /* 2 águas */
+        var y1d = y0 + sobe;
+        if (alongX) { q([X0, y0, Z0], [X1, y0, Z0], [X1, y1d, (Z0 + Z1) / 2], [X0, y1d, (Z0 + Z1) / 2]); q([X1, y0, Z1], [X0, y0, Z1], [X0, y1d, (Z0 + Z1) / 2], [X1, y1d, (Z0 + Z1) / 2]); }
+        else { q([X0, y0, Z1], [X0, y0, Z0], [(X0 + X1) / 2, y1d, Z0], [(X0 + X1) / 2, y1d, Z1]); q([X1, y0, Z0], [X1, y0, Z1], [(X0 + X1) / 2, y1d, Z1], [(X0 + X1) / 2, y1d, Z0]); }
+      }
+      /* tesoura à vista quando o vão é grande: banzo inferior, montantes e diagonais nas linhas de pilar */
+      var vaoLivre = (alongX ? D : W) / 1, passoPil = alongX ? W / Math.max(1, nx - 1) : D / Math.max(1, ny - 1);
+      if (tri.length && vaoLivre > 4 && f.tipo !== 'arco') {
+        var alturaEm = function (t3v) {   /* altura do telhado no ponto t3v (0..1) atravessando o vão */
+          if (f.tipo === 'uma') return (1 - t3v) * (2 * meia * fator * .5);
+          return (1 - Math.abs(t3v - .5) * 2) * sobe;   /* 2 e 4 águas: pico no meio */
+        };
+        var nLinhas = alongX ? nx : ny, L0 = alongX ? X0 + bei : Z0 + bei, L1 = alongX ? X1 - bei : Z1 - bei;
+        for (var li = 0; li < nLinhas; li++) {
+          var u2 = nLinhas === 1 ? (L0 + L1) / 2 : L0 + (L1 - L0) * li / (nLinhas - 1);
+          var v0b = alongX ? Z0 + bei : X0 + bei, v1b = alongX ? Z1 - bei : X1 - bei, nD2 = Math.max(4, Math.round(vaoLivre / 1.5)) & ~1;
+          for (var d2 = 0; d2 < nD2; d2++) {
+            var ta = d2 / nD2, tb = (d2 + 1) / nD2;
+            var va = v0b + (v1b - v0b) * ta, vb2 = v0b + (v1b - v0b) * tb;
+            var ya = y0 + alturaEm(ta) - .1, yb2 = y0 + alturaEm(tb) - .1;
+            /* banzo inferior + montante + diagonal (barras finas de metal ou madeira) */
+            var A2 = alongX ? [u2, y0 - .12, va] : [va, y0 - .12, u2], B2 = alongX ? [u2, y0 - .12, vb2] : [vb2, y0 - .12, u2];
+            var C2 = alongX ? [u2, ya, va] : [va, ya, u2], D2b = alongX ? [u2, yb2, vb2] : [vb2, yb2, u2];
+            barraCob(A2, B2, .07, matVig); barraCob(A2, C2, .05, matVig); barraCob(d2 % 2 ? A2 : C2, d2 % 2 ? D2b : B2, .04, matVig);
+          }
+        }
+      }
+      if (tri.length) {
+        var posC = [], uvC = [];
+        tri.forEach(function (v2) { posC.push(v2[0], v2[1], v2[2]); if (alongX) uvC.push(v2[0], v2[2] + v2[1] * 1.2); else uvC.push(v2[2], v2[0] + v2[1] * 1.2); });
+        var gC = new THREE.BufferGeometry(); gC.setAttribute('position', new THREE.Float32BufferAttribute(posC, 3)); gC.setAttribute('uv', new THREE.Float32BufferAttribute(uvC, 2)); gC.computeVertexNormals();
+        var mC = new THREE.Mesh(gC, matCob); mC.castShadow = true; mC.receiveShadow = true; mC.userData.fk = 'cobAvulsa'; mC.userData.fkid = c.id; mC.userData.pronto = matCob; mC.userData.cru = Mt.cruLaje; G.cobertura.add(mC);
+        if (f.forro) caixa(G.cobertura, X1 - X0 - .1, .04, Z1 - Z0 - .1, corMat('#F2EFE8'), (X0 + X1) / 2, y0 - .05, (Z0 + Z1) / 2, false);
+      }
+      if (f.calha && f.tipo !== 'pergolado' && f.tipo !== 'sombrite' && f.tipo !== 'plana') {   /* calha no beiral mais baixo */
+        var mCal = corMat('#B9BDC1', {roughness:.5, metalness:.3});
+        if (alongX) { caixa(G.cobertura, X1 - X0, .1, .1, mCal, (X0 + X1) / 2, y0 - .1, Z0 + .05, false); caixa(G.cobertura, X1 - X0, .1, .1, mCal, (X0 + X1) / 2, y0 - .1, Z1 - .05, false); }
+        else { caixa(G.cobertura, .1, .1, Z1 - Z0, mCal, X0 + .05, y0 - .1, (Z0 + Z1) / 2, false); caixa(G.cobertura, .1, .1, Z1 - Z0, mCal, X1 - .05, y0 - .1, (Z0 + Z1) / 2, false); }
+      }
+      /* piso de concreto sob a cobertura (só quando não cai sobre um ambiente) */
+      var sobreAmb = an.ambs.some(function (r) { return c.x < r.x + r.w && c.x + c.w > r.x && c.y < r.y + r.h && c.y + c.h > r.y; });
+      if (!sobreAmb && (c.pav || 0) === 0) { var pc3 = plano(G.terreno, W, D, Mt.concreto, x0 + W / 2, .012, z0 + D / 2); pc3.userData.fk = 'cobAvulsa'; pc3.userData.fkid = c.id; }
+      fk(null);
+    });
+
     /* ---------- letreiro com o nome do estabelecimento + totem ---------- */
     fk('letreiro');
     var logoImg = F.logo ? imagem(F.logo) : null, letreiroInfo = null;
@@ -1514,10 +1644,15 @@ function TRES_ENGINE(THREE, M){
         vg.receiveShadow = false;
       });
     });
+    function altNo(xc, yc){   /* até onde o pilar sobe naquele ponto: topo do andar mais alto que existe ali */
+      var top = 0;
+      andares.forEach(function (d) { if (d.an.ambs.some(function (r) { return xc >= r.x - 1 && xc <= r.x + r.w + 1 && yc >= r.y - 1 && yc <= r.y + r.h + 1; })) top = Math.max(top, d.pav); });
+      return top * andarH + H;
+    }
     Object.keys(nos).forEach(function (k) {
       var x = nos[k][0] * CM, z = nos[k][1] * CM;
       caixa(G.estrutura, .9, .35, .9, Mt.concretoEstr, x, -.75, z, false);           /* sapata */
-      caixa(G.estrutura, .2, altTotal + .5, .2, Mt.concretoEstr, x, -.45, z);         /* pilar até o último andar */
+      caixa(G.estrutura, .2, altNo(nos[k][0], nos[k][1]) + .5, .2, Mt.concretoEstr, x, -.45, z);   /* pilar só até o andar que existe ali (bloco térreo não ganha pilar de sobrado) */
       [[-.05, -.05], [.05, -.05], [-.05, .05], [.05, .05]].forEach(function (o) {  /* arranques de ferro */
         var f = cil(G.estrutura, .008, .6, Mt.ferro, x + o[0], H + .05, z + o[1], 5); f.userData.ferro = true; f.castShadow = false;
       });
@@ -1740,7 +1875,11 @@ function TRES_ENGINE(THREE, M){
       /* pegou uma janela/porta/portão (ou o letreiro) com o botão esquerdo → arrasta pela parede; soltar sem mover = clique normal (popover) */
       if (op.arrastar !== false && e.button === 0 && !e.shiftKey && modo !== 'tour' && !arrastoMov && cb.abMove) {
         var fa = sobFachada(e);
-        if (fa && fa.id && AB_ARRASTA[fa.fk]) {
+        if (fa && fa.fk === 'cobAvulsa' && fa.id && cb.cobMove) {   /* cobertura independente: arrasta na altura em que foi pega (o telhado anda junto com o ponteiro) */
+          var cc = (M.coberturaDe && M.coberturaDe(fa.id)) || null, yPlano = fa.p ? fa.p.y : (cc ? (cc.pav || 0) * (cena.andarH || 2.95) : 0);
+          var pcb = cc ? noPlano(e, yPlano) : null;
+          if (cc && pcb) arrastoCob = {id:fa.id, off:{x:pcb.x / CM - cc.x, y:pcb.z / CM - cc.y}, ultimo:0, mudou:false, pend:null, y:yPlano};
+        } else if (fa && fa.id && AB_ARRASTA[fa.fk]) {
           var ia = infoAbertura(fa.fk, fa.id), pa = ia ? noPlanoParede(e, ia) : null;
           if (ia && pa != null) arrastoAb = {fk:fa.fk, id:fa.id, chaveOv:AB_ARRASTA[fa.fk], off:pa - ia.centro, ultimo:0, mudou:false, pend:null};
         } else if (fa && fa.fk === 'letreiro' && cena.letreiro && cb.letreiroMove) {
@@ -1751,12 +1890,19 @@ function TRES_ENGINE(THREE, M){
       if (Object.keys(ptr).length === 2) {   /* 2º dedo = pinça: cancela o arrasto de janela/letreiro sem gravar */
         var k = Object.keys(ptr); arrasto = {pinch: dist2(ptr[k[0]], ptr[k[1]]), dist: orbD.dist};
         if (arrastoAb) { var ca = arrastoAb; arrastoAb = null; canvas.style.cursor = ''; if (ca.mudou && cb.abCancel) cb.abCancel(ca.id, ca.chaveOv); }
+        if (arrastoCob) { var cc3 = arrastoCob; arrastoCob = null; canvas.style.cursor = ''; if (cc3.mudou && cb.cobCancel) cb.cobCancel(cc3.id); }
         if (arrastoLet) { var cl = arrastoLet; arrastoLet = null; canvas.style.cursor = ''; if (cl.mudou && cb.letreiroCancel) cb.letreiroCancel(); }
       }
     });
     /* ---- arrasto de abertura: qual parede, qual abertura, centro atual (cm) ---- */
     var AB_ARRASTA = {janela:'pos', porta:'ppos', garagem:'ppos', portaInt:'ppos'}, AB_TIPO = {janela:'janela', porta:'entrada', garagem:'portao', portaInt:'porta'};
-    var arrastoAb = null, arrastoLet = null;
+    var arrastoAb = null, arrastoLet = null, arrastoCob = null;
+    function aplicarArrastoCob(agora){
+      if (!arrastoCob || !arrastoCob.pend) return;
+      if (agora !== true && performance.now() - arrastoCob.ultimo < 50) return;
+      var v = arrastoCob.pend; arrastoCob.pend = null; arrastoCob.ultimo = performance.now();
+      cb.cobMove(arrastoCob.id, v.x, v.y);
+    }
     function infoAbertura(fk, id){
       if (!cena) return null;
       var lista = [{an:cena.an, yb:0}].concat((cena.andares || []).map(function (d) { return {an:d.an, yb:d.yb}; }));
@@ -1803,10 +1949,16 @@ function TRES_ENGINE(THREE, M){
     on(canvas, 'pointermove', function (e) {
       var p = ptr[e.pointerId];
       if (!p) {   /* só passando o mouse: destaca o elemento de fachada clicável */
-        if (cb.fachadaHover && e.pointerType !== 'touch') { var fh = sobFachada(e), fhk = fh ? fh.fk + '|' + fh.id : null; if (fhk !== fkHover) { fkHover = fhk; canvas.style.cursor = fh ? (op.arrastar !== false && cb.abMove && ((fh.id && AB_ARRASTA[fh.fk]) || fh.fk === 'letreiro') ? 'grab' : 'pointer') : ''; cb.fachadaHover(fh ? fh.fk : null, e.clientX, e.clientY, fh ? fh.id : null); } }
+        if (cb.fachadaHover && e.pointerType !== 'touch') { var fh = sobFachada(e), fhk = fh ? fh.fk + '|' + fh.id : null; if (fhk !== fkHover) { fkHover = fhk; canvas.style.cursor = fh ? (op.arrastar !== false && cb.abMove && ((fh.id && (AB_ARRASTA[fh.fk] || fh.fk === 'cobAvulsa')) || fh.fk === 'letreiro') ? 'grab' : 'pointer') : ''; cb.fachadaHover(fh ? fh.fk : null, e.clientX, e.clientY, fh ? fh.id : null); } }
         return;
       }
       var dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+      if (arrastoCob) {
+        var cc2 = M.coberturaDe(arrastoCob.id), pcb2 = cc2 ? noPlano(e, arrastoCob.y) : null; if (!pcb2) return;
+        var nxc = Math.round((pcb2.x / CM - arrastoCob.off.x) / 5) * 5, nyc = Math.round((pcb2.z / CM - arrastoCob.off.y) / 5) * 5;
+        if (nxc !== cc2.x || nyc !== cc2.y) { arrastoCob.mudou = true; arrastoCob.pend = {x:nxc, y:nyc}; canvas.style.cursor = 'grabbing'; aplicarArrastoCob(); }
+        return;
+      }
       if (arrastoAb) {
         var ia2 = infoAbertura(arrastoAb.fk, arrastoAb.id); if (!ia2) return;
         var pa2 = noPlanoParede(e, ia2); if (pa2 == null) return;
@@ -1851,6 +2003,10 @@ function TRES_ENGINE(THREE, M){
     on(canvas, 'pointerup', soltar); on(canvas, 'pointercancel', soltar);
     function soltar(e){
       var p = ptr[e.pointerId]; delete ptr[e.pointerId]; arrasto = null;
+      if (arrastoCob) {
+        var ac2 = arrastoCob; aplicarArrastoCob(true); arrastoCob = null; canvas.style.cursor = '';
+        if (ac2.mudou) { if (cb.cobFim) cb.cobFim(ac2.id); return; }
+      }
       if (arrastoAb) {
         var aa = arrastoAb; aplicarArrastoAb(true); arrastoAb = null; canvas.style.cursor = '';
         if (aa.mudou) { if (cb.abFim) cb.abFim(aa.id, aa.fk); return; }
@@ -1929,7 +2085,7 @@ function TRES_ENGINE(THREE, M){
       raycaster.setFromCamera(ndc, camera);
       if (!fkCache || fkCache.cena !== cena) { fkCache = []; fkCache.cena = cena; cena.raiz.traverse(function (o) { if (o.isMesh && o.userData.fk) fkCache.push(o); }); }
       var hits = raycaster.intersectObjects(fkCache, false);
-      for (var i = 0; i < hits.length; i++) { var o = hits[i].object, vis = true, p = o; while (p) { if (p.visible === false) { vis = false; break; } p = p.parent; } if (vis) return {fk:o.userData.fk, id:o.userData.fkid || null, dist:hits[i].distance}; }
+      for (var i = 0; i < hits.length; i++) { var o = hits[i].object, vis = true, p = o; while (p) { if (p.visible === false) { vis = false; break; } p = p.parent; } if (vis) return {fk:o.userData.fk, id:o.userData.fkid || null, dist:hits[i].distance, p:hits[i].point}; }
       return null;
     }
     function sob(e){
@@ -2030,6 +2186,10 @@ function TRES_ENGINE(THREE, M){
       get auto(){ return tour.auto; }, setAuto:function (v) { tour.auto = !!v; tour.autoT = 0; sujo = true; },
       setProgresso:setProgresso,
       luz:function (a, b, c, d) { luzManual = true; if (a === null) { luzManual = false; aplicarNoite(); return; } sol.intensity = a; hemi.intensity = b; amb.intensity = c; if (d !== undefined) sol.castShadow = !!d; sujo = true; }, _cena:function () { return cena; },
+      olharPara:function (x, z, dist) {   /* leva a câmera para um ponto do terreno (um item da lista, por exemplo) */
+        if (modo !== 'orbit') setModo('orbit');
+        orbD.alvo.set(x, 1.4, z); orbD.dist = clamp(dist || 14, 4, 80); orbD.phi = 1.15; sujo = true;
+      },
       atualizar:reconstruir, _dbg:function () { return {ptr:Object.keys(ptr), let:!!arrastoLet, ab:!!arrastoAb, mov:!!arrastoMov, modo:modo}; },
       telaDe:function (x, y, z) { var v = new THREE.Vector3(x, y, z).project(camera), r = canvas.getBoundingClientRect(); return {x:(v.x + 1) / 2 * r.width + r.left, y:(1 - v.y) / 2 * r.height + r.top}; },   /* ponto do mundo → tela (conferência e menus) */
       foto:function () { renderer.render(scene, camera); return canvas.toDataURL('image/png'); },

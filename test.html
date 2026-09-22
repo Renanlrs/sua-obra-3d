@@ -404,6 +404,45 @@ t('elevação 2D desenha galpão (tesoura), arco e shed com a cor da estrutura',
 M.proj.fachada = {cobertura:'galpao'};
 t('custo: galpão entra como cobertura com estrutura e a telha cerâmica não é cobrada como tal', M.custoFachadaItens().some(function (i) { return /galp/i.test(i.rot); }));
 M.proj.fachada = null;
+/* ---- 22/09: coberturas independentes (telhado à parte sobre os próprios pilares) ---- */
+M.novo('casa-terrea', 1000, 2500);
+t('projeto nasce sem cobertura independente', M.coberturas().length === 0);
+var cb1 = M.addCobertura({nome:'Garagem coberta', x:100, y:500, w:600, h:520, tipo:'uma', pilarMat:'metalico'});
+t('cobertura criada entra na lista do andar e calcula área', M.coberturas().length === 1 && M.cobsPav(0).length === 1 && Math.abs(M.areaCob(cb1) - 31.2) < .01, M.areaCob(cb1) + ' m²');
+var fcb = M.cobCfg(cb1);
+t('cobCfg completa o que não foi escolhido e a seção vem do material', fcb.tipo === 'uma' && fcb.telha === 'metalica' && fcb.incl === 'media' && fcb.alt === 280 && fcb.pilarEsp === M.PILAR_MATS.metalico.esp, JSON.stringify(fcb));
+t('2 × 2 = 4 pilares no contorno', M.nPilares(cb1) === 4);
+cb1.nx = 4; cb1.ny = 3;
+t('4 × 3 = 12 lugares, mas o miolo fica livre → 10 pilares', M.nPilares(cb1) === 12 && (function () { var n = 0; for (var i = 0; i < 4; i++) for (var j = 0; j < 3; j++) if (!(i > 0 && i < 3 && j > 0 && j < 2)) n++; return n; })() === 10);
+cb1.nx = 2; cb1.ny = 2;
+var itC = M.custoCoberturaItens(cb1);
+t('custo: cobertura + pilares + calha; telha não é cobrada em pergolado', itC.length >= 3 && itC.some(function (i) { return /pilar/i.test(i.rot); }) && itC.some(function (i) { return /calha/i.test(i.rot); }) &&
+  !M.custoCoberturaItens({id:'x', nome:'P', x:0, y:0, w:300, h:300, tipo:'pergolado'}).some(function (i) { return /telha/i.test(i.rot); }), itC.map(function (i) { return i.rot; }).join(' | '));
+var totalAntes = M.custoGeral();
+M.addCobertura({nome:'Pergolado', x:0, y:0, w:300, h:300, tipo:'pergolado', pilarMat:'madeira'});
+t('a cobertura entra no custo geral e no orçamento por etapa', M.custoGeral() > totalAntes && M.orcamento().linhas.some(function (l) { return l.grupo === 'Coberturas'; }) && M.orcamento().grupos.some(function (g) { return g.grupo === 'Coberturas'; }));
+t('pilar da cobertura vai para a etapa fundação/estrutura e o telhado para a cobertura', M.orcamento().linhas.filter(function (l) { return l.grupo === 'Coberturas'; }).some(function (l) { return l.etapa === 1; }) && M.orcamento().linhas.filter(function (l) { return l.grupo === 'Coberturas'; }).some(function (l) { return l.etapa === 4; }));
+var lugar = M.lugarLivreCob(300, 300, 0), t9 = M.proj.terreno;
+t('lugar livre não cai em cima de ambiente nem de outra cobertura, e fica dentro do terreno',
+  !M.ambsPav(0).concat(M.cobsPav(0)).some(function (o) { return lugar.x < o.x + o.w && lugar.x + 300 > o.x && lugar.y < o.y + o.h && lugar.y + 300 > o.y; }) &&
+  lugar.x >= 0 && lugar.y >= 0 && lugar.x + 300 <= t9.largura && lugar.y + 300 <= t9.profundidade, JSON.stringify(lugar));
+var anC = TF.analise(M.proj, 0);
+var acAntes = M.areaConstruida(), ocAntes = M.ocupacao();
+t('cobertura independente NÃO vira ambiente: não entra na análise, na área construída nem na ocupação', anC.ambs.length === M.ambsPav(0).length && acAntes === M.areaConstruida() && ocAntes === M.ocupacao() && !anC.ambs.some(function (r) { return r.id === cb1.id; }));
+var cbF = M.addCobertura({nome:'Fora', x:900, y:2300, w:400, h:400, beiral:100});
+t('aviso: cobertura passando do terreno (o beiral conta)', M.problemas().some(function (q) { return q.tipo === 'cobfora' && q.id === cbF.id; }));
+M.removerCobertura(cbF.id);
+var cbV = M.addCobertura({nome:'Vão grande', x:0, y:0, w:1600, h:400, nx:2, ny:2});
+t('aviso: vão entre pilares acima de 6 m pede viga calculada', M.problemas().some(function (q) { return q.tipo === 'cobvao' && q.id === cbV.id; }));
+cbV.nx = 4;
+t('mais pilares resolvem o aviso do vão', !M.problemas().some(function (q) { return q.tipo === 'cobvao'; }));
+M.removerCobertura(cbV.id);
+t('relatório técnico lista a área coberta independente e cada cobertura', M.relatorio().some(function (l) { return /Área coberta independente/.test(l[0]); }));
+M.removerCobertura(cb1.id);
+t('excluir tira da lista e do custo', M.coberturas().length === 1 && !M.coberturaDe(cb1.id));
+M.proj.coberturas = [];
+M.novo('casa-terrea', 1000, 2500);
+
 M.proj.logo = 'data:image/png;base64,iVBORw0KGgo='; M.proj.ambientes[0].nome = 'Z'; M.commit('n'); M.undo();
 t('logo fica fora do undo e entra em fachadaDe/custo', M.proj.logo && TF.fachadaDe(M.proj).logo === M.proj.logo && M.custoFachadaItens().some(function (i) { return /arte/i.test(i.rot); }));
 delete M.proj.logo;

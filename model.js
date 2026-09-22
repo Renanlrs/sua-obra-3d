@@ -91,6 +91,7 @@ var M = (function () {
       equip: {aquecimento:0, filtragem:0},
       ambientes: [],
       moveis: [],
+      coberturas: [],
       cotas: [],
       renders: [],
       versoes: []
@@ -101,6 +102,83 @@ var M = (function () {
     hist = []; fut = []; base = snap();
     return proj;
   }
+
+  /* ================= COBERTURAS INDEPENDENTES =================
+     Telhado à parte, apoiado nos próprios pilares — garagem coberta, área da piscina, quadra, galpão
+     separado, pergolado. Mora em proj.coberturas (mesma lista para 2D, 3D e orçamento). */
+  var COB_TIPOS = {
+    duas:      {rot:'2 águas',       desc:'cumeeira no meio, duas águas'},
+    uma:       {rot:'1 água',        desc:'caimento único (o mais barato)'},
+    quatro:    {rot:'4 águas',       desc:'água para os quatro lados'},
+    arco:      {rot:'Arco',          desc:'curvo, metálico'},
+    plana:     {rot:'Laje plana',    desc:'laje impermeabilizada, sem telha'},
+    pergolado: {rot:'Pergolado',     desc:'vigas vazadas de madeira ou metal'},
+    sombrite:  {rot:'Tela sombrite', desc:'tela tensionada, sombra sem telha'}
+  };
+  var COB_TELHAS = {metalica:'Metálica', sanduiche:'Termoacústica', fibrocimento:'Fibrocimento', ceramica:'Cerâmica', concreto:'Concreto', policarbonato:'Policarbonato', vidro:'Vidro'};
+  var PILAR_MATS = {
+    concreto:  {rot:'Concreto',        esp:20, cor:'#CFCBC2'},
+    metalico:  {rot:'Metálico',        esp:15, cor:'#3A3F45'},
+    madeira:   {rot:'Madeira',         esp:18, cor:'#7A5230'},
+    alvenaria: {rot:'Pilastra (alvenaria)', esp:30, cor:'#EFEAE0'},
+    pedra:     {rot:'Pedra',           esp:35, cor:'#9C968A'},
+    tubo:      {rot:'Tubo redondo',    esp:14, cor:'#A6ACB2'}
+  };
+  /* preços em centavos */
+  var PRECO_COB = {
+    tipo:{duas:16000, uma:13000, quatro:21000, arco:30000, plana:24000, pergolado:19000, sombrite:6000},   /* por m² de cobertura */
+    telha:{metalica:0, sanduiche:9000, fibrocimento:-3000, ceramica:5000, concreto:3000, policarbonato:14000, vidro:38000},
+    pilar:{concreto:48000, metalico:62000, madeira:55000, alvenaria:72000, pedra:110000, tubo:39000},      /* por pilar, por 3 m de altura */
+    calha:9000,   /* por m linear de beiral com calha */
+    forro:11000   /* por m² quando tem forro */
+  };
+  var COB_PADRAO = {tipo:'duas', telha:'metalica', incl:'media', beiral:50, alt:280, cor:'', pilarMat:'concreto', pilarEsp:0, nx:2, ny:2, calha:true, forro:false, fechado:''};
+  function coberturas(){ return proj.coberturas || (proj.coberturas = []); }
+  function cobsPav(pav){ return coberturas().filter(function (c) { return (c.pav || 0) === (pav === undefined ? pavAtual : pav); }); }
+  function coberturaDe(id){ return coberturas().filter(function (c) { return c.id === id; })[0] || null; }
+  function cobCfg(c){   /* o que o usuário escolheu + o padrão do resto (nada duplicado na lista) */
+    var out = {}; for (var k in COB_PADRAO) out[k] = (k in c) ? c[k] : COB_PADRAO[k];
+    out.pilarEsp = out.pilarEsp || (PILAR_MATS[out.pilarMat] || PILAR_MATS.concreto).esp;
+    return out;
+  }
+  function areaCob(c){ return c.w * c.h / 10000; }   /* m² em projeção */
+  function addCobertura(op){
+    op = op || {};
+    var t = proj.terreno, w = op.w || 400, h = op.h || 600;
+    var c = {id:uid(), nome:op.nome || 'Cobertura', pav:op.pav === undefined ? pavAtual : op.pav,
+      x:op.x === undefined ? Math.max(0, Math.round((t.largura - w) / 2)) : op.x,
+      y:op.y === undefined ? Math.max(0, Math.round((t.profundidade - h) / 2)) : op.y, w:w, h:h};
+    ['tipo', 'telha', 'incl', 'beiral', 'alt', 'cor', 'pilarMat', 'pilarEsp', 'nx', 'ny', 'calha', 'forro', 'fechado'].forEach(function (k) { if (op[k] !== undefined) c[k] = op[k]; });
+    coberturas().push(c);
+    return c;
+  }
+  function removerCobertura(id){ proj.coberturas = coberturas().filter(function (c) { return c.id !== id; }); }
+  /* lugar vazio para a cobertura nascer: procura um retângulo livre no terreno (fora dos ambientes e das outras coberturas) */
+  function lugarLivreCob(w, h, pav){
+    var t = proj.terreno, occ = ambsPav(pav).concat(cobsPav(pav)).map(function (a) { return {x:a.x, y:a.y, w:a.w, h:a.h}; });
+    function livre(x, y, folga){ return !occ.some(function (o) { return x < o.x + o.w + folga && x + w + folga > o.x && y < o.y + o.h + folga && y + h + folga > o.y; }); }
+    /* varre o terreno de trás para a frente (o fundo costuma ser a área de lazer); primeiro com folga, depois encostando */
+    for (var f = 0; f < 2; f++) {
+      var folga = f ? 0 : 30;
+      for (var y = Math.max(0, t.profundidade - h - 50); y >= 0; y -= 25)
+        for (var x = 25; x + w <= t.largura - 25; x += 25) if (livre(x, y, folga)) return {x:x, y:y};
+    }
+    return {x:Math.max(0, Math.min(t.largura - w, Math.round((t.largura - w) / 2))), y:Math.max(0, t.profundidade - h - 25)};   /* lotado: encosta no fundo */
+  }
+  function custoCoberturaItens(c){
+    var f = cobCfg(c), P = PRECO_COB, a = areaCob(c), itens = [];
+    function add(rot, v){ if (v) itens.push({rot:rot, valor:Math.round(v)}); }
+    add((COB_TIPOS[f.tipo] || {}).rot + ' (' + num(a) + ' m²)', a * (P.tipo[f.tipo] || 0));
+    if (f.tipo !== 'plana' && f.tipo !== 'pergolado' && f.tipo !== 'sombrite') add('Telha ' + (COB_TELHAS[f.telha] || f.telha).toLowerCase(), a * (P.telha[f.telha] || 0));
+    var n = nPilares(c);
+    add(n + ' pilar' + (n > 1 ? 'es' : '') + ' ' + (PILAR_MATS[f.pilarMat] || {}).rot.toLowerCase(), n * (P.pilar[f.pilarMat] || 0) * Math.max(1, f.alt / 300));
+    if (f.calha && f.tipo !== 'pergolado' && f.tipo !== 'sombrite') add('Calha e rufo', (c.w + c.h) * 2 / 100 * P.calha);
+    if (f.forro) add('Forro', a * P.forro);
+    return itens;
+  }
+  function nPilares(c){ var f = cobCfg(c); return Math.max(2, (f.nx | 0)) * Math.max(2, (f.ny | 0)) - (f.fechado ? 0 : 0); }
+  function custoCoberturas(){ return coberturas().reduce(function (s2, c) { return s2 + custoCoberturaItens(c).reduce(function (s3, i) { return s3 + i.valor; }, 0); }, 0); }
+  function areaCoberturas(){ return coberturas().reduce(function (s2, c) { return s2 + areaCob(c); }, 0); }
 
   /* ---------- móveis (a lista mora em proj.moveis; medidas padrão vêm do catálogo) ---------- */
   function lados(){
@@ -430,7 +508,7 @@ var M = (function () {
     return itens;
   }
   function custoFachada(){ return custoFachadaItens().reduce(function (s2, i) { return s2 + i.valor; }, 0); }
-  function custoGeral(){ return custoTotal() + custoFachada() + custoPiscina(); }
+  function custoGeral(){ return custoTotal() + custoFachada() + custoPiscina() + custoCoberturas(); }
   function custoPorM2(){
     var ac = areaConstruida() / 10000;
     return ac ? Math.round(custoTotal() / ac) : 0;
@@ -464,6 +542,12 @@ var M = (function () {
     if (ocupacao() > 70)
       p.push({id:null, tipo:'ocupacao', msg:'Taxa de ocupação em ' + fmtPct(ocupacao()) + ' — a maioria dos municípios limita em 50% a 70%'});
     piscinas().forEach(function (a) { piscinaAlertas(a).forEach(function (q) { if (q.nivel === 'erro') p.push({id:a.id, tipo:'piscina', msg:q.msg}); }); });
+    coberturas().forEach(function (c) {   /* cobertura independente: fora do terreno e vão grande demais para viga simples */
+      var f = cobCfg(c), vao = Math.max(c.w / Math.max(1, Math.max(2, f.nx | 0) - 1), c.h / Math.max(1, Math.max(2, f.ny | 0) - 1));
+      if (c.x - f.beiral < 0 || c.y - f.beiral < 0 || c.x + c.w + f.beiral > t.largura || c.y + c.h + f.beiral > t.profundidade)
+        p.push({id:c.id, tipo:'cobfora', msg: c.nome + ' (cobertura) passa do terreno — o beiral conta'});
+      if (vao > 600) p.push({id:c.id, tipo:'cobvao', msg: c.nome + ': vão de ' + fmtM(vao) + ' entre pilares — acima de 6,00 m pede viga calculada, acrescente pilares'});
+    });
     return p;
   }
 
@@ -548,6 +632,7 @@ var M = (function () {
     if (agua) linhas.push({grupo:'Piscina', rot:'Piscina em concreto armado', valor:agua, base:fmtM2(espelhoAgua()) + ' × ' + fmtBRL(TIPOS.agua.custo[proj.padrao] * 100) + '/m²', etapa:2});
     custoPiscinaItens().forEach(function (i) { linhas.push({grupo:'Piscina', rot:i.rot, valor:i.valor, base:i.campo ? 'campo editável' : 'calculado da piscina', etapa:5, campo:i.campo}); });
     custoFachadaItens().forEach(function (i) { linhas.push({grupo:'Fachada', rot:i.rot, valor:i.valor, base:'escolha na aba Fachada', etapa:5}); });
+    coberturas().forEach(function (c) { custoCoberturaItens(c).forEach(function (i) { linhas.push({grupo:'Coberturas', rot:c.nome + ' · ' + i.rot, valor:i.valor, base:'cobertura independente', etapa:/pilar/i.test(i.rot) ? 1 : 4}); }); });
     if (ext) linhas.push({grupo:'Externo', rot:'Jardim e áreas descobertas', valor:ext, base:'por m² descoberto', etapa:5});
     var subtotal = linhas.reduce(function (s2, l) { return s2 + l.valor; }, 0);
     var pct = proj.reservaPct == null ? 10 : proj.reservaPct, reserva = Math.round(subtotal * pct / 100), total = subtotal + reserva;
@@ -595,6 +680,7 @@ var M = (function () {
     {k:'ambientes', rot:'Ambientes e paredes'},
     {k:'piscina',   rot:'Piscina e raias'},
     {k:'escada',    rot:'Escada'},
+    {k:'coberturas',rot:'Coberturas independentes'},
     {k:'moveis',    rot:'Móveis'},
     {k:'rotulos',   rot:'Nomes e áreas'},
     {k:'cotas',     rot:'Cotas'},
@@ -636,6 +722,12 @@ var M = (function () {
     L.push(['Taxa de ocupação', fmtPct(ocupacao())]);
     for (var n = 0; n < nPavs(); n++) if (nPavs() > 1) L.push(['Área do ' + nomePav(n).toLowerCase(), fmtM2(ambsPav(n).filter(cobertoAmb).reduce(function (s2, a) { return s2 + areaOf(a); }, 0))]);
     Object.keys(TIPOS).forEach(function (k) { if (porTipo[k]) L.push(['Área — ' + TIPOS[k].rot.toLowerCase(), fmtM2(porTipo[k])]); });
+    if (coberturas().length) {   /* coberturas independentes: área coberta que não é área construída */
+      L.push(['Área coberta independente', num(areaCoberturas()) + ' m² em ' + coberturas().length + (coberturas().length > 1 ? ' coberturas' : ' cobertura')]);
+      coberturas().forEach(function (c) { var f = cobCfg(c);
+        L.push([c.nome, num(areaCob(c)) + ' m² · ' + (COB_TIPOS[f.tipo] || {}).rot + ' · ' + nPilares(c) + ' pilares ' + (PILAR_MATS[f.pilarMat] || {}).rot.toLowerCase() + ' · pé-direito ' + fmtM(f.alt)]);
+      });
+    }
     piscinas().forEach(function (a) {
       var i = piscinaInfo(a);
       L.push([a.nome + ' — lâmina d’água', num(i.area) + ' m² (' + num(i.comp) + ' × ' + num(i.larg) + ' m)']);
@@ -745,6 +837,7 @@ var M = (function () {
   function carregar(p){
     proj = p; hist = []; fut = [];
     if (!proj.moveis) mobiliarAuto();
+    if (!proj.coberturas) proj.coberturas = [];
     if (!proj.id) proj.id = uid();
     base = snap();
     emitir(); return proj;
@@ -754,6 +847,7 @@ var M = (function () {
     if (!all[id]) return false;
     proj = all[id]; hist = []; fut = [];
     if (!proj.moveis) mobiliarAuto();   /* projeto salvo antes dos móveis existirem */
+    if (!proj.coberturas) proj.coberturas = [];   /* projeto salvo antes das coberturas independentes */
     base = snap();
     emitir(); return true;
   }
@@ -774,6 +868,9 @@ var M = (function () {
     areaOf:areaOf, areaTerreno:areaTerreno, areaConstruida:areaConstruida,
     areaTotalAmbientes:areaTotalAmbientes, ocupacao:ocupacao, projecao:projecao, espelhoAgua:espelhoAgua,
     get pav(){ return pavAtual; }, setPav:setPav, pavDe:pavDe, nPavs:nPavs, ambsPav:ambsPav, nomePav:nomePav, apoio:apoio, addPavimento:addPavimento, removerPavimento:removerPavimento, escada:escada,
+    COB_TIPOS:COB_TIPOS, COB_TELHAS:COB_TELHAS, PILAR_MATS:PILAR_MATS, COB_PADRAO:COB_PADRAO, PRECO_COB:PRECO_COB,
+    coberturas:coberturas, cobsPav:cobsPav, coberturaDe:coberturaDe, cobCfg:cobCfg, addCobertura:addCobertura, removerCobertura:removerCobertura,
+    lugarLivreCob:lugarLivreCob, areaCob:areaCob, nPilares:nPilares, custoCoberturaItens:custoCoberturaItens, custoCoberturas:custoCoberturas, areaCoberturas:areaCoberturas,
     custoDe:custoDe, custoTotal:custoTotal, custoPorM2:custoPorM2, custoFachada:custoFachada, custoFachadaItens:custoFachadaItens, custoGeral:custoGeral, fachadaCfg:fachadaCfg, testada:testada, PRECO_FACHADA:PRECO_FACHADA, bbox:bbox, problemas:problemas,
     contem:contem, piscinas:piscinas, salaoDe:salaoDe, piscinaCfg:piscinaCfg, praias:praias, piscinaInfo:piscinaInfo, piscinaAlertas:piscinaAlertas, custoPiscinaItens:custoPiscinaItens, custoPiscina:custoPiscina, PRECO_PISCINA:PRECO_PISCINA,
     COMPOSICAO:COMPOSICAO, ETAPAS_OBRA:ETAPAS_OBRA, orcamento:orcamento, simular:simular, cenarios:cenarios, aplicarCenario:aplicarCenario,

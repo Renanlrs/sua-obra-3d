@@ -164,6 +164,42 @@ var PLAN = (function () {
       }
       s += '</g>';
     });
+    /* coberturas independentes: projeção tracejada + pilares + caimento (o telhado à parte, com pilares próprios) */
+    if (vis('coberturas')) M.cobsPav(pav).forEach(function (c) {
+      var f = M.cobCfg(c), on = (selTipo === 'cob' && sel === c.id), PM = M.PILAR_MATS[f.pilarMat] || M.PILAR_MATS.concreto, esp = f.pilarEsp || PM.esp;
+      s += '<g class="cob' + (bloq('coberturas') ? ' bloq' : '') + '" data-id="' + c.id + '">';
+      s += '<rect x="' + c.x + '" y="' + c.y + '" width="' + c.w + '" height="' + c.h + '" fill="#8B5E3C" fill-opacity=".07" stroke="#8B5E3C" stroke-width="' + (1.8 * esc) + '" stroke-dasharray="' + (14 * esc) + ' ' + (9 * esc) + '"/>';
+      /* beiral */
+      if (f.beiral > 0) s += '<rect x="' + (c.x - f.beiral) + '" y="' + (c.y - f.beiral) + '" width="' + (c.w + f.beiral * 2) + '" height="' + (c.h + f.beiral * 2) + '" fill="none" stroke="#8B5E3C" stroke-opacity=".45" stroke-width="' + (1 * esc) + '" stroke-dasharray="' + (5 * esc) + ' ' + (5 * esc) + '"/>';
+      /* pilares nas bordas (mesma grade do 3D) */
+      var nx = Math.max(2, f.nx | 0), ny = Math.max(2, f.ny | 0);
+      for (var i = 0; i < nx; i++) for (var j = 0; j < ny; j++) {
+        if (i > 0 && i < nx - 1 && j > 0 && j < ny - 1) continue;
+        var px = c.x + esp / 2 + i * (c.w - esp) / (nx - 1), py = c.y + esp / 2 + j * (c.h - esp) / (ny - 1);
+        s += f.pilarMat === 'tubo'
+          ? '<circle cx="' + px + '" cy="' + py + '" r="' + (esp / 2) + '" fill="#1B2229" fill-opacity=".8"/>'
+          : '<rect x="' + (px - esp / 2) + '" y="' + (py - esp / 2) + '" width="' + esp + '" height="' + esp + '" fill="#1B2229" fill-opacity=".8"/>';
+      }
+      /* caimento: seta do ponto alto para o baixo */
+      var alongX = c.w >= c.h, cxm = c.x + c.w / 2, cym = c.y + c.h / 2;
+      if (f.tipo === 'duas' || f.tipo === 'quatro') s += alongX
+        ? '<line x1="' + c.x + '" y1="' + cym + '" x2="' + (c.x + c.w) + '" y2="' + cym + '" stroke="#8B5E3C" stroke-opacity=".7" stroke-width="' + (1.4 * esc) + '"/>'
+        : '<line x1="' + cxm + '" y1="' + c.y + '" x2="' + cxm + '" y2="' + (c.y + c.h) + '" stroke="#8B5E3C" stroke-opacity=".7" stroke-width="' + (1.4 * esc) + '"/>';
+      if (f.tipo === 'uma') { var ax0 = alongX ? cxm : cxm, ay0 = alongX ? c.y + c.h * .25 : c.y + c.h * .25;
+        s += '<path d="M' + cxm + ' ' + (c.y + 20) + ' L' + cxm + ' ' + (c.y + c.h - 20) + ' M' + (cxm - 12 * esc) + ' ' + (c.y + c.h - 20 - 14 * esc) + ' L' + cxm + ' ' + (c.y + c.h - 20) + ' L' + (cxm + 12 * esc) + ' ' + (c.y + c.h - 20 - 14 * esc) + '" fill="none" stroke="#8B5E3C" stroke-opacity=".7" stroke-width="' + (1.4 * esc) + '"/>'; }
+      /* rótulo */
+      if (c.w / esc > 40 && c.h / esc > 24 && vis('rotulos')) {
+        var fsC = Math.max(7.5 * esc, Math.min(12 * esc, Math.min(c.w, c.h) * .12));
+        s += '<g style="pointer-events:none"><rect x="' + (c.x + 6 * esc) + '" y="' + (c.y + 6 * esc) + '" width="' + ((c.nome.length * .56 + 6) * fsC) + '" height="' + (fsC * 1.6) + '" rx="' + (fsC * .8) + '" fill="#FFFFFF" fill-opacity=".82"/>' +
+          '<text x="' + (c.x + 6 * esc + fsC * .5) + '" y="' + (c.y + 6 * esc + fsC * 1.1) + '" font-family="Inter,system-ui,sans-serif" font-size="' + fsC + '" fill="#6B4423">' + esc4(c.nome) +
+          '<tspan font-family="ui-monospace,monospace" font-size="' + (fsC * .8) + '" fill="#8B7355">  ' + M.fmtM2(M.areaCob(c) * 10000) + '</tspan></text></g>';
+      }
+      if (on) {
+        s += '<rect x="' + (c.x - 3 * esc) + '" y="' + (c.y - 3 * esc) + '" width="' + (c.w + 6 * esc) + '" height="' + (c.h + 6 * esc) + '" fill="none" stroke="#0F7E96" stroke-width="' + (2 * esc) + '"/>';
+        if (!bloq('coberturas')) s += alcas(c, esc);
+      }
+      s += '</g>';
+    });
     /* escada (derivada de M.escada): degraus no térreo, vão no andar de cima */
     var esc2 = M.escada();
     if (esc2 && (pav === 0 || pav === 1) && vis('escada')) {
@@ -182,7 +218,7 @@ var PLAN = (function () {
            '" stroke="#E5533D" stroke-width="' + (1 * esc) + '" stroke-dasharray="' + (14 * esc) + ' ' + (10 * esc) + '"/>';
     });
     if (drag && drag.modo === 'novo' && drag.novo)
-      s += '<rect x="' + drag.novo.x + '" y="' + drag.novo.y + '" width="' + drag.novo.w + '" height="' + drag.novo.h +
+      s += '<rect' + (drag.cob ? ' stroke-dasharray="' + (14 * esc) + ' ' + (9 * esc) + '"' : '') + ' x="' + drag.novo.x + '" y="' + drag.novo.y + '" width="' + drag.novo.w + '" height="' + drag.novo.h +
            '" fill="#22B8D6" fill-opacity=".18" stroke="#0F7E96" stroke-width="' + (1.6 * esc) + '"/>';
     /* laço de seleção */
     if (drag && drag.modo === 'laco') {
@@ -284,6 +320,8 @@ var PLAN = (function () {
     return M.movelDe(sel);
   }
   function selecionarMovel(id){ sel = id; selTipo = id ? 'mov' : 'amb'; multi = []; render(); UI.inspector(); UI.radial(id ? movAtual() : null); }
+  function cobAtual(){ return selTipo === 'cob' && sel ? M.coberturaDe(sel) : null; }
+  function selecionarCob(id){ sel = id; selTipo = id ? 'cob' : 'amb'; multi = []; render(); UI.inspector(); UI.radial(null); }
   /* ímã do móvel: encosta a caixa envolvente nas faces internas das paredes e nas bordas dos vizinhos */
   function grudarMovel(mv, nx, ny){
     var b = MOVEIS.aabb(mv), hw = b.w / 2, hh = b.h / 2, r = M.ambienteDe({x:nx, y:ny}) || M.ambienteDe(mv);
@@ -452,12 +490,20 @@ var PLAN = (function () {
       }
     }
 
-    /* alça → redimensionar */
+    /* alça → redimensionar (ambiente ou cobertura independente) */
     var alca = e.target.closest ? e.target.closest('.alca') : null;
-    if (alca && atual()) {
-      var a0 = atual();
-      drag = {modo:'resize', h:alca.getAttribute('data-h'), id:a0.id, ini:{x:a0.x, y:a0.y, w:a0.w, h:a0.h}, p0:p, mudou:false};
+    if (alca && (atual() || cobAtual())) {
+      var a0 = atual() || cobAtual();
+      drag = {modo:'resize', cob:!atual(), h:alca.getAttribute('data-h'), id:a0.id, ini:{x:a0.x, y:a0.y, w:a0.w, h:a0.h}, p0:p, mudou:false};
       svg.setPointerCapture(e.pointerId); return;
+    }
+    /* cobertura independente → arrastar */
+    var gc = e.target.closest ? e.target.closest('.cob') : null;
+    if (gc && tool === 'sel' && !UI.espaco) {
+      var cid = gc.getAttribute('data-id'), c0 = M.coberturaDe(cid);
+      selecionarCob(cid);
+      if (gc.classList.contains('bloq')) { UI.toast('Camada bloqueada — desbloqueie na aba Camadas para mover.'); return; }
+      if (c0) { drag = {modo:'cobmove', id:cid, ini:{x:c0.x, y:c0.y}, off:{x:p.x - c0.x, y:p.y - c0.y}, mudou:false}; svg.setPointerCapture(e.pointerId); return; }
     }
 
     /* ferramenta mão / espaço / botão do meio → pan */
@@ -465,9 +511,9 @@ var PLAN = (function () {
       drag = {modo:'pan', p0:p, v0:{x:view.x, y:view.y}}; svg.setPointerCapture(e.pointerId); return;
     }
 
-    /* ferramenta ambiente → desenhar retângulo novo */
-    if (tool === 'room') {
-      drag = {modo:'novo', p0:{x:snap(p.x), y:snap(p.y)}, novo:null};
+    /* ferramenta ambiente / cobertura → desenhar retângulo novo */
+    if (tool === 'room' || tool === 'cob') {
+      drag = {modo:'novo', cob:tool === 'cob', p0:{x:snap(p.x), y:snap(p.y)}, novo:null};
       svg.setPointerCapture(e.pointerId); return;
     }
 
@@ -522,6 +568,27 @@ var PLAN = (function () {
       render(); return;
     }
 
+    if (drag.modo === 'cobmove') {
+      var c2 = M.coberturaDe(drag.id); if (!c2) return;
+      var cx2 = snap(p.x - drag.off.x), cy2 = snap(p.y - drag.off.y);
+      if (UI.shift) { if (Math.abs(cx2 - drag.ini.x) > Math.abs(cy2 - drag.ini.y)) cy2 = drag.ini.y; else cx2 = drag.ini.x; }
+      c2.x = cx2; c2.y = cy2; drag.mudou = true;
+      UI.hud(c2.nome + '  ' + M.fmtMs(c2.w) + ' × ' + M.fmtMs(c2.h) + ' m');
+      render(); UI.inspector(); return;
+    }
+    if (drag.modo === 'resize' && drag.cob) {
+      var c3 = M.coberturaDe(drag.id); if (!c3) return;
+      var ic = drag.ini, hc = drag.h, cx1 = ic.x, cy1 = ic.y, cx3 = ic.x + ic.w, cy3 = ic.y + ic.h;
+      if (hc.indexOf('w') >= 0) cx1 = snap(p.x);
+      if (hc.indexOf('e') >= 0) cx3 = snap(p.x);
+      if (hc.indexOf('n') >= 0) cy1 = snap(p.y);
+      if (hc.indexOf('s') >= 0) cy3 = snap(p.y);
+      c3.x = Math.min(cx1, cx3); c3.y = Math.min(cy1, cy3);
+      c3.w = Math.max(100, Math.abs(cx3 - cx1)); c3.h = Math.max(100, Math.abs(cy3 - cy1));
+      drag.mudou = true;
+      UI.hud(M.fmtMs(c3.w) + ' × ' + M.fmtMs(c3.h) + ' m   ' + M.fmtM2(M.areaCob(c3) * 10000));
+      render(); UI.inspector(); return;
+    }
     if (drag.modo === 'movmove' || drag.modo === 'movrot') {
       var mv = M.movelDe(drag.id); if (!mv) return;
       if (drag.modo === 'movmove') {
@@ -579,6 +646,7 @@ var PLAN = (function () {
       (d.movs || []).forEach(function (o) { o.m.x = o.x0; o.m.y = o.y0; });
     }
     if (d.modo === 'grupo') moverGrupo(d.g, 0, 0);
+    if (d.modo === 'cobmove' || (d.modo === 'resize' && d.cob)) { var cc = M.coberturaDe(d.id); if (cc) { cc.x = d.ini.x; cc.y = d.ini.y; if (d.ini.w) { cc.w = d.ini.w; cc.h = d.ini.h; } } }
     if (d.modo === 'movmove') { var mv = M.movelDe(d.id); if (mv) { mv.x = d.ini.x; mv.y = d.ini.y; } }
     if (d.modo === 'movrot') { var mv2 = M.movelDe(d.id); if (mv2) mv2.rot = d.rot0; }
     render();
@@ -605,7 +673,12 @@ var PLAN = (function () {
       render(); UI.inspector(); return;
     }
     if (!d.mudou && d.modo !== 'novo' && d.modo !== 'pan') UI.selTap();
-    if (d.modo === 'novo' && d.novo && d.novo.w >= 90 && d.novo.h >= 90) {
+    if (d.modo === 'novo' && d.cob && d.novo && d.novo.w >= 100 && d.novo.h >= 100) {
+      var nc = M.addCobertura({x:d.novo.x, y:d.novo.y, w:d.novo.w, h:d.novo.h, pav:M.pav});
+      M.commit('Criar cobertura');
+      selecionarCob(nc.id); UI.setTool('sel');
+      UI.toast('Cobertura independente criada — pilares próprios e telhado à parte. Ajuste tipo, telha e pilares no painel.');
+    } else if (d.modo === 'novo' && d.novo && d.novo.w >= 90 && d.novo.h >= 90) {
       var a = {id:M.uid(), nome:'Ambiente', tipo:M.pav > 0 ? 'intimo' : 'social', x:d.novo.x, y:d.novo.y, w:d.novo.w, h:d.novo.h};
       if (M.pav > 0) a.pav = M.pav;
       M.proj.ambientes.push(a);
@@ -617,6 +690,8 @@ var PLAN = (function () {
       render(); UI.inspector(); UI.refreshTop(); UI.radial(movAtual()); return;
     } else if (d.modo === 'movmove' || d.modo === 'movrot') {
       UI.radial(movAtual());
+    } else if (d.mudou && (d.modo === 'cobmove' || (d.modo === 'resize' && d.cob))) {
+      M.commit(d.modo === 'cobmove' ? 'Mover cobertura' : 'Redimensionar cobertura');
     } else if (d.mudou) {
       var nome = d.modo === 'move' ? 'Mover ambiente' : 'Redimensionar ambiente';
       M.commit(nome);
@@ -668,6 +743,7 @@ var PLAN = (function () {
     montar:montar, render:render, enquadrar:enquadrar, enquadrarAmb:enquadrarAmb, zoom:zoom, setView:setView,
     get view(){ return view; },
     get sel(){ return sel; }, get selTipo(){ return selTipo; }, selecionar:selecionar, atual:atual,
+    cobAtual:cobAtual, selecionarCob:selecionarCob,
     movAtual:movAtual, selecionarMovel:selecionarMovel, telaDe:telaDe, PAREDE:PAREDE,
     setTool:function (t) { tool = t; }, get tool(){ return tool; },
     toggleGrid:function () { M.setCamada('grade', 'vis', !vis('grade')); M.salvar(); render(); return vis('grade'); },
