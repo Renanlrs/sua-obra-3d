@@ -5,8 +5,10 @@
 /* Arrasta a janela da entrada e o letreiro dentro do app real (iframe, mesma origem) e confere o que foi gravado no projeto. */
 var out = [], ok = 0, bad = 0;
 function t(n, c, x){ (c ? ok++ : bad++); out.push((c ? 'PASSA' : 'FALHA') + '  ' + n + (x ? '   → ' + x : '')); }
-function fim(){ var l = document.getElementById('log'); l.textContent = out.join('\n') + '\n' + ok + ' passaram · ' + bad + ' falharam'; document.title = (bad ? 'FALHOU ' : 'OK ') + ok + '/' + (ok + bad); }
+var acabou = false;
+function fim(){ if (acabou) return; acabou = true; var l = document.getElementById('log'); l.textContent = out.join('\n') + '\n' + ok + ' passaram · ' + bad + ' falharam'; document.title = (bad ? 'FALHOU ' : 'OK ') + ok + '/' + (ok + bad); }
 function ev(el, tipo, x, y, extra){ var e = new PointerEvent(tipo, Object.assign({bubbles:true, cancelable:true, clientX:x, clientY:y, pointerId:1, pointerType:'mouse', button:0, buttons:tipo === 'pointerup' ? 0 : 1, isPrimary:true}, extra || {})); el.dispatchEvent(e); }
+setTimeout(function () { if (!acabou) { t('TRAVOU: o harness não chegou ao fim em 70 s', false); fim(); } }, 70000);
 var f = document.getElementById('f');
 f.onload = function () {
   var W = f.contentWindow;
@@ -125,8 +127,52 @@ f.onload = function () {
                       catch (e3) { falhas.push(JSON.stringify(c) + ': ' + e3.message); }
                     });
                     t('os ' + combos.length + ' tipos de janela/vidro/porta/porta interna/garagem/portão/muro montam no 3D', falhas.length === 0, falhas.slice(0, 4).join(' | '));
-                    W.M.proj.fachada = null; t3.atualizar();
-                    fim();
+                    W.M.proj.fachada = null; W.M.novo('casa-terrea', 1000, 2500); t3.atualizar();
+                    /* ---- filme: roteiro, avanço das cenas e gravação real em vídeo ---- */
+                    setTimeout(function () {
+                      var cs = t3.roteiro({});
+                      t('o roteiro do vídeo tem capa, fachada, ambientes e fecho', cs.length >= 5 && cs[0].tipo === 'capa' && cs.some(function (c) { return c.tipo === 'ambiente'; }) && cs[cs.length - 1].tipo === 'fim', cs.map(function (c) { return c.tipo; }).join(','));
+                      t('toda cena tem duração e título', cs.every(function (c) { return c.dur > 0 && c.titulo; }));
+                      var tot = cs.reduce(function (s3, c) { return s3 + c.dur; }, 0);
+                      t('o vídeo tem duração de gente (20 a 180 s)', tot >= 20 && tot <= 180, Math.round(tot) + ' s');
+                      var quadros = 0, cenasVistas = {}, fimOk = false, poses = [];
+                      var ctrl = t3.filmar({durAmb:.25, durCapa:.25, durFim:.25,
+                        onQuadro: function (c, u) { quadros++; poses.push(t3.telaDe(0, 0, 0).x); if (u > 1.01) fimOk = false; },
+                        onCena: function (c) { cenasVistas[c.titulo] = true; },
+                        onFim: function () { fimOk = true; }});
+                      t('filmar() começa e devolve o controle com o total', !!ctrl && ctrl.total > 0 && t3.filmando);
+                      /* passo a passo, sem depender do rAF (o headless acelera o relógio) */
+                      for (var pf = 0; pf < 400 && t3.filmando; pf++) t3.passoFilme(1 / 30);
+                      setTimeout(function () {
+                        t('o filme desenhou quadros e passou por várias cenas', quadros > 10 && Object.keys(cenasVistas).length >= 3, quadros + ' quadros · ' + Object.keys(cenasVistas).length + ' cenas');
+                        t('a câmera realmente se move durante o filme', poses.length > 5 && Math.max.apply(null, poses) - Math.min.apply(null, poses) > 5, poses.length ? (Math.max.apply(null, poses) - Math.min.apply(null, poses)).toFixed(0) + ' px' : '-');
+                        t('o filme termina sozinho e libera a câmera', fimOk && !t3.filmando);
+                        /* gravação de verdade: MediaRecorder sobre um canvas 2D que copia o 3D */
+                        var mime = ['video/mp4;codecs=avc1.42E01E', 'video/webm;codecs=vp9', 'video/webm'].filter(function (m2) { return W.MediaRecorder && W.MediaRecorder.isTypeSupported(m2); })[0];
+                        t('o navegador grava vídeo (MediaRecorder disponível)', !!mime, mime || 'nenhum formato');
+                        if (!mime) { fim(); return; }
+                        var mix = f.contentDocument.createElement('canvas'); mix.width = 640; mix.height = 360;
+                        var gg = mix.getContext('2d'), ped = [], rec = new W.MediaRecorder(mix.captureStream(30), {mimeType:mime});
+                        rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) ped.push(ev.data); };
+                        var conferiu = false;
+                        function conferirGravacao(via){
+                          if (conferiu) return; conferiu = true;
+                          var blob = new W.Blob(ped, {type:mime.split(';')[0]});
+                          t('a gravação gera um arquivo de vídeo com conteúdo', blob.size > 2000, (blob.size / 1024).toFixed(0) + ' KB · ' + blob.type + ' · ' + ped.length + ' pedaços (' + via + ')');
+                          fim();
+                        }
+                        rec.onstop = function () { conferirGravacao('parou'); };
+                        setTimeout(function () { try { if (rec.state !== 'inactive') rec.stop(); } catch (e4) {} setTimeout(function () { conferirGravacao('watchdog'); }, 400); }, 6000);
+                        rec.start(200);
+                        var n2 = 0;
+                        t3.filmar({durAmb:.2, durCapa:.3, durFim:.2, onQuadro: function () { gg.drawImage(t3.canvas, 0, 0, 640, 360); gg.fillStyle = '#22B8D6'; gg.fillRect(0, 352, (n2 * 12) % 640, 8); }});
+                        /* desenha por setInterval: no headless o rAF quase não dispara, mas o timer sim */
+                        var timer = W.setInterval(function () {
+                          n2++;
+                          if (!t3.passoFilme(1 / 15) || n2 > 90) { W.clearInterval(timer); setTimeout(function () { try { if (rec.state !== 'inactive') rec.stop(); } catch (e5) {} }, 300); }
+                        }, 33);
+                      }, 2600);
+                    }, 400);
                   }, 600);
                 }, 700);
               }, 200);

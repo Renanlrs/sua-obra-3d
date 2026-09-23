@@ -107,6 +107,7 @@ var UI = (function () {
       if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true); } }
       if (q.get('fprompt') && viewAtual === 'tresd') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true, +q.get('fz') || 1); }
       if (q.get('fach')) { try { M.proj.fachada = Object.assign(M.proj.fachada || {}, JSON.parse(q.get('fach'))); } catch (e) {} if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true, +q.get('fz') || 1); } }   /* &fach={"cobertura":"galpao"} (conferência) */
+      if (q.has('video')) setTimeout(function () { if (q.get('video') === 'go') gravarVideo({durAmb:1.2, durCapa:1.2, durFim:1.2}); else dialogoVideo(); }, 500);   /* &video=1 abre o diálogo · &video=go grava (conferência) */
       if (q.get('add')) {   /* &add=suv,palco,caixaAguaTorre@x,y (conferência: solta itens do catálogo na planta) */
         q.get('add').split(',').forEach(function (spec, i2) {
           var pr2 = spec.split('@'), k2 = pr2[0], xy = (pr2[1] || '').split('_');   /* k@x_y_rot (cm) */
@@ -726,6 +727,144 @@ var UI = (function () {
     insp.innerHTML = h;
     ligarInspector(a);
   }
+  /* ================= VÍDEO DO PROJETO =================
+     O motor roda um roteiro de câmera (TRES.filmar) e, a cada quadro, este mixer copia o 3D para um
+     canvas 2D e desenha por cima capa, legendas, barra de tempo e assinatura. O MediaRecorder grava
+     esse canvas — sai um arquivo pronto para mandar no WhatsApp. Nada é enviado para fora do navegador. */
+  var VID = {W:1280, H:720};
+  function mimeVideo(){
+    var tent = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    for (var i = 0; i < tent.length; i++) if (window.MediaRecorder && MediaRecorder.isTypeSupported(tent[i])) return tent[i];
+    return '';
+  }
+  function gravarVideo(op){
+    op = op || {};
+    if (!t3) { toast('Abra o 3D primeiro.'); return; }
+    if (!window.MediaRecorder) { toast('Este navegador não grava vídeo. Use o Chrome.'); return; }
+    var mime = mimeVideo();
+    if (!mime) { toast('Este navegador não grava vídeo. Use o Chrome.'); return; }
+    var mix = document.createElement('canvas'); mix.width = VID.W; mix.height = VID.H;
+    var g = mix.getContext('2d'), src = t3.canvas;
+    var proj = M.proj, cenaAtual = null, iCena = 0, nCenas = 1, tCena = 0, progresso = 0;
+    var logo = proj.logo ? imagemDataURL(proj.logo) : null;
+    var pedacos = [], rec = null, cancelado = false;
+    var painel = document.createElement('div');
+    painel.className = 'vid-painel';
+    painel.innerHTML = '<div class="vid-box"><h3>🎬 Gravando o vídeo do projeto</h3>' +
+      '<div class="vid-prev"><canvas></canvas></div>' +
+      '<div class="vid-bar"><i></i></div><p class="vid-msg">Preparando…</p>' +
+      '<div class="vid-acts"><button class="btn ghost sm" data-cancelar>Cancelar</button></div></div>';
+    document.body.appendChild(painel);
+    var prev = painel.querySelector('.vid-prev canvas'), barra = painel.querySelector('.vid-bar i'), msg = painel.querySelector('.vid-msg');
+    prev.width = 384; prev.height = 216; var gp = prev.getContext('2d');
+    painel.querySelector('[data-cancelar]').onclick = function () { cancelado = true; t3.pararFilme(); if (rec && rec.state !== 'inactive') rec.stop(); fechar(); toast('Gravação cancelada.'); };
+    function fechar(){ if (painel.parentNode) painel.parentNode.removeChild(painel); }
+
+    /* ---- desenho de um quadro: 3D + capa/legenda ---- */
+    function quadro(cena, u, total){
+      cenaAtual = cena;
+      g.fillStyle = '#0B0E11'; g.fillRect(0, 0, VID.W, VID.H);
+      try { g.drawImage(src, 0, 0, VID.W, VID.H); } catch (e) {}
+      var margem = 54;
+      if (cena.tipo === 'capa') {   /* abertura: escurece e escreve grande */
+        var op2 = u < .75 ? 1 : 1 - (u - .75) / .25;
+        g.fillStyle = 'rgba(8,11,14,' + (.55 * op2) + ')'; g.fillRect(0, 0, VID.W, VID.H);
+        g.textAlign = 'center';
+        g.fillStyle = 'rgba(255,255,255,' + op2 + ')'; g.font = '600 62px Inter, system-ui, sans-serif';
+        g.fillText(cena.titulo, VID.W / 2, VID.H / 2 - 6);
+        g.fillStyle = 'rgba(190,205,215,' + op2 + ')'; g.font = '300 26px Inter, system-ui, sans-serif';
+        g.fillText(cena.sub, VID.W / 2, VID.H / 2 + 42);
+        if (logo && logo.complete && logo.naturalWidth) { var lw = Math.min(260, logo.naturalWidth), lh = lw * logo.naturalHeight / logo.naturalWidth;
+          g.globalAlpha = op2; g.drawImage(logo, VID.W / 2 - lw / 2, VID.H / 2 - 150 - lh, lw, lh); g.globalAlpha = 1; }
+        g.textAlign = 'left';
+      } else {   /* legenda inferior: entra e sai suave */
+        var ap = Math.min(1, Math.min(u, 1 - u) * 6 + .15);
+        var alt = cena.frase ? 132 : 104, y0 = VID.H - alt - margem;
+        g.fillStyle = 'rgba(8,11,14,' + (.72 * ap) + ')';
+        arredondado(g, margem, y0, 620, alt, 16); g.fill();
+        g.fillStyle = 'rgba(34,184,214,' + ap + ')'; g.fillRect(margem, y0, 5, alt);
+        g.fillStyle = 'rgba(255,255,255,' + ap + ')'; g.font = '600 34px Inter, system-ui, sans-serif';
+        g.fillText(corta(g, cena.titulo, 560), margem + 26, y0 + 46);
+        g.fillStyle = 'rgba(180,196,208,' + ap + ')'; g.font = '300 20px Inter, system-ui, sans-serif';
+        g.fillText(corta(g, cena.sub || '', 560), margem + 26, y0 + 78);
+        if (cena.frase) { g.fillStyle = 'rgba(140,160,175,' + ap + ')'; g.font = 'italic 300 19px Inter, system-ui, sans-serif'; g.fillText(corta(g, cena.frase, 560), margem + 26, y0 + 108); }
+      }
+      /* barra de tempo + assinatura */
+      var p = Math.min(1, (progresso + u * (cena.dur || 1)) / Math.max(1, total));
+      g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(0, VID.H - 5, VID.W, 5);
+      g.fillStyle = '#22B8D6'; g.fillRect(0, VID.H - 5, VID.W * p, 5);
+      g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '300 16px ui-monospace, monospace'; g.textAlign = 'right';
+      g.fillText('SUA OBRA 3D · estudo conceitual', VID.W - margem, VID.H - 26); g.textAlign = 'left';
+      gp.drawImage(mix, 0, 0, prev.width, prev.height);
+    }
+    function arredondado(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+    function corta(ctx, txt, max){ txt = String(txt || ''); if (ctx.measureText(txt).width <= max) return txt; while (txt.length > 4 && ctx.measureText(txt + '…').width > max) txt = txt.slice(0, -1); return txt + '…'; }
+
+    /* ---- grava ---- */
+    var stream = mix.captureStream(30);
+    try { rec = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: op.bits || 6000000}); }
+    catch (e) { fechar(); toast('Não consegui iniciar a gravação neste navegador.'); return; }
+    rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) pedacos.push(ev.data); };
+    rec.onstop = function () {
+      if (cancelado) return;
+      var blob = new Blob(pedacos, {type:mime.split(';')[0]});
+      var ext = mime.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
+      var url = URL.createObjectURL(blob);
+      msg.textContent = 'Pronto: ' + (blob.size / 1048576).toFixed(1) + ' MB';
+      barra.style.width = '100%';
+      var a = document.createElement('a'); a.href = url; a.download = slug() + '-projeto.' + ext; a.click();
+      painel.querySelector('.vid-acts').innerHTML = '<a class="btn solid sm" href="' + url + '" download="' + slug() + '-projeto.' + ext + '">⬇ Baixar de novo</a><button class="btn ghost sm" data-fechar>Fechar</button>';
+      painel.querySelector('[data-fechar]').onclick = function () { URL.revokeObjectURL(url); fechar(); };
+      toast('Vídeo do projeto salvo (' + ext.toUpperCase() + ', ' + (blob.size / 1048576).toFixed(1) + ' MB). Está na pasta de downloads.');
+    };
+    var ctrl = t3.filmar({
+      durAmb: op.durAmb || 3.4,
+      onCena: function (c, i, n) { iCena = i; nCenas = n; progresso = 0; c.cenas = n;
+        progresso = ctrl && ctrl.cenas ? ctrl.cenas.slice(0, i).reduce(function (s2, x) { return s2 + x.dur; }, 0) : 0;
+        msg.textContent = 'Cena ' + (i + 1) + ' de ' + n + ' — ' + (c.titulo || '');
+        if (op.narrar && window.speechSynthesis) narrar(c);
+      },
+      onQuadro: function (c, u, total) {
+        quadro(c, u, total);
+        var p = Math.min(1, (progresso + u * (c.dur || 1)) / Math.max(1, total));
+        barra.style.width = (p * 100).toFixed(1) + '%';
+      },
+      onFim: function () { if (rec.state !== 'inactive') rec.stop(); }
+    });
+    if (!ctrl) { fechar(); toast('Não consegui montar o roteiro — o projeto tem ambientes?'); return; }
+    rec.start(250);
+    msg.textContent = 'Gravando… ' + Math.round(ctrl.total) + ' segundos de vídeo';
+  }
+  function narrar(c){
+    try {
+      var u = new SpeechSynthesisUtterance([c.titulo, c.sub, c.frase].filter(Boolean).join('. '));
+      u.lang = 'pt-BR'; u.rate = .96; u.pitch = 1;
+      var vs = speechSynthesis.getVoices().filter(function (v) { return /pt/i.test(v.lang); });
+      if (vs.length) u.voice = vs[0];
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function imagemDataURL(src){ var im = new Image(); im.src = src; return im; }
+  /* diálogo: duração, narração e o que entra */
+  function dialogoVideo(){
+    if (!t3) { irPara('tresd'); setTimeout(dialogoVideo, 400); return; }
+    var cs = t3.roteiro({}), total = cs.reduce(function (s2, c) { return s2 + c.dur; }, 0);
+    var d = document.createElement('div'); d.className = 'vid-painel';
+    d.innerHTML = '<div class="vid-box"><h3>🎬 Vídeo do projeto</h3>' +
+      '<p class="vid-txt">O app grava sozinho um passeio pela casa: chegada pela calçada, cada ambiente e a vista aérea — com legendas e o seu logo. Sai um arquivo para mandar no WhatsApp do cliente.</p>' +
+      '<div class="vid-info"><b>' + cs.length + '</b> cenas · <b>' + Math.round(total) + 's</b> de vídeo · 1280 × 720</div>' +
+      '<div class="chips" style="margin:12px 0"><button class="chip on" data-dur="3.4">Normal</button><button class="chip" data-dur="2.4">Curto</button><button class="chip" data-dur="4.6">Devagar</button></div>' +
+      '<div class="chips"><button class="chip" data-narrar>🔊 Narrar em voz alta enquanto grava</button></div>' +
+      '<div class="ins-empty" style="margin-top:10px">Fica na sua máquina: nada é enviado para a internet. Deixe esta aba na frente até terminar.</div>' +
+      '<div class="vid-acts"><button class="btn ghost sm" data-fechar>Cancelar</button><button class="btn solid sm" data-gravar>Gravar vídeo</button></div></div>';
+    document.body.appendChild(d);
+    var dur = 3.4, narrarOn = false;
+    d.querySelectorAll('[data-dur]').forEach(function (b) { b.onclick = function () { dur = +b.getAttribute('data-dur'); d.querySelectorAll('[data-dur]').forEach(function (x) { x.classList.toggle('on', x === b); }); }; });
+    var bn = d.querySelector('[data-narrar]'); bn.onclick = function () { narrarOn = !narrarOn; bn.classList.toggle('on', narrarOn); };
+    d.querySelector('[data-fechar]').onclick = function () { d.remove(); };
+    d.querySelector('[data-gravar]').onclick = function () { d.remove(); gravarVideo({durAmb:dur, narrar:narrarOn}); };
+  }
+
   /* ================= COBERTURA INDEPENDENTE (telhado à parte, sobre os próprios pilares) =================
      O mesmo bloco serve ao inspector da planta e ao popover do 3D — uma fonte, dois lugares. */
   function htmlCobertura(c, compacto){
@@ -1211,6 +1350,7 @@ var UI = (function () {
     {n:'Passeio 3D pela casa', g:'',       f:function(){ irPara('tresd'); if (t3) t3.setModo('tour'); }},
     {n:'Exportar passeio 3D (.html)', g:'', f:function(){ exportar('html'); }},
     {n:'Mobiliar (catálogo de móveis)', g:'M', f:function(){ if (viewAtual !== 'planta' && viewAtual !== 'tresd') irPara('planta'); toggleCatalogo(true); }},
+    {n:'Gerar vídeo do projeto (para WhatsApp)', g:'', f:function(){ dialogoVideo(); }},
     {n:'Cobertura independente (telhado à parte)', g:'T', f:function(){ novaCobertura(); }},
     {n:'Cobrir a garagem',    g:'', f:function(){ novaCobertura(COB_PRESETS.garagem); }},
     {n:'Cobrir a área da piscina', g:'', f:function(){ novaCobertura(COB_PRESETS.piscina); }},
@@ -1443,6 +1583,7 @@ var UI = (function () {
         '<button class="ctx-it" data-m="estilos">✨ Ver a casa nos ' + Object.keys(TRES.FACHADA_PRESETS).length + ' estilos</button>' +
         '<button class="ctx-it" data-m="frente">🏠 Câmera na frente da casa</button>' +
         '<button class="ctx-it" data-m="cob">⛱ Nova cobertura independente</button>' +
+        '<button class="ctx-it" data-m="video">🎬 Gerar vídeo do projeto</button>' +
         '<button class="ctx-it" data-m="foto">📷 Salvar imagem (PNG)</button>' +
         '<button class="ctx-it" data-m="apres">▶ Apresentar ao cliente</button>';
       var r = this.getBoundingClientRect(); c.style.left = Math.max(8, Math.min(window.innerWidth - 268, r.right - 260)) + 'px'; c.style.top = (r.bottom + 6) + 'px'; c.hidden = false;
@@ -1450,6 +1591,7 @@ var UI = (function () {
         var m = b.getAttribute('data-m'); c.hidden = true;
         if (m === 'elev') elevacao(); else if (m === 'estilos') compararEstilos(); else if (m === 'frente') t3.verFachada();
         else if (m === 'cob') { var nc2 = novaCobertura(); t3.olharPara((nc2.x + nc2.w / 2) * .01, (nc2.y + nc2.h / 2) * .01, Math.max(nc2.w, nc2.h) * .01 * 1.6 + 6); }
+        else if (m === 'video') dialogoVideo();
         else if (m === 'foto') { var a = document.createElement('a'); a.href = t3.foto(); a.download = slug() + '-3d.png'; a.click(); toast('Imagem salva.'); }
         else if (m === 'apres') { var ap = document.getElementById('btn-apresentar'); if (ap) ap.click(); }
       }; });

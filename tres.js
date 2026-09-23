@@ -2730,11 +2730,97 @@ function TRES_ENGINE(THREE, M){
       /* água ondula devagar */
       if (etapa >= 4) cena.G.acabamento.traverse(function (o) { if (o.userData.agua) { o.position.y = -.25 + Math.sin(agora * .0012) * .012; sujo = true; } });
 
+      if (filme) avancarFilme(dt);
       camera.position.copy(pos); camera.lookAt(alvo);
-      if (sujo) {
+      if (sujo || filme) {
         renderer.render(scene, camera); sujo = false;
+        if (filme && filme.onQuadro) filme.onQuadro(filme.cena, filme.t / filme.dur, filme.total);   /* logo após o render: o canvas ainda tem a imagem para copiar */
         if (sel3 && !arrastoMov && cb.selPos) cb.selPos(sel3, telaDeMovel(sel3));
       }
+    }
+
+    /* ---------- FILME: roteiro de câmera contínuo, para gravar o projeto em vídeo ----------
+       Chega pela calçada, entra, passa pelos ambientes e termina na vista aérea. Cada cena tem
+       pose de entrada e de saída; a câmera interpola devagar (sem cortes secos) e o chamador
+       desenha legendas por cima a cada quadro. */
+    var filme = null;
+    function roteiro(op){
+      op = op || {};
+      if (!cena) return [];
+      var P = cena.paradas, cs = [], fach = P.filter(function (p) { return p.id === 'fachada'; })[0];
+      var internos = P.filter(function (p) { return p.interno; }), aerea = P.filter(function (p) { return p.id === 'aerea' || p.aerea; })[0];
+      var externos = P.filter(function (p) { return p.externo && p.id !== 'fachada'; });
+      var cx = cena.casa.cx, cz = cena.casa.cz, R = Math.max(cena.casa.w, cena.casa.d) * .9 + 9;
+      function pose(p, a){ return {pos:p.slice(), alvo:a.slice()}; }
+      /* 1. abertura: giro lento em volta da casa */
+      cs.push({tipo:'capa', titulo:M.proj.nome, sub:M.fmtM2(M.areaConstruida()) + ' construídos · terreno ' + M.fmtM(M.proj.terreno.largura) + ' × ' + M.fmtM(M.proj.terreno.profundidade) + ' m',
+        dur:op.durCapa || 4.5, orbita:{de:2.1, para:2.9, phi:.95, dist:R, alvo:[cx, 1.6, cz]}});
+      /* 2. a fachada de frente */
+      if (fach) cs.push({tipo:'fachada', titulo:'A chegada', sub:fach.frase || '', dur:3.6,
+        de:pose(fach.pos, fach.alvo), para:pose([fach.pos[0] + 1.2, 1.65, fach.pos[2] + 2.2], fach.alvo)});
+      /* 3. cada ambiente: entra olhando e passeia um pouco */
+      internos.forEach(function (p) {
+        var d = new THREE.Vector3().fromArray(p.alvo).sub(new THREE.Vector3().fromArray(p.pos));
+        var lado = new THREE.Vector3(-d.z, 0, d.x).normalize().multiplyScalar(.55);
+        cs.push({tipo:'ambiente', id:p.id, titulo:p.titulo, sub:p.sub, frase:p.frase, dur:op.durAmb || 3.4,
+          de:pose(p.pos, p.alvo),
+          para:pose([p.pos[0] + lado.x, p.pos[1], p.pos[2] + lado.z], [p.alvo[0] - lado.x * .4, p.alvo[1], p.alvo[2] - lado.z * .4])});
+      });
+      /* 4. externos (varanda, piscina) */
+      externos.forEach(function (p) { cs.push({tipo:'externo', id:p.id, titulo:p.titulo, sub:p.sub, frase:p.frase, dur:3.2, de:pose(p.pos, p.alvo), para:pose([p.pos[0], p.pos[1] + .35, p.pos[2] - .8], p.alvo)}); });
+      /* 5. fecho: sobe para a aérea */
+      cs.push({tipo:'fim', titulo:'O conjunto', sub:M.fmtBRL(M.orcamento().total) + ' · estimativa de estudo', dur:op.durFim || 5,
+        de:pose(aerea ? aerea.pos : [cx - R * .4, 12, cz - R * .6], aerea ? aerea.alvo : [cx, 0, cz]),
+        para:pose([cx + R * .25, (aerea ? aerea.pos[1] : 12) + 5, cz - R * .75], [cx, 0, cz])});
+      return cs;
+    }
+    function filmar(op){
+      op = op || {};
+      if (!cena) return null;
+      var cs = roteiro(op);
+      if (modo !== 'orbit') setModo('orbit');
+      filme = {cenas:cs, i:0, t:0, dur:cs[0].dur, total:cs.reduce(function (s2, c) { return s2 + c.dur; }, 0), decorrido:0,
+        onQuadro:op.onQuadro || null, onCena:op.onCena || null, onFim:op.onFim || null, cena:cs[0]};
+      aplicarCenaFilme(0);
+      if (op.onCena) op.onCena(cs[0], 0, cs.length);
+      sujo = true;
+      return {parar:pararFilme, get total(){ return filme ? filme.total : 0; }, get cenas(){ return cs; }};
+    }
+    function aplicarCenaFilme(i){
+      var c = filme.cenas[i]; filme.cena = c; filme.dur = c.dur; filme.t = 0;
+      if (c.orbita) { orb.phi = orbD.phi = c.orbita.phi; orb.dist = orbD.dist = c.orbita.dist; orb.alvo.fromArray(c.orbita.alvo); orbD.alvo.copy(orb.alvo); orb.theta = orbD.theta = c.orbita.de; }
+    }
+    function avancarFilme(dt){
+      var c = filme.cena, e;
+      filme.t += dt; filme.decorrido += dt;
+      var u = Math.min(1, filme.t / filme.dur);
+      e = u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;   /* suave nas pontas */
+      if (c.orbita) {
+        var th = c.orbita.de + (c.orbita.para - c.orbita.de) * u;
+        orb.theta = orbD.theta = th; orb.alvo.fromArray(c.orbita.alvo); orbD.alvo.copy(orb.alvo);
+        orb.dist = orbD.dist = c.orbita.dist; orb.phi = orbD.phi = c.orbita.phi;
+        pos.set(orb.alvo.x + orb.dist * Math.sin(orb.phi) * Math.sin(th), orb.alvo.y + orb.dist * Math.cos(orb.phi), orb.alvo.z + orb.dist * Math.sin(orb.phi) * Math.cos(th));
+        alvo.copy(orb.alvo);
+      } else {
+        pos.fromArray(c.de.pos).lerp(new THREE.Vector3().fromArray(c.para.pos), e);
+        alvo.fromArray(c.de.alvo).lerp(new THREE.Vector3().fromArray(c.para.alvo), e);
+      }
+      if (filme.t >= filme.dur) {
+        if (filme.i + 1 >= filme.cenas.length) { var fim = filme.onFim; pararFilme(); if (fim) fim(); return; }
+        filme.i++; aplicarCenaFilme(filme.i);
+        if (filme.onCena) filme.onCena(filme.cena, filme.i, filme.cenas.length);
+      }
+    }
+    function pararFilme(){ if (!filme) return; filme = null; sujo = true; }
+    /* um passo do filme sem depender do requestAnimationFrame (usado pelo teste e por quem grava quadro a quadro) */
+    function passoFilme(dt){
+      if (!filme) return false;
+      avancarFilme(dt || 1 / 30);
+      if (!filme) return false;
+      camera.position.copy(pos); camera.lookAt(alvo);
+      renderer.render(scene, camera);
+      if (filme.onQuadro) filme.onQuadro(filme.cena, filme.t / filme.dur, filme.total);
+      return true;
     }
     function redimensionar(){
       var w = el.clientWidth || 300, h = el.clientHeight || 200;
@@ -2764,6 +2850,7 @@ function TRES_ENGINE(THREE, M){
         if (modo !== 'orbit') setModo('orbit');
         orbD.alvo.set(x, 1.4, z); orbD.dist = clamp(dist || 14, 4, 80); orbD.phi = 1.15; sujo = true;
       },
+      filmar:filmar, roteiro:roteiro, get filmando(){ return !!filme; }, pararFilme:pararFilme, passoFilme:passoFilme, get canvas(){ return canvas; },
       atualizar:reconstruir, _dbg:function () { return {ptr:Object.keys(ptr), let:!!arrastoLet, ab:!!arrastoAb, mov:!!arrastoMov, modo:modo}; },
       telaDe:function (x, y, z) { var v = new THREE.Vector3(x, y, z).project(camera), r = canvas.getBoundingClientRect(); return {x:(v.x + 1) / 2 * r.width + r.left, y:(1 - v.y) / 2 * r.height + r.top}; },   /* ponto do mundo → tela (conferência e menus) */
       foto:function () { renderer.render(scene, camera); return canvas.toDataURL('image/png'); },
