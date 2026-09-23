@@ -3005,6 +3005,75 @@ function TRES_ENGINE(THREE, M){
       }
     }
     function pararFilme(){ if (!filme) return; filme = null; sujo = true; }
+
+    /* ---------- REALIDADE AUMENTADA (WebXR) ----------
+       No Android com Chrome: a câmera do celular vira o fundo, um retículo procura o chão e, ao tocar,
+       a casa é ancorada ali. Dá para ver como maquete (1:50) ou em tamanho real e andar em volta.
+       Sem plugins: usa o próprio renderer.xr do three. */
+    var ar = null;
+    function entrarAR(op){
+      op = op || {};
+      if (!navigator.xr || !cena) { if (op.onErro) op.onErro('sem suporte'); return; }
+      navigator.xr.requestSession('immersive-ar', {requiredFeatures:['hit-test'], optionalFeatures:['dom-overlay'], domOverlay: op.overlay ? {root: op.overlay} : undefined})
+        .then(function (sessao) {
+          var escala = op.escala || .02;   /* 1:50 — cabe numa mesa; 1 = tamanho real */
+          var raizAR = cena.raiz, paiAntes = raizAR.parent;
+          var ancora = new THREE.Group(); scene.add(ancora);
+          ancora.add(raizAR);
+          ancora.scale.setScalar(escala);
+          ancora.position.set(0, -.6, -1.2);
+          var cxa = (cena.casaX0 + cena.casaX1) / 2, cza = cena.TP / 2;
+          raizAR.position.set(-cxa, 0, -cza);   /* o centro da casa fica no ponto tocado */
+          var fundoAntes = scene.background, fogAntes = scene.fog;
+          scene.background = null; scene.fog = null;
+          renderer.xr.enabled = true;
+          var ret = new THREE.Mesh(new THREE.RingGeometry(.09, .11, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({color:0x22B8D6}));
+          ret.visible = false; scene.add(ret);
+          ar = {sessao:sessao, ancora:ancora, raiz:raizAR, paiAntes:paiAntes, ret:ret, escala:escala, fundoAntes:fundoAntes, fogAntes:fogAntes, fonte:null, hit:null, fixada:false, op:op};
+          renderer.xr.setReferenceSpaceType('local');
+          renderer.xr.setSession(sessao).then(function () {
+            sessao.requestReferenceSpace('viewer').then(function (vs) {
+              sessao.requestHitTestSource({space:vs}).then(function (fonte) { if (ar) ar.fonte = fonte; });
+            });
+          });
+          sessao.addEventListener('select', function () {
+            if (!ar) return;
+            if (ar.hit) { ar.ancora.position.copy(ar.hit); ar.fixada = true; ret.visible = false; if (op.onFixou) op.onFixou(); }
+          });
+          sessao.addEventListener('end', function () { sairAR(); });
+          renderer.setAnimationLoop(function (t, frame) { quadroAR(frame); });
+          if (op.onEntrou) op.onEntrou(sessao);
+        })
+        .catch(function (e) { if (op.onErro) op.onErro(e && e.message ? e.message : 'não consegui abrir'); });
+    }
+    function quadroAR(frame){
+      if (!ar) return;
+      if (frame && ar.fonte && !ar.fixada) {
+        var ref = renderer.xr.getReferenceSpace(), hits = frame.getHitTestResults(ar.fonte);
+        if (hits.length) {
+          var pose = hits[0].getPose(ref);
+          ar.hit = new THREE.Vector3(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+          ar.ret.position.copy(ar.hit); ar.ret.visible = true;
+          if (!ar.fixada) ar.ancora.position.copy(ar.hit);
+        }
+      }
+      renderer.render(scene, camera);
+    }
+    function arEscala(v){ if (!ar) return; ar.escala = v; ar.ancora.scale.setScalar(v); }
+    function arGirar(graus){ if (!ar) return; ar.ancora.rotation.y += graus * Math.PI / 180; }
+    function sairAR(){
+      if (!ar) return;
+      var a = ar; ar = null;
+      try { if (a.sessao && !a.sessao.ended) a.sessao.end(); } catch (e) {}
+      renderer.setAnimationLoop(null);
+      renderer.xr.enabled = false;
+      scene.remove(a.ret);
+      a.raiz.position.set(0, 0, 0);
+      a.ancora.remove(a.raiz); scene.add(a.raiz); scene.remove(a.ancora);
+      scene.background = a.fundoAntes; scene.fog = a.fogAntes;
+      sujo = true; requestAnimationFrame(quadroAnim);
+      if (a.op && a.op.onFim) a.op.onFim();
+    }
     /* um passo do filme sem depender do requestAnimationFrame (usado pelo teste e por quem grava quadro a quadro) */
     function passoFilme(dt){
       if (!filme) return false;
@@ -3045,6 +3114,7 @@ function TRES_ENGINE(THREE, M){
         orbD.alvo.set(x, 1.4, z); orbD.dist = clamp(dist || 14, 4, 80); orbD.phi = 1.15; sujo = true;
       },
       filmar:filmar, roteiro:roteiro, get filmando(){ return !!filme; }, pararFilme:pararFilme, passoFilme:passoFilme, get canvas(){ return canvas; },
+      entrarAR:entrarAR, sairAR:sairAR, arEscala:arEscala, arGirar:arGirar, get emAR(){ return !!ar; },
       atualizar:reconstruir, _dbg:function () { return {ptr:Object.keys(ptr), let:!!arrastoLet, ab:!!arrastoAb, mov:!!arrastoMov, modo:modo, solPos:sol.position.toArray(), solInt:sol.intensity}; },
       telaDe:function (x, y, z) { var v = new THREE.Vector3(x, y, z).project(camera), r = canvas.getBoundingClientRect(); return {x:(v.x + 1) / 2 * r.width + r.left, y:(1 - v.y) / 2 * r.height + r.top}; },   /* ponto do mundo → tela (conferência e menus) */
       foto:function () { renderer.render(scene, camera); return canvas.toDataURL('image/png'); },

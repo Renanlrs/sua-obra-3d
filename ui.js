@@ -82,6 +82,8 @@ var UI = (function () {
       window.parent.postMessage({type:'suaobra:pronto'}, '*');
       return;
     }
+    /* link com o projeto dentro (#p=…): abre direto no 3D — é o QR do celular */
+    if (carregarDoLink()) return;
     /* ?demo=casa-terrea&l=10&p=25&v=planta — abre direto, para conferência e print */
     if (q.has('demo')) {
       var k = q.get('demo') || 'casa-terrea';
@@ -107,6 +109,7 @@ var UI = (function () {
       if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true); } }
       if (q.get('fprompt') && viewAtual === 'tresd') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true, +q.get('fz') || 1); }
       if (q.get('fach')) { try { M.proj.fachada = Object.assign(M.proj.fachada || {}, JSON.parse(q.get('fach'))); } catch (e) {} if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true, +q.get('fz') || 1); } }   /* &fach={"cobertura":"galpao"} (conferência) */
+      if (q.has('cel')) setTimeout(function () { dialogoCelular(); if (q.get('cel') === 'big') setTimeout(function () { var b = document.querySelector('[data-ampliar]'); if (b) b.click(); }, 700); }, 600);   /* &cel=1 abre o QR · &cel=big já amplia (conferência) */
       if (q.has('sol')) setTimeout(function () {   /* &sol=1 abre o estudo · &sol=15 já vai para as 15h (conferência) */
         var hq = parseFloat(q.get('sol'));
         if (hq > 1) setSolCfg({hora:hq, on:true}, true);
@@ -732,6 +735,148 @@ var UI = (function () {
     insp.innerHTML = h;
     ligarInspector(a);
   }
+  /* ================= VER NO CELULAR / AR =================
+     O projeto inteiro cabe num link: comprime o JSON (só o essencial), põe na hash e desenha um QR
+     offline. O celular abre o mesmo app (GitHub Pages ou o servidor onde este arquivo está), carrega
+     o projeto do link e entra no 3D — e, no Android com Chrome, no modo AR de verdade (WebXR):
+     a casa aparece em tamanho real no terreno, ou como maquete em cima da mesa. */
+  var AR_BASE = 'https://renanlrs.github.io/sua-obra-3d/';
+  /* o link carrega o projeto inteiro: listas viram arrays posicionais (bem menor que objetos com chaves),
+     sem renders, logo nem versões. Os ids dos AMBIENTES são mantidos porque proj.aberturas usa eles. */
+  function projetoMagro(op){
+    op = op || {};
+    var p = M.proj, t = p.terreno, curto = {};
+    p.ambientes.forEach(function (a, i) { curto[a.id] = 'a' + i; });   /* ids curtos: o link encolhe e o QR fica menos denso */
+    function troca(k){ return String(k).split('|').map(function (parte) { return curto[parte] || parte; }).join('|'); }
+    var ab = null;
+    if (p.aberturas) { ab = {}; Object.keys(p.aberturas).forEach(function (k) { ab[troca(k)] = p.aberturas[k]; }); if (!Object.keys(ab).length) ab = null; }
+    return {v:1, n:p.nome, t:p.tipoKey, pd:p.peDireito, pa:p.padrao,
+      tr:[t.largura, t.profundidade, t.recuoFrontal, t.recuoLateral, t.recuoFundo],
+      a:p.ambientes.map(function (a) { return [curto[a.id], a.nome, a.tipo, a.x, a.y, a.w, a.h, a.pav || 0]; }),
+      m:op.semMoveis ? [] : (p.moveis || []).map(function (m2) { return [m2.k, m2.x, m2.y, m2.rot || 0, m2.pav || 0, m2.esp ? 1 : 0, m2.elev || 0, m2.w || 0, m2.d || 0, m2.alt || 0]; }),
+      c:(p.coberturas || []).map(function (c) { var o = {}; Object.keys(c).forEach(function (k) { if (c[k] !== '' && c[k] != null) o[k] = c[k]; }); return o; }),
+      f:p.fachada || null, ab:ab, en:p.entradaEm ? troca(p.entradaEm) : null, sl:p.sol || null, eq:p.equip || null};
+  }
+  function projetoDoMagro(j){
+    var tr = j.tr || [1000, 2500, 400, 150, 300];
+    return {id:'link', nome:j.n || 'Projeto', tipoKey:j.t || 'casa-terrea', criado:Date.now(),
+      terreno:{largura:tr[0], profundidade:tr[1], recuoFrontal:tr[2], recuoLateral:tr[3], recuoFundo:tr[4]},
+      peDireito:j.pd || 280, padrao:j.pa || 'padrao', meta:0, reservaPct:10, equip:j.eq || {aquecimento:0, filtragem:0},
+      ambientes:(j.a || []).map(function (a) { var o = {id:a[0], nome:a[1], tipo:a[2], x:a[3], y:a[4], w:a[5], h:a[6]}; if (a[7]) o.pav = a[7]; return o; }),
+      moveis:(j.m || []).map(function (m2, i) { var o = {id:'l' + i, k:m2[0], x:m2[1], y:m2[2], rot:m2[3] || 0}; if (m2[4]) o.pav = m2[4]; if (m2[5]) o.esp = true; if (m2[6]) o.elev = m2[6]; if (m2[7]) o.w = m2[7]; if (m2[8]) o.d = m2[8]; if (m2[9]) o.alt = m2[9]; return o; }),
+      coberturas:j.c || [], fachada:j.f || null, aberturas:j.ab || null, entradaEm:j.en || null, sol:j.sl || null,
+      cotas:[], renders:[], versoes:[]};
+  }
+  function b64url(bytes){ var s = ''; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function deB64url(s){ s = s.replace(/-/g, '+').replace(/_/g, '/'); var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function comprimir(txt){   /* gzip do navegador; sem ele, o link vai cru */
+    var bytes = new TextEncoder().encode(txt);
+    if (!window.CompressionStream) return Promise.resolve({dados:b64url(bytes), z:0});
+    var cs = new CompressionStream('gzip'), w = cs.writable.getWriter(); w.write(bytes); w.close();
+    return new Response(cs.readable).arrayBuffer().then(function (ab) { return {dados:b64url(new Uint8Array(ab)), z:1}; });
+  }
+  function descomprimir(s, z){
+    var u = deB64url(s);
+    if (!z || !window.DecompressionStream) return Promise.resolve(new TextDecoder().decode(u));
+    var ds = new DecompressionStream('gzip'), w = ds.writable.getWriter(); w.write(u); w.close();
+    return new Response(ds.readable).arrayBuffer().then(function (ab) { return new TextDecoder().decode(new Uint8Array(ab)); });
+  }
+  function linkDoProjeto(op){
+    return comprimir(JSON.stringify(projetoMagro(op))).then(function (r) {
+      var base = /^https?:/.test(location.href) ? location.href.split('#')[0].split('?')[0] : AR_BASE;
+      return base + '#p=' + (r.z ? 'z' : 'c') + r.dados;
+    });
+  }
+  /* o app abre um link com #p= : carrega o projeto e vai direto para o 3D (ou para o AR) */
+  function carregarDoLink(){
+    var h = location.hash || '';
+    var m2 = h.match(/[#&]p=([zc])([A-Za-z0-9\-_]+)/);
+    if (!m2) return false;
+    var ar = /[#&]ar=1/.test(h);
+    descomprimir(m2[2], m2[1] === 'z').then(function (txt) {
+      var j = JSON.parse(txt);
+      M.carregar(projetoDoMagro(j));
+      $('#home').hidden = true; $('#app').hidden = false;
+      irPara('tresd'); refreshTop();
+      setTimeout(function () { if (ar) abrirAR(true); else toast('Projeto aberto pelo link. Toque em ⋯ → Ver no celular para entrar no AR.'); }, 600);
+    }).catch(function (e) { toast('Não consegui ler o projeto deste link.'); });
+    return true;
+  }
+  /* --- tela: QR + botão de AR --- */
+  function dialogoCelular(){
+    if (!t3 && viewAtual !== 'tresd') { irPara('tresd'); setTimeout(dialogoCelular, 450); return; }
+    var d = document.createElement('div'); d.className = 'vid-painel';
+    d.innerHTML = '<div class="vid-box"><h3>📱 Ver no celular (e em AR)</h3>' +
+      '<p class="vid-txt">O projeto inteiro cabe neste QR. Aponte a câmera do celular: ele abre o mesmo app, já com a casa carregada. No <b>Android com Chrome</b> dá para tocar em <b>Ver em AR</b> e colocar a casa no terreno em tamanho real (ou como maquete na mesa).</p>' +
+      '<div class="qr-wrap"><canvas class="qr-cv" width="360" height="360"></canvas><div class="qr-status">Montando o link…</div></div>' +
+      '<div class="chips" style="margin-top:6px"><button class="chip" data-ampliar>🔍 Ampliar o QR</button><button class="chip" data-copiar>Copiar link (com móveis)</button><button class="chip" data-abrir>Abrir aqui</button><button class="chip" data-leve>Pôr os móveis no QR</button>' +
+      (temAR() ? '<button class="chip on" data-ar>Ver em AR agora</button>' : '') + '</div>' +
+      '<div class="ins-empty" style="margin-top:8px">O link leva o projeto inteiro dentro dele — nada é enviado para servidor nenhum. Quanto maior a casa, maior o QR.</div>' +
+      '<div class="vid-acts"><button class="btn ghost sm" data-fechar>Fechar</button></div></div>';
+    document.body.appendChild(d);
+    d.querySelector('[data-fechar]').onclick = function () { d.remove(); };
+    var cv = d.querySelector('.qr-cv'), st = d.querySelector('.qr-status'), linkPronto = '', linkCheio = '', semMoveis = true;   /* o QR nasce leve: denso demais a câmera não lê */
+    function montar(){ st.textContent = 'Montando o link…'; linkDoProjeto({semMoveis:semMoveis}).then(pintar); }
+    function pintar(url){
+      linkPronto = url;
+      if (!semMoveis) linkCheio = url;
+      var q = QR.desenhar(cv.getContext('2d'), url, 440, 0, 0);
+      if (!q) { st.textContent = 'Projeto grande demais para o QR — use “Copiar link” e mande pelo WhatsApp.'; cv.style.display = 'none'; }
+      else st.innerHTML = 'QR versão ' + q.ver + ' · ' + (url.length / 1024).toFixed(1) + ' KB no link' +
+        (q.ver > 16 ? '<br><b style="color:#E0B44C">QR denso: chegue perto com a câmera, ou use “Copiar link”.</b>' : '') +
+        (semMoveis ? ' · sem móveis' : '') +
+        (/^file:/.test(location.href) ? '<br><b style="color:#E0B44C">Este app está aberto como arquivo: o QR aponta para a versão publicada (renanlrs.github.io) — o projeto vai junto no link e abre igual.</b>' : '');
+    }
+    montar();
+    linkDoProjeto({}).then(function (u) { linkCheio = u; });   /* o link copiado leva tudo, inclusive os móveis */
+    var bl = d.querySelector('[data-leve]');
+    bl.onclick = function () { semMoveis = !semMoveis; bl.classList.toggle('on', !semMoveis); bl.textContent = semMoveis ? 'Pôr os móveis no QR' : 'Tirar os móveis do QR'; montar(); };
+    d.querySelector('[data-ampliar]').onclick = function () { ampliarQR(linkPronto); };
+    d.querySelector('[data-copiar]').onclick = function () { var u = linkCheio || linkPronto; if (!u) return; navigator.clipboard.writeText(u).then(function () { toast('Link copiado (projeto inteiro) — cole no WhatsApp.'); }); };
+    d.querySelector('[data-abrir]').onclick = function () { var u = linkCheio || linkPronto; if (u) window.open(u, '_blank'); };
+    var bar = d.querySelector('[data-ar]'); if (bar) bar.onclick = function () { d.remove(); abrirAR(); };
+  }
+  /* QR em tela cheia: quanto maior na tela, mais fácil a câmera ler */
+  function ampliarQR(url){
+    if (!url) return;
+    var d = document.createElement('div'); d.className = 'qr-full';
+    var lado = Math.min(window.innerWidth, window.innerHeight) - 60;
+    d.innerHTML = '<canvas width="' + lado + '" height="' + lado + '"></canvas><p>Aponte a câmera do celular · toque para fechar</p>';
+    document.body.appendChild(d);
+    QR.desenhar(d.querySelector('canvas').getContext('2d'), url, lado, 0, 0);
+    d.onclick = function () { d.remove(); };
+  }
+  function temAR(){ return !!(navigator.xr && navigator.xr.isSessionSupported); }
+  function abrirAR(auto){
+    if (!t3) { if (viewAtual !== 'tresd') { irPara('tresd'); setTimeout(function () { abrirAR(auto); }, 500); return; } toast('Abra o 3D primeiro.'); return; }
+    if (!navigator.xr) { toast('Este aparelho não tem AR. Abra o link no celular (Android + Chrome).'); return; }
+    navigator.xr.isSessionSupported('immersive-ar').then(function (ok) {
+      if (!ok) { toast('Este aparelho não tem AR — no iPhone o link abre o 3D normal, dá para girar e entrar na casa.'); return; }
+      var ov = document.createElement('div'); ov.className = 'ar-ov';
+      ov.innerHTML = '<div class="ar-dica">Aponte para o chão e toque para colocar a casa</div>' +
+        '<div class="ar-ctrl">' +
+        '<button data-ar-esc="0.02" class="on">Maquete 1:50</button>' +
+        '<button data-ar-esc="0.1">1:10</button>' +
+        '<button data-ar-esc="1">Tamanho real</button>' +
+        '<button data-ar-gira="-30">⟲</button><button data-ar-gira="30">⟳</button>' +
+        '<button data-ar-sair class="sair">Sair</button></div>';
+      document.body.appendChild(ov);
+      function fora(){ if (ov.parentNode) ov.remove(); }
+      ov.querySelectorAll('[data-ar-esc]').forEach(function (b) { b.onclick = function () {
+        t3.arEscala(+b.getAttribute('data-ar-esc'));
+        ov.querySelectorAll('[data-ar-esc]').forEach(function (x) { x.classList.toggle('on', x === b); });
+      }; });
+      ov.querySelectorAll('[data-ar-gira]').forEach(function (b) { b.onclick = function () { t3.arGirar(+b.getAttribute('data-ar-gira')); }; });
+      ov.querySelector('[data-ar-sair]').onclick = function () { t3.sairAR(); };
+      t3.entrarAR({
+        escala:.02, overlay:ov,
+        onFixou: function () { var dd = ov.querySelector('.ar-dica'); if (dd) dd.textContent = 'Casa colocada — ande em volta. Toque nos botões para mudar o tamanho.'; },
+        onFim: function () { fora(); toast('Saiu do AR.'); },
+        onErro: function (msg) { fora(); toast('AR: ' + msg); }
+      });
+    });
+  }
+
   /* ================= SOL DE VERDADE (estudo de insolação) =================
      Cidade + data + hora + para onde aponta o Norte: o sol do 3D vai para a posição real e as sombras
      andam. A tabela diz quantas horas de sol cada ambiente recebe naquele dia (a casa e as coberturas
@@ -1448,6 +1593,7 @@ var UI = (function () {
     {n:'Mobiliar (catálogo de móveis)', g:'M', f:function(){ if (viewAtual !== 'planta' && viewAtual !== 'tresd') irPara('planta'); toggleCatalogo(true); }},
     {n:'Gerar vídeo do projeto (para WhatsApp)', g:'', f:function(){ dialogoVideo(); }},
     {n:'Sol de verdade: insolação por hora e por ambiente', g:'', f:function(){ abrirSol(); }},
+    {n:'Ver no celular / realidade aumentada (QR)', g:'', f:function(){ dialogoCelular(); }},
     {n:'Cobertura independente (telhado à parte)', g:'T', f:function(){ novaCobertura(); }},
     {n:'Cobrir a garagem',    g:'', f:function(){ novaCobertura(COB_PRESETS.garagem); }},
     {n:'Cobrir a área da piscina', g:'', f:function(){ novaCobertura(COB_PRESETS.piscina); }},
@@ -1682,6 +1828,7 @@ var UI = (function () {
         '<button class="ctx-it" data-m="cob">⛱ Nova cobertura independente</button>' +
         '<button class="ctx-it" data-m="video">🎬 Gerar vídeo do projeto</button>' +
         '<button class="ctx-it" data-m="sol">☀ Sol de verdade (insolação)</button>' +
+        '<button class="ctx-it" data-m="cel">📱 Ver no celular / AR (QR)</button>' +
         '<button class="ctx-it" data-m="foto">📷 Salvar imagem (PNG)</button>' +
         '<button class="ctx-it" data-m="apres">▶ Apresentar ao cliente</button>';
       var r = this.getBoundingClientRect(); c.style.left = Math.max(8, Math.min(window.innerWidth - 268, r.right - 260)) + 'px'; c.style.top = (r.bottom + 6) + 'px'; c.hidden = false;
@@ -1691,6 +1838,7 @@ var UI = (function () {
         else if (m === 'cob') { var nc2 = novaCobertura(); t3.olharPara((nc2.x + nc2.w / 2) * .01, (nc2.y + nc2.h / 2) * .01, Math.max(nc2.w, nc2.h) * .01 * 1.6 + 6); }
         else if (m === 'video') dialogoVideo();
         else if (m === 'sol') abrirSol();
+        else if (m === 'cel') dialogoCelular();
         else if (m === 'foto') { var a = document.createElement('a'); a.href = t3.foto(); a.download = slug() + '-3d.png'; a.click(); toast('Imagem salva.'); }
         else if (m === 'apres') { var ap = document.getElementById('btn-apresentar'); if (ap) ap.click(); }
       }; });
@@ -2396,6 +2544,7 @@ var UI = (function () {
     editarCota:editarCota, renomearInline:renomearInline, addRoomDefault:addRoomDefault,
     radial:radial, addMovel:addMovel, acaoMovel:acaoMovel, toggleCatalogo:toggleCatalogo, htmlPasseio:htmlPasseio,
     selTap:selTap, fecharInsp:function(){ setInsp(false); }, get t3(){ return t3; }, novaCobertura:novaCobertura, acaoCobertura:acaoCobertura,
+    linkDoProjeto:linkDoProjeto, dialogoCelular:dialogoCelular, abrirAR:abrirAR, abrirSol:abrirSol, dialogoVideo:dialogoVideo,
     toast:toast, saveState:saveState, zoomLabel:zoomLabel, coord:coord, hud:hud, msg:msg, menuContexto:menuContexto, fecharPop:fecharPop, copiarDeFoto:copiarDeFoto, pedirChave:pedirChave, popFachada:popFachada,
     closeOverlays:closeOverlays, fecharApres:fecharApres, abrirApres:abrirApres, exportar:exportar,
     get shift(){ return shift; }, get alt(){ return alt; }, get espaco(){ return espaco; }

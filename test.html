@@ -10,7 +10,7 @@ h1{font-size:15px;margin:0 0 16px}
 <h1>SUA OBRA 3D — verificação do modelo e das vistas</h1>
 <div id="out"></div>
 <div id="resumo"></div>
-<script src="icons.js"></script><script src="moveis.js"></script><script src="model.js"></script><script src="visao.js"></script>
+<script src="qr.js"></script><script src="icons.js"></script><script src="moveis.js"></script><script src="model.js"></script><script src="visao.js"></script>
 <script src="views.js"></script>
 <script src="tres.js"></script>
 <script>
@@ -404,6 +404,15 @@ t('elevação 2D desenha galpão (tesoura), arco e shed com a cor da estrutura',
 M.proj.fachada = {cobertura:'galpao'};
 t('custo: galpão entra como cobertura com estrutura e a telha cerâmica não é cobrada como tal', M.custoFachadaItens().some(function (i) { return /galp/i.test(i.rot); }));
 M.proj.fachada = null;
+/* ---- 23/09: QR próprio (o celular precisa ler de verdade) ---- */
+var q1 = QR.gerar('https://renanlrs.github.io/sua-obra-3d/#p=zH4sIA');
+t('QR gera matriz quadrada com tamanho de versão válido', q1 && q1.n === q1.ver * 4 + 17 && q1.m.length === q1.n, q1 ? 'v' + q1.ver + ' · ' + q1.n + '×' + q1.n : 'nulo');
+t('QR tem os três marcadores de canto', q1 && q1.m[0][0] === 1 && q1.m[6][6] === 1 && q1.m[0][6] === 1 && q1.m[3][3] === 1 && q1.m[0][q1.n - 1] === 1 && q1.m[q1.n - 1][0] === 1);
+t('QR cresce de versão conforme o texto cresce', QR.gerar('x'.repeat(40)).ver < QR.gerar('x'.repeat(400)).ver);
+t('QR devolve nulo quando não cabe (o app cai para “copiar link”)', QR.gerar('x'.repeat(8000)) === null);
+var cvQ = document.createElement('canvas'); cvQ.width = cvQ.height = 200;
+t('QR desenha no canvas sem quebrar', !!QR.desenhar(cvQ.getContext('2d'), 'teste', 200, 0, 0));
+
 /* ---- 23/09: sol de verdade (insolação) ---- */
 var CAMP = TF.CIDADES.campinas;
 var solDez = TF.posicaoSol(CAMP.lat, CAMP.lon, CAMP.tz, 355, 12), solJun = TF.posicaoSol(CAMP.lat, CAMP.lon, CAMP.tz, 172, 12);

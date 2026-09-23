@@ -130,6 +130,41 @@ f.onload = function () {
                     W.M.proj.fachada = null; W.M.novo('casa-terrea', 1000, 2500); t3.atualizar();
                     /* ---- filme: roteiro, avanço das cenas e gravação real em vídeo ---- */
                     setTimeout(function () {
+                      /* ---- link do projeto: cabe numa URL, volta igual e o QR sai legível ---- */
+                      W.M.novo('casa-terrea', 1100, 2400);
+                      var antes = {amb:W.M.proj.ambientes.length, mov:W.M.proj.moveis.length, nome:W.M.proj.nome, area:W.M.areaConstruida()};
+                      W.M.proj.fachada = {estilo:'rustico', letreiro:'TESTE'};
+                      W.UI.linkDoProjeto().then(function (url) {
+                        t('o link do projeto sai pronto e leva os dados dentro', /#p=[zc][A-Za-z0-9\-_]+$/.test(url), (url.length / 1024).toFixed(1) + ' KB');
+                        var qq = W.QR.gerar(url);
+                        t('o QR cabe nesse link', !!qq, qq ? 'versão ' + qq.ver : 'não coube');
+                        /* AR: sem WebXR (desktop) tem que avisar e seguir vivo, nunca quebrar */
+                        var erroAR = null, chamou = false;
+                        try { t3.entrarAR({onErro: function (msg) { erroAR = msg; chamou = true; }}); } catch (e6) { erroAR = 'exceção: ' + e6.message; chamou = true; }
+                        t('sem WebXR o AR avisa em vez de quebrar', !W.navigator.xr ? (chamou && !t3.emAR) : true, W.navigator.xr ? 'este navegador tem WebXR' : String(erroAR));
+                        t('o 3D continua funcionando depois da tentativa de AR', !!t3._cena() && !t3.emAR);
+                        W.UI.linkDoProjeto({semMoveis:true}).then(function (u2) {
+                          var q2 = W.QR.gerar(u2);
+                          t('sem os móveis o link encolhe e o QR fica bem menos denso', u2.length < url.length * .75 && q2 && q2.ver < qq.ver - 4, (u2.length / 1024).toFixed(1) + ' KB · versão ' + (q2 ? q2.ver : '-'));
+                        });
+                        /* abre o link numa segunda janela (mesmo app) e confere que o projeto voltou igual */
+                        var f2 = f.contentDocument.createElement('iframe');
+                        f2.style.cssText = 'width:900px;height:600px;border:0';
+                        f2.src = url.replace(/^https:\/\/renanlrs\.github\.io\/sua-obra-3d\//, location.origin + '/');
+                        f.contentDocument.body.appendChild(f2);
+                        f2.onload = function () {
+                          setTimeout(function () {
+                            var W2 = f2.contentWindow, p2 = W2.M && W2.M.proj;
+                            t('abrir o link recria o projeto igual (ambientes, móveis, nome e área)',
+                              !!p2 && p2.ambientes.length === antes.amb && p2.moveis.length === antes.mov && p2.nome === antes.nome && Math.abs(W2.M.areaConstruida() - antes.area) < 1,
+                              p2 ? p2.ambientes.length + ' amb · ' + p2.moveis.length + ' móveis · ' + W2.M.areaConstruida() + ' cm²' : 'não abriu');
+                            t('a fachada escolhida também viaja no link', !!p2 && p2.fachada && p2.fachada.estilo === 'rustico' && p2.fachada.letreiro === 'TESTE');
+                            t('o link abre direto no 3D', !!W2.UI && !!W2.UI.t3);
+                            f2.remove(); W.M.proj.fachada = null; segue();
+                          }, 2500);
+                        };
+                      });
+                      function segue(){
                       /* ---- sol de verdade: a luz vai para a posição real e muda com a hora ---- */
                       t3.setSol({cidade:'campinas', dia:355, hora:8, norte:0});
                       var s8 = t3._dbg().solPos.slice(), i8 = t3.infoSol();
@@ -144,6 +179,7 @@ f.onload = function () {
                       t('ao meio-dia o sol de dezembro fica mais alto que o de junho', alto > t3._dbg().solPos[1], alto.toFixed(1) + ' vs ' + t3._dbg().solPos[1].toFixed(1));
                       t3.setSol(null);
                       t('desligar volta ao sol de estúdio', !t3.sol && t3._dbg().solInt > 1);
+                      W.M.novo('casa-terrea', 1000, 2500); t3.atualizar();
                       var cs = t3.roteiro({});
                       t('o roteiro do vídeo tem capa, fachada, ambientes e fecho', cs.length >= 5 && cs[0].tipo === 'capa' && cs.some(function (c) { return c.tipo === 'ambiente'; }) && cs[cs.length - 1].tipo === 'fim', cs.map(function (c) { return c.tipo; }).join(','));
                       t('toda cena tem duração e título', cs.every(function (c) { return c.dur > 0 && c.titulo; }));
@@ -186,6 +222,7 @@ f.onload = function () {
                           if (!t3.passoFilme(1 / 15) || n2 > 90) { W.clearInterval(timer); setTimeout(function () { try { if (rec.state !== 'inactive') rec.stop(); } catch (e5) {} }, 300); }
                         }, 33);
                       }, 2600);
+                      }
                     }, 400);
                   }, 600);
                 }, 700);
