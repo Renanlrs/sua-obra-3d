@@ -715,6 +715,146 @@ function TRES_ENGINE(THREE, M){
     return vidroCache[tipo];
   }
   function corMat(hex, op){ var k = hex + (op ? JSON.stringify(op) : ''); if (!corCache[k]) corCache[k] = std(hex, op); return corCache[k]; }
+
+  /* ================= SOL DE VERDADE (insolação) =================
+     Posição do sol pela data, hora e latitude — fórmulas de astronomia de posição (NOAA, simplificadas).
+     Serve para as sombras do 3D andarem certo e para dizer quantas horas de sol cada ambiente recebe.
+     `norte` é para onde aponta o Norte na planta, em graus horários a partir de "para cima" (−y). */
+  var CIDADES = {
+    campinas:  {rot:'Campinas / SP',      lat:-22.91, lon:-47.06, tz:-3},
+    saopaulo:  {rot:'São Paulo / SP',     lat:-23.55, lon:-46.63, tz:-3},
+    rio:       {rot:'Rio de Janeiro / RJ', lat:-22.91, lon:-43.20, tz:-3},
+    brasilia:  {rot:'Brasília / DF',      lat:-15.79, lon:-47.88, tz:-3},
+    curitiba:  {rot:'Curitiba / PR',      lat:-25.43, lon:-49.27, tz:-3},
+    portoalegre:{rot:'Porto Alegre / RS', lat:-30.03, lon:-51.22, tz:-3},
+    salvador:  {rot:'Salvador / BA',      lat:-12.97, lon:-38.50, tz:-3},
+    recife:    {rot:'Recife / PE',        lat:-8.05,  lon:-34.90, tz:-3},
+    belem:     {rot:'Belém / PA',         lat:-1.46,  lon:-48.50, tz:-3},
+    manaus:    {rot:'Manaus / AM',        lat:-3.12,  lon:-60.02, tz:-4},
+    goiania:   {rot:'Goiânia / GO',       lat:-16.68, lon:-49.25, tz:-3},
+    fortaleza: {rot:'Fortaleza / CE',     lat:-3.73,  lon:-38.52, tz:-3}
+  };
+  var DATAS = {verao:{rot:'21/dez (verão)', dia:355}, inverno:{rot:'21/jun (inverno)', dia:172}, equinocio:{rot:'21/mar (equinócio)', dia:80}, hoje:{rot:'Hoje', dia:null}};
+  function diaDoAno(d){ d = d || new Date(); return Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000); }
+  /* altura e azimute do sol (graus). azimute 0 = Norte, 90 = Leste (sentido horário) */
+  function posicaoSol(lat, lon, tz, dia, hora){
+    var rad = Math.PI / 180;
+    var g = 360 / 365 * (dia - 81) * rad;                       /* ângulo do dia */
+    var decl = 23.45 * Math.sin(g) * rad;                        /* declinação solar */
+    var eot = 9.87 * Math.sin(2 * g) - 7.53 * Math.cos(g) - 1.5 * Math.sin(g);   /* equação do tempo (min) */
+    var horaSolar = hora + (4 * (lon - tz * 15) + eot) / 60;
+    var H = (horaSolar - 12) * 15 * rad;                         /* ângulo horário */
+    var la = lat * rad;
+    var sinAlt = Math.sin(la) * Math.sin(decl) + Math.cos(la) * Math.cos(decl) * Math.cos(H);
+    var alt = Math.asin(Math.max(-1, Math.min(1, sinAlt)));
+    var cosAz = (Math.sin(decl) - Math.sin(alt) * Math.sin(la)) / (Math.cos(alt) * Math.cos(la));
+    var az = Math.acos(Math.max(-1, Math.min(1, cosAz)));
+    if (H > 0) az = 2 * Math.PI - az;                            /* tarde: sol a oeste */
+    return {alt: alt / rad, az: az / rad};
+  }
+  /* nascer e pôr do sol (hora local decimal) */
+  function nascerPor(lat, lon, tz, dia){
+    var rad = Math.PI / 180, g = 360 / 365 * (dia - 81) * rad;
+    var decl = 23.45 * Math.sin(g) * rad, la = lat * rad;
+    var cosH = -Math.tan(la) * Math.tan(decl);
+    if (cosH > 1) return {nascer:null, por:null};                /* noite polar */
+    if (cosH < -1) return {nascer:0, por:24};                     /* sol da meia-noite */
+    var H = Math.acos(cosH) / rad / 15;
+    var eot = 9.87 * Math.sin(2 * g) - 7.53 * Math.cos(g) - 1.5 * Math.sin(g);
+    var meio = 12 - (4 * (lon - tz * 15) + eot) / 60;
+    return {nascer: meio - H, por: meio + H};
+  }
+  /* direção do sol no mundo do app (x para a direita, z para o fundo do terreno, y para cima).
+     A frente do terreno (rua) é z = 0; `norte` gira a rosa dos ventos. */
+  function direcaoSol(p, norte){
+    var rad = Math.PI / 180, altR = p.alt * rad, azR = (p.az + (norte || 0)) * rad;
+    return {x: Math.sin(azR) * Math.cos(altR), y: Math.sin(altR), z: -Math.cos(azR) * Math.cos(altR)};
+  }
+  /* quantas horas de sol um ponto do terreno recebe no dia (passo de 15 min), considerando a
+     sombra da casa e das coberturas — teste de visibilidade por caixas, sem raytracer */
+  function horasDeSol(proj, cfg, ponto){
+    var c = CIDADES[cfg.cidade] || CIDADES.campinas, dia = cfg.dia || diaDoAno(), norte = cfg.norte || 0;
+    var np = nascerPor(c.lat, c.lon, c.tz, dia); if (np.nascer === null) return 0;
+    var caixas = volumesQueSombreiam(proj), h = 0, passo = .25;
+    for (var t = Math.max(0, np.nascer); t <= Math.min(24, np.por); t += passo) {
+      var p = posicaoSol(c.lat, c.lon, c.tz, dia, t);
+      if (p.alt <= 3) continue;                                   /* sol muito baixo não conta */
+      var d = direcaoSol(p, norte);
+      if (!bloqueado(ponto, d, caixas)) h += passo;
+    }
+    return h;
+  }
+  function volumesQueSombreiam(proj){
+    var H = proj.peDireito || 280, LAJE = 15, out = [];
+    proj.ambientes.forEach(function (a) {
+      if (a.tipo === 'externo' || a.tipo === 'agua') return;
+      var pav = a.pav || 0;
+      out.push({x0:a.x, x1:a.x + a.w, z0:a.y, z1:a.y + a.h, y0:pav * (H + LAJE), y1:(pav + 1) * (H + LAJE)});
+    });
+    (proj.coberturas || []).forEach(function (c) {
+      var f = M.cobCfg ? M.cobCfg(c) : c, base = (c.pav || 0) * (H + LAJE), topo = base + (f.alt || 280) + 60;
+      out.push({x0:c.x - (f.beiral || 0), x1:c.x + c.w + (f.beiral || 0), z0:c.y - (f.beiral || 0), z1:c.y + c.h + (f.beiral || 0), y0:base + (f.alt || 280) - 20, y1:topo});
+    });
+    return out;
+  }
+  /* o raio do ponto até o sol atravessa alguma caixa? (tudo em cm) */
+  function bloqueado(ponto, dir, caixas){
+    if (dir.y <= 0) return true;
+    for (var i = 0; i < caixas.length; i++) {
+      var b = caixas[i];
+      var t0 = (b.y0 - ponto.y) / dir.y, t1 = (b.y1 - ponto.y) / dir.y;
+      var ta = Math.max(0, Math.min(t0, t1)), tb = Math.max(t0, t1);
+      if (tb <= 0) continue;
+      var passos = 6;
+      for (var s = 0; s <= passos; s++) {
+        var t = ta + (tb - ta) * s / passos;
+        var x = ponto.x + dir.x * t, z = ponto.z + dir.z * t, y = ponto.y + dir.y * t;
+        if (y >= b.y0 - 1 && y <= b.y1 + 1 && x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1) return true;
+      }
+    }
+    return false;
+  }
+  /* lados do ambiente que dão para fora (é por eles que o sol entra) */
+  function facesExternas(proj, a){
+    var pav = a.pav || 0, viz = proj.ambientes.filter(function (b) { return b !== a && (b.pav || 0) === pav && b.tipo !== 'externo' && b.tipo !== 'agua'; });
+    function tapado(lado){
+      var cob = 0, tot = lado.horiz ? a.w : a.h;
+      viz.forEach(function (b) {
+        if (lado.k === 'n' && Math.abs(b.y + b.h - a.y) > 20) return;
+        if (lado.k === 's' && Math.abs(b.y - (a.y + a.h)) > 20) return;
+        if (lado.k === 'w' && Math.abs(b.x + b.w - a.x) > 20) return;
+        if (lado.k === 'e' && Math.abs(b.x - (a.x + a.w)) > 20) return;
+        cob += lado.horiz ? Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
+                          : Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+      });
+      return cob > tot * .8;
+    }
+    var lados = [
+      {k:'n', horiz:true,  x:a.x + a.w / 2, z:a.y - 25},
+      {k:'s', horiz:true,  x:a.x + a.w / 2, z:a.y + a.h + 25},
+      {k:'w', horiz:false, x:a.x - 25,      z:a.y + a.h / 2},
+      {k:'e', horiz:false, x:a.x + a.w + 25, z:a.y + a.h / 2}
+    ];
+    return lados.filter(function (l) { return !tapado(l); });
+  }
+  /* insolação de cada ambiente: nos ambientes cobertos mede do lado de fora de cada parede externa,
+     a 1,20 m do chão (onde ficaria a janela) e fica com o melhor lado; nos externos/piscina, no centro */
+  function insolacao(proj, cfg){
+    cfg = cfg || {};
+    var H = proj.peDireito || 280, LAJE = 15;
+    return proj.ambientes.map(function (a) {
+      var y = (a.pav || 0) * (H + LAJE) + 120, horas = 0, lado = null;
+      if (a.tipo === 'externo' || a.tipo === 'agua') {
+        horas = horasDeSol(proj, cfg, {x:a.x + a.w / 2, y:(a.pav || 0) * (H + LAJE) + 10, z:a.y + a.h / 2});
+      } else {
+        facesExternas(proj, a).forEach(function (l) {
+          var hs = horasDeSol(proj, cfg, {x:l.x, y:y, z:l.z});
+          if (hs > horas) { horas = hs; lado = l.k; }
+        });
+      }
+      return {id:a.id, nome:a.nome, tipo:a.tipo, horas:horas, lado:lado, semParedeExterna: a.tipo !== 'externo' && a.tipo !== 'agua' && !facesExternas(proj, a).length};
+    }).sort(function (x, y2) { return y2.horas - x.horas; });
+  }
   function materiais(){
     if (mats) return mats;
     var T = texturas();
@@ -2288,7 +2428,7 @@ function TRES_ENGINE(THREE, M){
       if (cena) { scene.remove(cena.raiz); descartar(cena.raiz); }
       cena = construir(M.proj); cena.casaAntes = casaAntes;
       scene.add(cena.raiz); cena.raiz.updateMatrixWorld(true);   /* raycast (clique/arrasto) funciona já no mesmo quadro da reconstrução */
-      if (manter === true) { aplicarEtapa(); aplicarTeto(); montarLuzes(); aplicarNoite(); sujo = true; if (sel3) selecionarMovel(cena.moveis[sel3] ? sel3 : null, true); return; }   /* mudou só um detalhe (arrasto): a câmera fica onde está */
+      if (manter === true) { aplicarEtapa(); aplicarTeto(); montarLuzes(); aplicarNoite(); if (solReal) aplicarSol(); sujo = true; if (sel3) selecionarMovel(cena.moveis[sel3] ? sel3 : null, true); return; }   /* mudou só um detalhe (arrasto): a câmera fica onde está */
       var R = Math.max(cena.TL, cena.TP) / 2 + 8;
       sol.position.set(cena.TL / 2 - R * .8, R * 1.4, cena.TP / 2 - R * .6); sol.target.position.set(cena.TL / 2, 0, cena.TP / 2);
       sol.shadow.camera.left = -R; sol.shadow.camera.right = R; sol.shadow.camera.top = R; sol.shadow.camera.bottom = -R; sol.shadow.camera.near = 1; sol.shadow.camera.far = R * 4;
@@ -2301,7 +2441,7 @@ function TRES_ENGINE(THREE, M){
       /* a casa não mudou de lugar (trocou cor, moveu janela…): a câmera fica onde o usuário a deixou */
       if (!casaAntes || Math.abs(casaAntes.cx - cena.casa.cx) > .01 || Math.abs(casaAntes.cz - cena.casa.cz) > .01 || Math.abs(casaAntes.w - cena.casa.w) > .01 || Math.abs(casaAntes.d - cena.casa.d) > .01) { orbD.alvo.set(cena.casa.cx, 1, cena.casa.cz); orb.alvo.copy(orbD.alvo); }
       if (!walk.pos.length()) { walk.pos.set(cena.portaoX, 1.6, -2.2); walk.yaw = 0; }
-      aplicarEtapa(); aplicarTeto(); montarLuzes(); aplicarNoite();
+      aplicarEtapa(); aplicarTeto(); montarLuzes(); aplicarNoite(); if (solReal) aplicarSol();
       if (tour.i >= cena.paradas.length) tour.i = 0;
       if (modo === 'tour') { var p = cena.paradas[tour.i]; tour.de = null; tour.para = p; tour.t = 1; pos.fromArray(p.pos); alvo.fromArray(p.alvo); legenda(); }
       sujo = true;
@@ -2372,6 +2512,59 @@ function TRES_ENGINE(THREE, M){
       sujo = true;
     }
     function setNoite(v){ noite = !!v; aplicarNoite(); if (cb.noite) cb.noite(noite); }
+    /* ---------- SOL DE VERDADE: posição pela cidade, data e hora (sombras andam certo) ----------
+       sol = null volta ao sol "de estúdio" (o padrão bonito de sempre). */
+    var solReal = null;
+    function setSol(cfg){
+      solReal = cfg ? {cidade:cfg.cidade || 'campinas', dia:cfg.dia || diaDoAno(), hora:cfg.hora == null ? 14 : cfg.hora, norte:cfg.norte || 0} : null;
+      aplicarSol(); sujo = true;
+      if (cb.sol) cb.sol(solReal);
+    }
+    function aplicarSol(){
+      if (!cena) return;
+      var R = Math.max(cena.TL, cena.TP) / 2 + 8;
+      if (!solReal) {   /* padrão: sol de estúdio, no ângulo que deixa a casa bonita */
+        sol.position.set(cena.TL / 2 - R * .8, R * 1.4, cena.TP / 2 - R * .6);
+        sol.target.position.set(cena.TL / 2, 0, cena.TP / 2);
+        if (!luzManual && !noite) { sol.intensity = 1.9; sol.color.set('#FFF3DC'); hemi.intensity = .85; scene.background = new THREE.Color(CEU_DIA); scene.fog.color.set(CEU_DIA); }
+        return;
+      }
+      var c = CIDADES[solReal.cidade] || CIDADES.campinas;
+      var p = posicaoSol(c.lat, c.lon, c.tz, solReal.dia, solReal.hora);
+      var d = direcaoSol(p, solReal.norte), dist = R * 2.2;
+      var cx = cena.TL / 2, cz = cena.TP / 2;
+      sol.target.position.set(cx, 0, cz);
+      sol.position.set(cx + d.x * dist, Math.max(.5, d.y * dist), cz + d.z * dist);
+      /* cor e força do sol mudam com a altura: nascer/pôr alaranjado e fraco, meio-dia branco e forte */
+      var alt = Math.max(0, p.alt), k2 = Math.min(1, alt / 50);
+      var forca = alt <= 0 ? 0 : (.25 + 1.75 * Math.pow(k2, .6));
+      var corSol = new THREE.Color().setHSL(.09 - .05 * k2, .55 - .35 * k2, .55 + .28 * k2);
+      var ceuDia = new THREE.Color().setHSL(.56, .35 + .12 * (1 - k2), .55 + .25 * k2);
+      if (!luzManual) {
+        var noiteReal = alt <= -1;
+        sol.intensity = noiteReal ? .1 : forca;
+        sol.color.copy(noiteReal ? new THREE.Color('#9FB4D6') : corSol);
+        hemi.intensity = noiteReal ? .12 : (.35 + .5 * k2);
+        fill.intensity = noiteReal ? .05 : .3 + .25 * k2;
+        scene.background = noiteReal ? new THREE.Color(CEU_NOITE) : ceuDia;
+        scene.fog.color.copy(scene.background);
+        renderer.toneMappingExposure = noiteReal ? 1.15 : .95;
+        grupoLuz.visible = (noiteReal || alt < 6) && etapa >= 5;
+        var Mt2 = materiais();
+        cena.raiz.traverse(function (o) {
+          if (o.userData && o.userData.janela) o.material = (noiteReal || alt < 4) && etapa >= 5 ? Mt2.vidroNoite : Mt2.vidro;
+          if (o.userData && o.userData.letreiro !== undefined && o.material && o.material.userData) o.material.emissiveIntensity = (noiteReal || alt < 6) && o.userData.letreiro && o.material.userData.acende ? 1.35 : 0;
+        });
+      }
+      sujo = true;
+    }
+    function infoSol(){
+      if (!solReal) return null;
+      var c = CIDADES[solReal.cidade] || CIDADES.campinas;
+      var p = posicaoSol(c.lat, c.lon, c.tz, solReal.dia, solReal.hora);
+      var np = nascerPor(c.lat, c.lon, c.tz, solReal.dia);
+      return {cidade:c, alt:p.alt, az:p.az, nascer:np.nascer, por:np.por, cfg:solReal};
+    }
     /* câmera de frente para a fachada, na altura de quem está na calçada */
     function verFachada(imediato, fator){   /* fator < 1 aproxima (conferência: &fz=0.5) */
       if (!cena) return;
@@ -2840,6 +3033,7 @@ function TRES_ENGINE(THREE, M){
       get etapa(){ return etapa; }, setEtapa:function (n) { etapa = clamp(n | 0, 0, 5); aplicarEtapa(); if (cb.etapa) cb.etapa(etapa); },
       get selMovel(){ return sel3; }, selecionarMovel:selecionarMovel, telaDeMovel:telaDeMovel,
       get noite(){ return noite; }, setNoite:setNoite, verFachada:verFachada,
+      setSol:setSol, infoSol:infoSol, get sol(){ return solReal; },
       get teto(){ return teto; }, setTeto:function (v) { teto = !!v; aplicarTeto(); },
       get parada(){ return tour.i; }, get paradas(){ return cena ? cena.paradas : []; },
       irParada:irParada, irAmbiente:irAmbiente, proxima:function () { irParada(tour.i + 1); }, anterior:function () { irParada(tour.i - 1); },
@@ -2851,7 +3045,7 @@ function TRES_ENGINE(THREE, M){
         orbD.alvo.set(x, 1.4, z); orbD.dist = clamp(dist || 14, 4, 80); orbD.phi = 1.15; sujo = true;
       },
       filmar:filmar, roteiro:roteiro, get filmando(){ return !!filme; }, pararFilme:pararFilme, passoFilme:passoFilme, get canvas(){ return canvas; },
-      atualizar:reconstruir, _dbg:function () { return {ptr:Object.keys(ptr), let:!!arrastoLet, ab:!!arrastoAb, mov:!!arrastoMov, modo:modo}; },
+      atualizar:reconstruir, _dbg:function () { return {ptr:Object.keys(ptr), let:!!arrastoLet, ab:!!arrastoAb, mov:!!arrastoMov, modo:modo, solPos:sol.position.toArray(), solInt:sol.intensity}; },
       telaDe:function (x, y, z) { var v = new THREE.Vector3(x, y, z).project(camera), r = canvas.getBoundingClientRect(); return {x:(v.x + 1) / 2 * r.width + r.left, y:(1 - v.y) / 2 * r.height + r.top}; },   /* ponto do mundo → tela (conferência e menus) */
       foto:function () { renderer.render(scene, camera); return canvas.toDataURL('image/png'); },
       desmontar:function () { var ii = aoCarregarImg.indexOf(aoImg); if (ii >= 0) aoCarregarImg.splice(ii, 1);
@@ -2891,7 +3085,9 @@ function TRES_ENGINE(THREE, M){
     return {inst:inst, desmontar:function () { scroller.removeEventListener('scroll', tick); window.removeEventListener('resize', tick); inst.desmontar(); }};
   }
 
-  return {analise:analise, paradas:paradas, quadro:quadro, frase:frase, montar:montar, passeio:passeio, ETAPAS:ETAPAS, coberto:coberto, FACHADA_PRESETS:FACHADA_PRESETS, FACHADA_EXTRA:FACHADA_EXTRA, COBERTURAS:COBERTURAS, INCLINACOES:INCLINACOES, TELHAS:TELHAS, SEM_LAJE:SEM_LAJE, JANELAS:JANELAS, VIDROS:VIDROS, PORTAS:PORTAS, PORTAS_LOJA:PORTAS_LOJA, PORTAS_INT:PORTAS_INT, LETREIRO_FORMATOS:LETREIRO_FORMATOS, LETREIRO_POS:LETREIRO_POS, LETREIRO_TAMS:LETREIRO_TAMS, LETREIRO_FONTES:LETREIRO_FONTES, GARAGENS:GARAGENS, PISOS_FRENTE:PISOS_FRENTE, fachadaDe:fachadaDe, fachadaPorPrompt:fachadaPorPrompt};
+  return {analise:analise, paradas:paradas, quadro:quadro, frase:frase, montar:montar, passeio:passeio, ETAPAS:ETAPAS, coberto:coberto,
+    CIDADES:CIDADES, DATAS:DATAS, posicaoSol:posicaoSol, nascerPor:nascerPor, direcaoSol:direcaoSol, insolacao:insolacao, horasDeSol:horasDeSol, facesExternas:facesExternas, diaDoAno:diaDoAno,
+    FACHADA_PRESETS:FACHADA_PRESETS, FACHADA_EXTRA:FACHADA_EXTRA, COBERTURAS:COBERTURAS, INCLINACOES:INCLINACOES, TELHAS:TELHAS, SEM_LAJE:SEM_LAJE, JANELAS:JANELAS, VIDROS:VIDROS, PORTAS:PORTAS, PORTAS_LOJA:PORTAS_LOJA, PORTAS_INT:PORTAS_INT, LETREIRO_FORMATOS:LETREIRO_FORMATOS, LETREIRO_POS:LETREIRO_POS, LETREIRO_TAMS:LETREIRO_TAMS, LETREIRO_FONTES:LETREIRO_FONTES, GARAGENS:GARAGENS, PISOS_FRENTE:PISOS_FRENTE, fachadaDe:fachadaDe, fachadaPorPrompt:fachadaPorPrompt};
 }
 
 var TRES = (typeof THREE !== 'undefined' && typeof M !== 'undefined') ? TRES_ENGINE(THREE, M) : null;

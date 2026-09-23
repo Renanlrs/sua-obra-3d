@@ -130,6 +130,20 @@ f.onload = function () {
                     W.M.proj.fachada = null; W.M.novo('casa-terrea', 1000, 2500); t3.atualizar();
                     /* ---- filme: roteiro, avanço das cenas e gravação real em vídeo ---- */
                     setTimeout(function () {
+                      /* ---- sol de verdade: a luz vai para a posição real e muda com a hora ---- */
+                      t3.setSol({cidade:'campinas', dia:355, hora:8, norte:0});
+                      var s8 = t3._dbg().solPos.slice(), i8 = t3.infoSol();
+                      t3.setSol({cidade:'campinas', dia:355, hora:17, norte:0});
+                      var s17 = t3._dbg().solPos.slice(), i17 = t3.infoSol();
+                      t('o sol muda de lugar entre 8h e 17h (leste → oeste)', Math.abs(s8[0] - s17[0]) > 4 && i8.az < 180 && i17.az > 180, 'x ' + s8[0].toFixed(1) + ' → ' + s17[0].toFixed(1) + ' · az ' + i8.az.toFixed(0) + '° → ' + i17.az.toFixed(0) + '°');
+                      t3.setSol({cidade:'campinas', dia:355, hora:22, norte:0});
+                      t('à noite o sol fica fraco (vira lua)', t3._dbg().solInt < .3, String(t3._dbg().solInt));
+                      t3.setSol({cidade:'campinas', dia:355, hora:12, norte:0});
+                      var alto = t3._dbg().solPos[1];
+                      t3.setSol({cidade:'campinas', dia:172, hora:12, norte:0});
+                      t('ao meio-dia o sol de dezembro fica mais alto que o de junho', alto > t3._dbg().solPos[1], alto.toFixed(1) + ' vs ' + t3._dbg().solPos[1].toFixed(1));
+                      t3.setSol(null);
+                      t('desligar volta ao sol de estúdio', !t3.sol && t3._dbg().solInt > 1);
                       var cs = t3.roteiro({});
                       t('o roteiro do vídeo tem capa, fachada, ambientes e fecho', cs.length >= 5 && cs[0].tipo === 'capa' && cs.some(function (c) { return c.tipo === 'ambiente'; }) && cs[cs.length - 1].tipo === 'fim', cs.map(function (c) { return c.tipo; }).join(','));
                       t('toda cena tem duração e título', cs.every(function (c) { return c.dur > 0 && c.titulo; }));

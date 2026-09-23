@@ -107,6 +107,11 @@ var UI = (function () {
       if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true); } }
       if (q.get('fprompt') && viewAtual === 'tresd') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true, +q.get('fz') || 1); }
       if (q.get('fach')) { try { M.proj.fachada = Object.assign(M.proj.fachada || {}, JSON.parse(q.get('fach'))); } catch (e) {} if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true, +q.get('fz') || 1); } }   /* &fach={"cobertura":"galpao"} (conferência) */
+      if (q.has('sol')) setTimeout(function () {   /* &sol=1 abre o estudo · &sol=15 já vai para as 15h (conferência) */
+        var hq = parseFloat(q.get('sol'));
+        if (hq > 1) setSolCfg({hora:hq, on:true}, true);
+        abrirSol();
+      }, 500);
       if (q.has('video')) setTimeout(function () { if (q.get('video') === 'go') gravarVideo({durAmb:1.2, durCapa:1.2, durFim:1.2}); else dialogoVideo(); }, 500);   /* &video=1 abre o diálogo · &video=go grava (conferência) */
       if (q.get('add')) {   /* &add=suv,palco,caixaAguaTorre@x,y (conferência: solta itens do catálogo na planta) */
         q.get('add').split(',').forEach(function (spec, i2) {
@@ -727,6 +732,97 @@ var UI = (function () {
     insp.innerHTML = h;
     ligarInspector(a);
   }
+  /* ================= SOL DE VERDADE (estudo de insolação) =================
+     Cidade + data + hora + para onde aponta o Norte: o sol do 3D vai para a posição real e as sombras
+     andam. A tabela diz quantas horas de sol cada ambiente recebe naquele dia (a casa e as coberturas
+     fazem sombra de verdade). Fica em proj.sol — some com o projeto, sem duplicar nada. */
+  function solCfg(){
+    var s = M.proj.sol || {};
+    return {cidade:s.cidade || 'campinas', norte:s.norte || 0, dataK:s.dataK || 'hoje', dia:s.dia || TRES.diaDoAno(), hora:s.hora == null ? 14 : s.hora, on:!!s.on};
+  }
+  function setSolCfg(patch, semRender){
+    M.proj.sol = Object.assign(solCfg(), patch);
+    if (t3) t3.setSol(M.proj.sol.on ? M.proj.sol : null);
+    if (!semRender) { M.salvar(); painelSol(); }
+  }
+  function hhmm(h){ if (h == null) return '—'; var m = Math.round((h - Math.floor(h)) * 60); var hh = Math.floor(h) + (m === 60 ? 1 : 0); return (hh < 10 ? '0' : '') + hh + ':' + (m === 60 ? '00' : (m < 10 ? '0' : '') + m); }
+  function horasTxt(h){ var hh = Math.floor(h), mm = Math.round((h - hh) * 60); return hh + 'h' + (mm ? (mm < 10 ? '0' : '') + mm : ''); }
+  function abrirSol(){
+    if (viewAtual !== 'tresd') { irPara('tresd'); setTimeout(abrirSol, 450); return; }
+    var cfg = solCfg();
+    if (!cfg.on) setSolCfg({on:true}, true);
+    if (t3) t3.setSol(Object.assign(solCfg(), {on:true}));
+    var d = document.getElementById('solp');
+    if (!d) { d = document.createElement('div'); d.id = 'solp'; d.className = 'solp'; document.body.appendChild(d); }
+    d.hidden = false; painelSol();
+  }
+  function fecharSol(){ var d = document.getElementById('solp'); if (d) d.hidden = true; setSolCfg({on:false}, true); if (t3) t3.setSol(null); M.salvar(); }
+  function painelSol(){
+    var d = document.getElementById('solp'); if (!d || d.hidden) return;
+    var cfg = solCfg(), info = t3 ? t3.infoSol() : null;
+    var lista = TRES.insolacao(M.proj, cfg).filter(function (r) { return r.tipo !== 'agua' || true; });
+    var np = info || {}, alt = info ? info.alt : 0;
+    var h = '<div class="solp-hd"><b>☀ Sol de verdade</b><span>' + (TRES.CIDADES[cfg.cidade] || {}).rot + '</span><button class="icon-btn" data-sol-fechar title="Fechar">' + icon('close') + '</button></div><div class="solp-bd">';
+    h += '<section><h6>CIDADE</h6><select data-sol-cidade>' + Object.keys(TRES.CIDADES).map(function (k) { return '<option value="' + k + '"' + (cfg.cidade === k ? ' selected' : '') + '>' + TRES.CIDADES[k].rot + '</option>'; }).join('') + '</select></section>';
+    h += '<section><h6>DATA</h6><div class="chips">' + Object.keys(TRES.DATAS).map(function (k) { return '<button class="chip' + (cfg.dataK === k ? ' on' : '') + '" data-sol-data="' + k + '">' + TRES.DATAS[k].rot + '</button>'; }).join('') + '</div></section>';
+    h += '<section><h6>HORA <b class="solp-hora">' + hhmm(cfg.hora) + '</b></h6>' +
+      '<input type="range" data-sol-hora min="5" max="19" step="0.25" value="' + cfg.hora + '">' +
+      '<div class="solp-kv"><span>Nascer</span><b>' + hhmm(np.nascer) + '</b><span>Pôr</span><b>' + hhmm(np.por) + '</b></div>' +
+      '<div class="solp-kv"><span>Altura do sol</span><b>' + (alt > 0 ? alt.toFixed(0) + '°' : 'abaixo do horizonte') + '</b><span>Direção</span><b>' + rosa(np.az) + '</b></div>' +
+      '<div class="chips" style="margin-top:8px"><button class="chip" data-sol-play>▶ Rodar o dia</button><button class="chip" data-sol-hora-set="9">9h</button><button class="chip" data-sol-hora-set="12">12h</button><button class="chip" data-sol-hora-set="15">15h</button><button class="chip" data-sol-hora-set="17.5">17h30</button></div></section>';
+    h += '<section><h6>NORTE (GIRE ATÉ BATER COM O TERRENO)</h6><div class="solp-norte"><div class="bussola" style="transform:rotate(' + (-cfg.norte) + 'deg)"><i></i><b>N</b></div>' +
+      '<input type="range" data-sol-norte min="0" max="355" step="5" value="' + cfg.norte + '"><span class="solp-ndeg">' + cfg.norte + '°</span></div>' +
+      '<div class="ins-empty">0° = o Norte fica para cima na planta (a rua, embaixo, é o Sul).</div></section>';
+    h += '<section><h6>HORAS DE SOL NESTE DIA</h6><div class="solp-lista">' + lista.map(function (r) {
+      var pct = Math.min(100, r.horas / 12 * 100), cor = r.horas >= 4 ? '#4E9A5D' : (r.horas >= 1.5 ? '#E0B44C' : '#E4574F');
+      var LADO = {n:'fundo', s:'frente', w:'esquerda', e:'direita'};
+      var dica = r.semParedeExterna ? 'sem parede externa — só luz de outro cômodo' : (r.lado ? 'melhor pela ' + LADO[r.lado] : '');
+      return '<div class="solp-item" data-sol-amb="' + r.id + '" title="' + dica + '"><span>' + esc(r.nome) + (r.semParedeExterna ? ' <i class="solp-tag">miolo</i>' : '') + '</span><i style="width:' + pct + '%;background:' + cor + '"></i><b>' + horasTxt(r.horas) + '</b></div>';
+    }).join('') + '</div>' +
+      '<div class="ins-empty">Medido no centro de cada ambiente, a 1,20 m do chão, de 15 em 15 minutos — contando a sombra da própria casa e das coberturas.</div></section>';
+    h += '</div>';
+    d.innerHTML = h;
+    d.querySelector('[data-sol-fechar]').onclick = fecharSol;
+    d.querySelector('[data-sol-cidade]').onchange = function () { setSolCfg({cidade:this.value}); };
+    d.querySelectorAll('[data-sol-data]').forEach(function (b) { b.onclick = function () {
+      var k = b.getAttribute('data-sol-data'), dia = TRES.DATAS[k].dia || TRES.diaDoAno();
+      setSolCfg({dataK:k, dia:dia});
+    }; });
+    var rg = d.querySelector('[data-sol-hora]');
+    rg.oninput = function () { var v = +this.value; d.querySelector('.solp-hora').textContent = hhmm(v); setSolCfg({hora:v}, true); };
+    rg.onchange = function () { setSolCfg({hora:+this.value}); };
+    rg.onpointerdown = function (e) { e.stopPropagation(); };
+    d.querySelectorAll('[data-sol-hora-set]').forEach(function (b) { b.onclick = function () { setSolCfg({hora:+b.getAttribute('data-sol-hora-set')}); }; });
+    var rn = d.querySelector('[data-sol-norte]');
+    rn.oninput = function () { var v = +this.value; d.querySelector('.solp-ndeg').textContent = v + '°'; d.querySelector('.bussola').style.transform = 'rotate(' + (-v) + 'deg)'; setSolCfg({norte:v}, true); };
+    rn.onchange = function () { setSolCfg({norte:+this.value}); };
+    rn.onpointerdown = function (e) { e.stopPropagation(); };
+    d.querySelector('[data-sol-play]').onclick = function () { rodarDia(this); };
+    d.querySelectorAll('[data-sol-amb]').forEach(function (it) { it.onclick = function () {
+      var a = M.proj.ambientes.filter(function (x) { return x.id === it.getAttribute('data-sol-amb'); })[0];
+      if (a && t3) { PLAN.selecionar(a.id); t3.irAmbiente(a.id); }
+    }; });
+  }
+  function rosa(az){
+    if (az == null) return '—';
+    var nomes = ['Norte', 'Nordeste', 'Leste', 'Sudeste', 'Sul', 'Sudoeste', 'Oeste', 'Noroeste'];
+    return nomes[Math.round(((az % 360) + 360) % 360 / 45) % 8];
+  }
+  var dia_timer = null;
+  function rodarDia(botao){
+    if (dia_timer) { clearInterval(dia_timer); dia_timer = null; if (botao) botao.textContent = '▶ Rodar o dia'; return; }
+    if (botao) botao.textContent = '❚❚ Parar';
+    var h = 6;
+    dia_timer = setInterval(function () {
+      h += .12; if (h > 19) h = 6;
+      setSolCfg({hora:h}, true);
+      var d = document.getElementById('solp');
+      if (!d || d.hidden) { clearInterval(dia_timer); dia_timer = null; return; }
+      var lab = d.querySelector('.solp-hora'), rg2 = d.querySelector('[data-sol-hora]');
+      if (lab) lab.textContent = hhmm(h); if (rg2) rg2.value = h;
+    }, 60);
+  }
+
   /* ================= VÍDEO DO PROJETO =================
      O motor roda um roteiro de câmera (TRES.filmar) e, a cada quadro, este mixer copia o 3D para um
      canvas 2D e desenha por cima capa, legendas, barra de tempo e assinatura. O MediaRecorder grava
@@ -1351,6 +1447,7 @@ var UI = (function () {
     {n:'Exportar passeio 3D (.html)', g:'', f:function(){ exportar('html'); }},
     {n:'Mobiliar (catálogo de móveis)', g:'M', f:function(){ if (viewAtual !== 'planta' && viewAtual !== 'tresd') irPara('planta'); toggleCatalogo(true); }},
     {n:'Gerar vídeo do projeto (para WhatsApp)', g:'', f:function(){ dialogoVideo(); }},
+    {n:'Sol de verdade: insolação por hora e por ambiente', g:'', f:function(){ abrirSol(); }},
     {n:'Cobertura independente (telhado à parte)', g:'T', f:function(){ novaCobertura(); }},
     {n:'Cobrir a garagem',    g:'', f:function(){ novaCobertura(COB_PRESETS.garagem); }},
     {n:'Cobrir a área da piscina', g:'', f:function(){ novaCobertura(COB_PRESETS.piscina); }},
@@ -1584,6 +1681,7 @@ var UI = (function () {
         '<button class="ctx-it" data-m="frente">🏠 Câmera na frente da casa</button>' +
         '<button class="ctx-it" data-m="cob">⛱ Nova cobertura independente</button>' +
         '<button class="ctx-it" data-m="video">🎬 Gerar vídeo do projeto</button>' +
+        '<button class="ctx-it" data-m="sol">☀ Sol de verdade (insolação)</button>' +
         '<button class="ctx-it" data-m="foto">📷 Salvar imagem (PNG)</button>' +
         '<button class="ctx-it" data-m="apres">▶ Apresentar ao cliente</button>';
       var r = this.getBoundingClientRect(); c.style.left = Math.max(8, Math.min(window.innerWidth - 268, r.right - 260)) + 'px'; c.style.top = (r.bottom + 6) + 'px'; c.hidden = false;
@@ -1592,6 +1690,7 @@ var UI = (function () {
         if (m === 'elev') elevacao(); else if (m === 'estilos') compararEstilos(); else if (m === 'frente') t3.verFachada();
         else if (m === 'cob') { var nc2 = novaCobertura(); t3.olharPara((nc2.x + nc2.w / 2) * .01, (nc2.y + nc2.h / 2) * .01, Math.max(nc2.w, nc2.h) * .01 * 1.6 + 6); }
         else if (m === 'video') dialogoVideo();
+        else if (m === 'sol') abrirSol();
         else if (m === 'foto') { var a = document.createElement('a'); a.href = t3.foto(); a.download = slug() + '-3d.png'; a.click(); toast('Imagem salva.'); }
         else if (m === 'apres') { var ap = document.getElementById('btn-apresentar'); if (ap) ap.click(); }
       }; });

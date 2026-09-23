@@ -404,6 +404,36 @@ t('elevação 2D desenha galpão (tesoura), arco e shed com a cor da estrutura',
 M.proj.fachada = {cobertura:'galpao'};
 t('custo: galpão entra como cobertura com estrutura e a telha cerâmica não é cobrada como tal', M.custoFachadaItens().some(function (i) { return /galp/i.test(i.rot); }));
 M.proj.fachada = null;
+/* ---- 23/09: sol de verdade (insolação) ---- */
+var CAMP = TF.CIDADES.campinas;
+var solDez = TF.posicaoSol(CAMP.lat, CAMP.lon, CAMP.tz, 355, 12), solJun = TF.posicaoSol(CAMP.lat, CAMP.lon, CAMP.tz, 172, 12);
+t('meio-dia em Campinas: sol quase a pino no verão e baixo no inverno', solDez.alt > 80 && solJun.alt > 38 && solJun.alt < 50, 'dez ' + solDez.alt.toFixed(0) + '° · jun ' + solJun.alt.toFixed(0) + '°');
+var manha = TF.posicaoSol(CAMP.lat, CAMP.lon, CAMP.tz, 80, 8), tarde = TF.posicaoSol(CAMP.lat, CAMP.lon, CAMP.tz, 80, 17);
+t('de manhã o sol está a leste, de tarde a oeste', manha.az > 45 && manha.az < 135 && tarde.az > 225 && tarde.az < 315, 'manhã ' + manha.az.toFixed(0) + '° · tarde ' + tarde.az.toFixed(0) + '°');
+var npDez = TF.nascerPor(CAMP.lat, CAMP.lon, CAMP.tz, 355), npJun = TF.nascerPor(CAMP.lat, CAMP.lon, CAMP.tz, 172);
+t('dia mais longo no verão do que no inverno (hemisfério sul)', (npDez.por - npDez.nascer) > (npJun.por - npJun.nascer) + 1.5, ((npDez.por - npDez.nascer)).toFixed(1) + 'h vs ' + ((npJun.por - npJun.nascer)).toFixed(1) + 'h');
+var npRecife = TF.nascerPor(TF.CIDADES.recife.lat, TF.CIDADES.recife.lon, TF.CIDADES.recife.tz, 172);
+t('perto do equador o dia quase não muda', Math.abs((npRecife.por - npRecife.nascer) - 12) < 1);
+var dirMeio = TF.direcaoSol({alt:60, az:0}, 0), dirLeste = TF.direcaoSol({alt:20, az:90}, 0);
+t('a direção do sol aponta para cima e o leste vai para +x', dirMeio.y > .8 && dirLeste.x > .9 && Math.abs(dirLeste.y - Math.sin(20 * Math.PI / 180)) < .01);
+t('girar o Norte gira o sol junto', Math.abs(TF.direcaoSol({alt:20, az:90}, 90).z - (-Math.cos(180 * Math.PI / 180) * Math.cos(20 * Math.PI / 180))) < .01);
+M.novo('casa-terrea', 1200, 2500);
+var ins = TF.insolacao(M.proj, {cidade:'campinas', dia:355, norte:0});
+t('insolação: toda lista tem horas entre 0 e 14 e vem ordenada do mais ensolarado', ins.length === M.proj.ambientes.length && ins.every(function (r) { return r.horas >= 0 && r.horas <= 14; }) && ins[0].horas >= ins[ins.length - 1].horas, ins.slice(0, 3).map(function (r) { return r.nome + ' ' + r.horas.toFixed(1) + 'h'; }).join(' · '));
+t('ambiente com parede externa pega sol; o corredor do miolo pega muito menos', ins[0].horas > 3 && ins[ins.length - 1].horas < ins[0].horas);
+var insJun = TF.insolacao(M.proj, {cidade:'campinas', dia:172, norte:0});
+t('no inverno a casa recebe menos sol que no verão', insJun.reduce(function (s2, r) { return s2 + r.horas; }, 0) < ins.reduce(function (s2, r) { return s2 + r.horas; }, 0));
+var insGirado = TF.insolacao(M.proj, {cidade:'campinas', dia:355, norte:180});
+function porId(lista){ var o = {}; lista.forEach(function (r) { o[r.id] = Math.round(r.horas * 4); }); return o; }
+t('girar o Norte muda quem pega sol (a mesma casa, outra orientação)', JSON.stringify(porId(insGirado)) !== JSON.stringify(porId(ins)),
+  M.proj.ambientes.slice(0, 3).map(function (a) { return a.nome + ': ' + porId(ins)[a.id] / 4 + 'h → ' + porId(insGirado)[a.id] / 4 + 'h'; }).join(' · '));
+var cbSol = M.addCobertura({nome:'Coberta', x:0, y:0, w:2000, h:2500, alt:400, beiral:100});
+var insCob = TF.insolacao(M.proj, {cidade:'campinas', dia:355, norte:0});
+t('uma cobertura por cima derruba as horas de sol de quem ficou embaixo', insCob.reduce(function (s2, r) { return s2 + r.horas; }, 0) < ins.reduce(function (s2, r) { return s2 + r.horas; }, 0) * .7);
+M.removerCobertura(cbSol.id);
+t('ambiente sem parede externa aparece marcado como miolo', TF.insolacao(M.proj, {cidade:'campinas', dia:80}).some(function (r) { return r.semParedeExterna !== undefined; }));
+M.novo('casa-terrea', 1000, 2500);
+
 /* ---- 23/09: catálogo ampliado — móveis, janelas, portas, portões, muros ---- */
 t('catálogo com mais de 160 itens em 17 categorias', Object.keys(MOVEIS.ITENS).length >= 160 && MOVEIS.CATS.length >= 17, Object.keys(MOVEIS.ITENS).length + ' itens · ' + MOVEIS.CATS.length + ' categorias');
 t('categorias novas existem e têm itens: veículos, eletrônicos, palco, instalações', ['veiculos', 'eletronicos', 'palco', 'instalacoes'].every(function (c) { return MOVEIS.CATS.some(function (x) { return x.k === c; }) && MOVEIS.porCat(c).length >= 4; }));
