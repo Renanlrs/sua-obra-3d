@@ -429,19 +429,21 @@ var M = (function () {
     revestimento:{nenhum:0, ripado:42000, pedra:38000, tijolo:26000, cimento:14000},   /* por m² de testada */
     cobertura:{platibanda:0, telhado2:18000, telhado4:23000, galpao:29000, arco:34000, shed:38000},   /* por m² construído (galpão/arco/shed incluem a estrutura metálica) */
     telha:{ceramica:0, concreto:3000, metalica:-4000, fibrocimento:-7000, sanduiche:9000},           /* ajuste por m² construído */
-    portao:{grade:350000, ripado:650000, chapa:480000},
-    muro:{baixo:0, alto:26000, vidro:90000},                                             /* alto: por m linear de testada */
+    portao:{grade:350000, ripado:650000, chapa:480000, deslizante:890000, lanca:520000, perfurada:720000},
+    muro:{baixo:0, alto:26000, vidro:90000, cobogo:42000, gradil:38000, pedra:58000},     /* por m linear de testada (baixo = 0) */
     jardim:180000, marquise:320000, iluminacao:240000,
     letreiro:{placa:120000, caixa:380000, led:650000, neon:550000, backlight:480000}, totem:450000,
     vitrine:95000,                                                                        /* por m² de frente envidraçada */
     pergolado:320000,
     /* detalhe fino (por unidade, exceto onde indicado) */
-    janela:{correr:0, fixa:-4000, guilhotina:6000, basculante:3000, veneziana:9000, quadriculada:7000},   /* por janela */
-    vidro:{incolor:0, fume:3500, verde:3000, espelhado:5500},                                          /* por janela */
+    janela:{correr:0, fixa:-4000, guilhotina:6000, basculante:3000, veneziana:9000, quadriculada:7000, maximar:8000, pivotante:14000, sanfonada:32000, cobogo:-6000, vitro:-2000, persiana:26000, arco:19000},   /* por janela */
+    vidro:{incolor:0, fume:3500, verde:3000, espelhado:5500, leitoso:2500, canelado:4000, bronze:4500},   /* por janela */
     moldura:2800, gradeJanela:4500, brise:12000,                                                       /* por janela */
-    porta:{madeira:0, pivotante:520000, vidro:380000, dupla:290000, ripada:260000, aco:180000, enrolar:240000, subir:210000, correr:890000, vidroDupla:520000, gradeLoja:160000, articulada:190000},   /* loja: por m² da abertura acima de 1,9 m² */
+    porta:{madeira:0, pivotante:520000, vidro:380000, dupla:290000, ripada:260000, aco:180000, enrolar:240000, subir:210000, correr:890000, vidroDupla:520000, gradeLoja:160000, articulada:190000,
+      almofadada:180000, vidroLateral:340000, bandeira:220000, francesa:480000, balcao:620000, camarao:560000, blindex:720000, giratoria:2800000, cortinaAr:1450000},   /* loja: por m² da abertura acima de 1,9 m² */
     letreiroTam:{p:.7, m:1, g:1.4, gg:1.9},
-    garagem:{basculante:0, enrolar:180000, ripado:420000, vidro:650000},
+    garagem:{basculante:0, enrolar:180000, ripado:420000, vidro:650000, seccionada:520000, pivotanteG:90000, deslizante:390000},
+    portaInt:{lisa:0, almofadada:22000, vidro:38000, correr:65000, embutida:145000, camarao:78000, francesa:120000, veneziana:88000},   /* por porta interna */
     arandelas:38000, vasos:26000,
     bandeira:180000, placaMuro:90000, faixa:25000, adesivo:60000, letreiroTopo:220000,   /* placas publicitárias */
     pisoFrente:{concreto:0, pedra:18000, deck:26000, intertravado:9000, grama:-6000}                   /* por m² do caminho */
@@ -458,7 +460,7 @@ var M = (function () {
   function limparAbertura(chave){ if (proj.aberturas) delete proj.aberturas[chave]; if (proj.entradaEm === chave) delete proj.entradaEm; }
   function fachadaCfg(){
     if (window.TRES) return TRES.fachadaDe(proj);
-    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem, janela:f.janela || 'correr', vidro:f.vidro || 'incolor', moldura:!!f.moldura, gradeJanela:!!f.gradeJanela, brise:!!f.brise, porta:f.porta || 'madeira', garagem:f.garagem || 'basculante', arandelas:!!f.arandelas, vasos:!!f.vasos, pisoFrente:f.pisoFrente || 'concreto', portaLargura:f.portaLargura || 0, portaAltura:f.portaAltura || 0, letreiroTam:f.letreiroTam || 'm', letreiroPos:f.letreiroPos || 'parede', bandeira:!!f.bandeira, placaMuro:!!f.placaMuro, faixa:f.faixa || '', adesivo:!!f.adesivo, logo:proj.logo || '', inclinacao:f.inclinacao || '', beiral:f.beiral || 0, estruturaCor:f.estruturaCor || '#3A3F45', letreiroX:f.letreiroX || 0, letreiroY:f.letreiroY || 0, logoEscala:f.logoEscala || 1, logoX:f.logoX || 0, logoY:f.logoY || 0, logoComTexto:!!f.logoComTexto};
+    var f = proj.fachada || {}; return {estilo:f.estilo || 'moderno', revestimento:f.revestimento || 'ripado', cobertura:f.cobertura || 'platibanda', telha:f.telha || 'concreto', portao:f.portao || 'ripado', muro:f.muro || 'baixo', jardim:f.jardim !== false, marquise:f.marquise !== false, iluminacao:f.iluminacao !== false, vitrine:!!f.vitrine, pergolado:!!f.pergolado, letreiro:f.letreiro || '', letreiroEstilo:f.letreiroEstilo || 'led', totem:!!f.totem, janela:f.janela || 'correr', vidro:f.vidro || 'incolor', moldura:!!f.moldura, gradeJanela:!!f.gradeJanela, brise:!!f.brise, porta:f.porta || 'madeira', garagem:f.garagem || 'basculante', arandelas:!!f.arandelas, vasos:!!f.vasos, pisoFrente:f.pisoFrente || 'concreto', portaLargura:f.portaLargura || 0, portaAltura:f.portaAltura || 0, portaInt:f.portaInt || 'lisa', letreiroTam:f.letreiroTam || 'm', letreiroPos:f.letreiroPos || 'parede', bandeira:!!f.bandeira, placaMuro:!!f.placaMuro, faixa:f.faixa || '', adesivo:!!f.adesivo, logo:proj.logo || '', inclinacao:f.inclinacao || '', beiral:f.beiral || 0, estruturaCor:f.estruturaCor || '#3A3F45', letreiroX:f.letreiroX || 0, letreiroY:f.letreiroY || 0, logoEscala:f.logoEscala || 1, logoX:f.logoX || 0, logoY:f.logoY || 0, logoComTexto:!!f.logoComTexto};
   }
   function testada(){   /* largura da frente construída, em cm */
     var cob = ambientesCobertos(); if (!cob.length) return 0;
@@ -477,6 +479,7 @@ var M = (function () {
     add('Portão ' + f.portao, P.portao[f.portao] || 0);
     if (f.muro === 'alto') add('Muro alto', proj.terreno.largura / 100 * P.muro.alto);
     if (f.muro === 'vidro') add('Muro com vidro', P.muro.vidro);
+    if (P.muro[f.muro] && ['alto', 'vidro', 'baixo'].indexOf(f.muro) < 0) add('Muro de ' + ({cobogo:'cobogó', gradil:'gradil', pedra:'pedra'}[f.muro] || f.muro), proj.terreno.largura / 100 * P.muro[f.muro]);
     if (f.jardim) add('Jardim frontal', P.jardim);
     if (f.marquise) add('Marquise da entrada', P.marquise);
     if (f.iluminacao) add('Iluminação de fachada', P.iluminacao);
@@ -492,7 +495,14 @@ var M = (function () {
     if (f.brise) add('Brise na frente', Math.max(1, Math.round(nJ / 3)) * P.brise);
     var areaPorta = (f.portaLargura || .9) * (f.portaAltura || 2.1), fatorPorta = Math.max(1, areaPorta / 1.89);
     if (f.porta && f.porta !== 'madeira') add('Porta ' + ({pivotante:'pivotante', vidro:'de vidro', dupla:'dupla', ripada:'ripada', aco:'de aço', enrolar:'de enrolar', subir:'de subir', correr:'de vidro automática', vidroDupla:'de vidro 2 folhas', gradeLoja:'grade pantográfica', articulada:'articulada'}[f.porta] || f.porta) + (fatorPorta > 1 ? ' (' + num(f.portaLargura || .9) + ' × ' + num(f.portaAltura || 2.1) + ' m)' : ''), (P.porta[f.porta] || 0) * fatorPorta);
-    if (f.garagem && f.garagem !== 'basculante') add('Porta da garagem ' + ({enrolar:'de enrolar', ripado:'ripada', vidro:'de vidro'}[f.garagem] || f.garagem), P.garagem[f.garagem] || 0);
+    if (f.garagem && f.garagem !== 'basculante') add('Porta da garagem ' + ({enrolar:'de enrolar', ripado:'ripada', vidro:'de vidro', seccionada:'seccionada', pivotanteG:'pivotante', deslizante:'deslizante'}[f.garagem] || f.garagem), P.garagem[f.garagem] || 0);
+    /* portas internas: uma por par de ambientes que se comunicam (aproximação: ambientes cobertos − 1) */
+    var nPI = Math.max(0, ambientesCobertos().length - 1), rotPI = {almofadada:'almofadadas', vidro:'com visor', correr:'de correr', embutida:'de correr embutidas', camarao:'camarão', francesa:'duplas', veneziana:'venezianas'};
+    if (f.portaInt && f.portaInt !== 'lisa' && nPI) add('Portas internas ' + (rotPI[f.portaInt] || f.portaInt) + ' (' + nPI + ')', nPI * (P.portaInt[f.portaInt] || 0));
+    /* portas internas com tipo próprio, escolhidas uma a uma no 3D */
+    var pintEsp = {};
+    Object.keys(proj.aberturas || {}).forEach(function (k2) { var o2 = proj.aberturas[k2]; if (o2 && o2.pint && o2.pint !== f.portaInt) pintEsp[o2.pint] = (pintEsp[o2.pint] || 0) + 1; });
+    Object.keys(pintEsp).forEach(function (k3) { add('Porta interna ' + (rotPI[k3] || k3) + ' (' + pintEsp[k3] + ')', pintEsp[k3] * ((P.portaInt[k3] || 0) - (P.portaInt[f.portaInt] || 0))); });
     if (f.arandelas) add('Arandelas da entrada', P.arandelas);
     if (f.vasos) add('Vasos na entrada', P.vasos);
     if (f.pisoFrente && f.pisoFrente !== 'concreto') add('Piso da frente ' + f.pisoFrente, Math.max(1, proj.terreno.recuoFrontal / 100 * 3) * (P.pisoFrente[f.pisoFrente] || 0));

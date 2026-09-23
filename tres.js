@@ -387,7 +387,7 @@ function TRES_ENGINE(THREE, M){
   var FACHADA_EXTRA = {vitrine:false, pergolado:false, letreiro:'', letreiroEstilo:'led', letreiroCor:'#22B8D6', letreiroLuz:true, letreiroPos:'parede', totem:false,
     /* detalhe fino (15/09): janelas, vidro, porta de entrada, portão da garagem, cores livres e a frente da casa */
     janela:'correr', vidro:'incolor', moldura:false, gradeJanela:false, brise:false,
-    porta:'madeira', portaCor:'', arandelas:false, vasos:false, garagem:'basculante',
+    porta:'madeira', portaCor:'', arandelas:false, vasos:false, garagem:'basculante', portaInt:'lisa',
     esquadriaCor:'', portaoCor:'', muroCor:'', pisoFrente:'concreto',
     /* porta: medida da abertura (m; 0 = padrão 0,90 × 2,10) · letreiro: formato, tamanho, fonte, subtítulo, fundo */
     portaLargura:0, portaAltura:0,
@@ -403,17 +403,22 @@ function TRES_ENGINE(THREE, M){
   var INCLINACOES = {baixa:'Baixa (10%)', media:'Média (30%)', alta:'Alta (45%)'}, INCLINACAO_FATOR = {baixa:.1, media:.3, alta:.45};
   var TELHAS = {ceramica:'Cerâmica', concreto:'Concreto', metalica:'Metálica', fibrocimento:'Fibrocimento', sanduiche:'Termoacústica (sanduíche)'};
   var LETREIRO_POS = {parede:'Na parede', marquise:'Sobre a marquise', topo:'No topo (outdoor)'};
-  var JANELAS = {correr:'De correr', fixa:'Vidro fixo', guilhotina:'Guilhotina', basculante:'Basculante', veneziana:'Veneziana', quadriculada:'Quadriculada'};
-  var VIDROS = {incolor:'Incolor', fume:'Fumê', verde:'Verde', espelhado:'Espelhado'};
-  var PORTAS = {madeira:'Madeira', pivotante:'Pivotante', vidro:'De vidro', dupla:'Dupla', ripada:'Ripada', aco:'Aço'};
+  var JANELAS = {correr:'De correr', fixa:'Vidro fixo', guilhotina:'Guilhotina', basculante:'Basculante', veneziana:'Veneziana', quadriculada:'Quadriculada',
+    /* 23/09 */ maximar:'Maxim-ar', pivotante:'Pivotante', sanfonada:'Sanfonada', cobogo:'Cobogó', vitro:'Vitrô (banheiro)', persiana:'Com persiana', arco:'Bandeira em arco'};
+  var VIDROS = {incolor:'Incolor', fume:'Fumê', verde:'Verde', espelhado:'Espelhado', leitoso:'Leitoso (jateado)', canelado:'Canelado', bronze:'Bronze'};
+  var PORTAS = {madeira:'Madeira', pivotante:'Pivotante', vidro:'De vidro', dupla:'Dupla', ripada:'Ripada', aco:'Aço',
+    /* 23/09 */ almofadada:'Almofadada', vidroLateral:'Com vidro lateral', bandeira:'Com bandeira', francesa:'Francesa (2 folhas de vidro)', balcao:'Porta-balcão de correr', camarao:'Camarão (sanfonada)'};
   /* portas de loja / comércio (a abertura pode ser bem mais larga: portaLargura) */
-  var PORTAS_LOJA = {enrolar:'De enrolar', subir:'De subir (basculante)', correr:'Vidro de correr (automática)', vidroDupla:'Vidro 2 folhas', gradeLoja:'Grade pantográfica', articulada:'Aço articulada'};
+  var PORTAS_LOJA = {enrolar:'De enrolar', subir:'De subir (basculante)', correr:'Vidro de correr (automática)', vidroDupla:'Vidro 2 folhas', gradeLoja:'Grade pantográfica', articulada:'Aço articulada',
+    /* 23/09 */ blindex:'Blindex 1 folha', giratoria:'Giratória', cortinaAr:'Vidro + cortina de ar'};
+  /* portas internas (entre cômodos): tipo por porta, escolhido no popover */
+  var PORTAS_INT = {lisa:'Lisa', almofadada:'Almofadada', vidro:'Com visor de vidro', correr:'De correr', embutida:'De correr embutida', camarao:'Camarão', francesa:'Dupla (francesa)', veneziana:'Veneziana'};
   var LETREIRO_FORMATOS = {retangular:'Retangular', arredondado:'Arredondado', redondo:'Redondo', oval:'Oval', faixa:'Faixa (frente toda)'};
   var LETREIRO_TAMS = {p:'P', m:'M', g:'G', gg:'GG'};
   var LETREIRO_FATOR = {p:.7, m:1, g:1.4, gg:1.9};
   var LETREIRO_FONTES = {sans:'Moderna', serif:'Clássica', script:'Manuscrita', condensada:'Condensada', display:'Impacto'};
   var LETREIRO_CSSFONT = {sans:'Inter, Arial, sans-serif', serif:'Georgia, "Times New Roman", serif', script:'"Segoe Script", "Brush Script MT", cursive', condensada:'"Arial Narrow", "Roboto Condensed", sans-serif', display:'Impact, "Arial Black", sans-serif'};
-  var GARAGENS = {basculante:'Basculante', enrolar:'De enrolar', ripado:'Ripado', vidro:'Vidro'};
+  var GARAGENS = {basculante:'Basculante', enrolar:'De enrolar', ripado:'Ripado', vidro:'Vidro', seccionada:'Seccionada', pivotanteG:'Pivotante', deslizante:'Deslizante'};
   var PISOS_FRENTE = {concreto:'Concreto', pedra:'Pedra', deck:'Deck', intertravado:'Intertravado', grama:'Só grama'};
   function fachadaDe(proj){
     var f = proj.fachada || {}, pr = FACHADA_PRESETS[f.estilo] || FACHADA_PRESETS.moderno, out = {estilo: f.estilo || 'moderno'};
@@ -482,10 +487,16 @@ function TRES_ENGINE(THREE, M){
     if (ce === '#1F2326' || ce === '#2B2F33' || tem('esquadria preta', 'esquadrias pretas', 'janelas pretas')) { f.esquadria = 'preto'; lidos.push('esquadrias pretas'); }
     else if (ce === '#F2EFE8' || tem('esquadria branca', 'esquadrias brancas', 'janelas brancas')) { f.esquadria = 'branco'; lidos.push('esquadrias brancas'); }
     else if (ce === '#8B5E3C' || tem('esquadria de madeira', 'esquadrias de madeira', 'janelas de madeira')) { f.esquadria = 'madeira'; lidos.push('esquadrias de madeira'); }
-    if (tem('portao de grade', 'portao grade', 'portao gradeado', 'grade')) { f.portao = 'grade'; lidos.push('portão de grade'); }
+    if (tem('portao deslizante', 'portao de correr')) { f.portao = 'deslizante'; lidos.push('portão deslizante'); }
+    else if (tem('lanca', 'ponta de flecha')) { f.portao = 'lanca'; lidos.push('portão com lança'); }
+    else if (tem('chapa perfurada', 'portao perfurado', 'perfurad')) { f.portao = 'perfurada'; lidos.push('portão de chapa perfurada'); }
+    else if (tem('portao de grade', 'portao grade', 'portao gradeado', 'grade')) { f.portao = 'grade'; lidos.push('portão de grade'); }
     else if (tem('portao ripado', 'portao de madeira', 'portao de ripa')) { f.portao = 'ripado'; lidos.push('portão ripado'); }
     else if (tem('portao de chapa', 'portao fechado', 'portao chapa', 'chapa')) { f.portao = 'chapa'; lidos.push('portão de chapa'); }
-    if (tem('muro alto', 'muro fechado')) { f.muro = 'alto'; lidos.push('muro alto'); }
+    if (tem('cobogo', 'elemento vazado', 'muro vazado')) { f.muro = 'cobogo'; lidos.push('muro de cobogó'); }
+    else if (tem('gradil', 'muro com grade', 'cerca metalica')) { f.muro = 'gradil'; lidos.push('gradil'); }
+    else if (tem('muro de pedra', 'pedra no muro')) { f.muro = 'pedra'; lidos.push('muro de pedra'); }
+    else if (tem('muro alto', 'muro fechado')) { f.muro = 'alto'; lidos.push('muro alto'); }
     else if (tem('muro de vidro', 'muro vidro', 'vidro no muro', 'gradil de vidro')) { f.muro = 'vidro'; lidos.push('muro com vidro'); }
     else if (tem('muro baixo', 'mureta', 'sem muro')) { f.muro = 'baixo'; lidos.push('muro baixo'); }
     /* extras */
@@ -494,19 +505,42 @@ function TRES_ENGINE(THREE, M){
     if (tem('sem iluminacao', 'sem luz')) { f.iluminacao = false; } else if (tem('iluminac', 'iluminad', 'spots', 'spot ', 'luz')) { f.iluminacao = true; lidos.push('iluminação'); }
     if (tem('vitrine', 'fachada de vidro', 'frente de vidro', 'pele de vidro', 'toda de vidro')) { f.vitrine = true; lidos.push('vitrine'); }
     /* janelas, vidro, porta, garagem, frente */
-    if (tem('guilhotina')) { f.janela = 'guilhotina'; lidos.push('janela guilhotina'); }
+    if (tem('maxim ar', 'maxim-ar', 'maximar')) { f.janela = 'maximar'; lidos.push('janela maxim-ar'); }
+    else if (tem('janela pivotante')) { f.janela = 'pivotante'; lidos.push('janela pivotante'); }
+    else if (tem('janela sanfonada')) { f.janela = 'sanfonada'; lidos.push('janela sanfonada'); }
+    else if (tem('janela de cobogo', 'cobogo na janela')) { f.janela = 'cobogo'; lidos.push('cobogó na janela'); }
+    else if (tem('vitro')) { f.janela = 'vitro'; lidos.push('vitrô'); }
+    else if (tem('com persiana', 'persiana integrada')) { f.janela = 'persiana'; lidos.push('janela com persiana'); }
+    else if (tem('janela em arco', 'bandeira em arco')) { f.janela = 'arco'; lidos.push('janela com arco'); }
+    else if (tem('guilhotina')) { f.janela = 'guilhotina'; lidos.push('janela guilhotina'); }
     else if (tem('basculante') && !tem('garagem')) { f.janela = 'basculante'; lidos.push('janela basculante'); }
     else if (tem('veneziana', 'persiana')) { f.janela = 'veneziana'; lidos.push('janela veneziana'); }
     else if (tem('quadriculad', 'janela inglesa')) { f.janela = 'quadriculada'; lidos.push('janela quadriculada'); }
     else if (tem('vidro fixo', 'janela fixa', 'janelao', 'janela ampla')) { f.janela = 'fixa'; lidos.push('vidro fixo'); }
     else if (tem('janela de correr', 'janelas de correr')) { f.janela = 'correr'; lidos.push('janela de correr'); }
-    if (tem('fume', 'vidro escuro', 'vidro preto')) { f.vidro = 'fume'; lidos.push('vidro fumê'); }
+    if (tem('leitoso', 'jateado', 'vidro fosco')) { f.vidro = 'leitoso'; lidos.push('vidro leitoso'); }
+    else if (tem('canelado')) { f.vidro = 'canelado'; lidos.push('vidro canelado'); }
+    else if (tem('vidro bronze')) { f.vidro = 'bronze'; lidos.push('vidro bronze'); }
+    else if (tem('fume', 'vidro escuro', 'vidro preto')) { f.vidro = 'fume'; lidos.push('vidro fumê'); }
     else if (tem('vidro verde')) { f.vidro = 'verde'; lidos.push('vidro verde'); }
     else if (tem('espelhad', 'vidro refletivo', 'reflecta')) { f.vidro = 'espelhado'; lidos.push('vidro espelhado'); }
+    if (tem('portas internas embutidas', 'porta embutida', 'porta em gaveta')) { f.portaInt = 'embutida'; lidos.push('portas internas embutidas'); }
+    else if (tem('portas internas de correr', 'porta interna de correr')) { f.portaInt = 'correr'; lidos.push('portas internas de correr'); }
+    else if (tem('portas internas almofadadas', 'porta interna almofadada')) { f.portaInt = 'almofadada'; lidos.push('portas internas almofadadas'); }
+    else if (tem('portas internas com visor', 'porta interna com vidro')) { f.portaInt = 'vidro'; lidos.push('portas internas com visor'); }
     if (tem('moldura')) { f.moldura = true; lidos.push('moldura nas janelas'); }
     if (tem('grade nas janelas', 'grades nas janelas', 'janelas com grade', 'grade de protecao')) { f.gradeJanela = true; lidos.push('grade nas janelas'); }
     if (tem('brise')) { f.brise = true; lidos.push('brise'); }
-    if (tem('porta de enrolar', 'porta de aco de enrolar')) { f.porta = 'enrolar'; lidos.push('porta de enrolar'); }
+    if (tem('porta camarao')) { f.porta = 'camarao'; lidos.push('porta camarão'); }
+    else if (tem('porta balcao', 'porta-balcao', 'balcao de correr')) { f.porta = 'balcao'; lidos.push('porta-balcão'); }
+    else if (tem('porta francesa')) { f.porta = 'francesa'; lidos.push('porta francesa'); }
+    else if (tem('almofadada')) { f.porta = 'almofadada'; lidos.push('porta almofadada'); }
+    else if (tem('blindex')) { f.porta = 'blindex'; lidos.push('porta blindex'); }
+    else if (tem('giratoria')) { f.porta = 'giratoria'; lidos.push('porta giratória'); }
+    else if (tem('cortina de ar')) { f.porta = 'cortinaAr'; lidos.push('porta com cortina de ar'); }
+    else if (tem('vidro lateral', 'lateral de vidro')) { f.porta = 'vidroLateral'; lidos.push('porta com vidro lateral'); }
+    else if (tem('porta com bandeira', 'bandeira na porta')) { f.porta = 'bandeira'; lidos.push('porta com bandeira'); }
+    else if (tem('porta de enrolar', 'porta de aco de enrolar')) { f.porta = 'enrolar'; lidos.push('porta de enrolar'); }
     else if (tem('porta de subir', 'porta basculante')) { f.porta = 'subir'; lidos.push('porta de subir'); }
     else if (tem('porta automatica', 'porta de correr', 'vidro de correr')) { f.porta = 'correr'; lidos.push('porta de vidro de correr'); }
     else if (tem('porta pantografica', 'grade pantografica', 'grade de loja')) { f.porta = 'gradeLoja'; lidos.push('grade pantográfica'); }
@@ -533,7 +567,10 @@ function TRES_ENGINE(THREE, M){
     else if (tem('condensad', 'fonte estreita')) { f.letreiroFonte = 'condensada'; lidos.push('fonte condensada'); }
     var cpo = corApos('porta(?!o)');
     if (cpo) { f.portaCor = cpo; lidos.push('porta ' + cpo); }
-    if (tem('garagem de enrolar', 'garagem com porta de enrolar', 'portao de enrolar')) { f.garagem = 'enrolar'; lidos.push('garagem de enrolar'); }
+    if (tem('garagem seccionada', 'porta seccionada')) { f.garagem = 'seccionada'; lidos.push('garagem seccionada'); }
+    else if (tem('garagem deslizante', 'garagem de correr')) { f.garagem = 'deslizante'; lidos.push('garagem deslizante'); }
+    else if (tem('garagem pivotante')) { f.garagem = 'pivotanteG'; lidos.push('garagem pivotante'); }
+    else if (tem('garagem de enrolar', 'garagem com porta de enrolar', 'portao de enrolar')) { f.garagem = 'enrolar'; lidos.push('garagem de enrolar'); }
     else if (tem('garagem ripad', 'garagem de madeira')) { f.garagem = 'ripado'; lidos.push('garagem ripada'); }
     else if (tem('garagem de vidro', 'garagem em vidro')) { f.garagem = 'vidro'; lidos.push('garagem de vidro'); }
     if (tem('arandela')) { f.arandelas = true; lidos.push('arandelas'); }
@@ -671,7 +708,8 @@ function TRES_ENGINE(THREE, M){
   function vidroMat(tipo){
     if (!tipo || tipo === 'incolor') return materiais().vidro;
     if (!vidroCache[tipo]) {
-      var c = {fume:['#3C4146', .62, .25], verde:['#8FCFB8', .42, .12], espelhado:['#A9C2CF', .82, .85]}[tipo] || ['#BFE6F2', .34, .15];
+      var c = {fume:['#3C4146', .62, .25], verde:['#8FCFB8', .42, .12], espelhado:['#A9C2CF', .82, .85],
+        leitoso:['#EDF2F4', .82, .02], canelado:['#D6E9F0', .55, .08], bronze:['#8A6A4B', .6, .3]}[tipo] || ['#BFE6F2', .34, .15];
       vidroCache[tipo] = new THREE.MeshStandardMaterial({color:c[0], transparent:true, opacity:c[1], roughness:.05, metalness:c[2], side:THREE.DoubleSide, depthWrite:false});
     }
     return vidroCache[tipo];
@@ -707,6 +745,7 @@ function TRES_ENGINE(THREE, M){
       tecido:   std('#E8E2D6'), tecido2: std('#B9C4B0'), madEsc: std('#8B5E3C'), madClara: std('#D8B98C'),
       branco:   std('#F5F5F2'), preto: std('#25282C'), metal: std('#A6ACB2', {roughness:.35, metalness:.6}),
       tronco:   std('#6F4E37'), folhas: std('#4F8A3E'), folhas2: std('#6AA24C'), pele: std('#D9C7A6'),
+      fogo:     std('#E4884F', {emissive:'#C2451B', emissiveIntensity:.8, roughness:.9}),   /* brasa da lareira */
       carro:    std('#8FA3B5', {roughness:.35, metalness:.5}), pneu: std('#1E1F22'), vidroCarro: std('#2C3A44', {roughness:.2, metalness:.5}),
       terraExt: std('#9DB088'),
       /* fachada */
@@ -886,6 +925,192 @@ function TRES_ENGINE(THREE, M){
       var fp = new THREE.Mesh(new THREE.IcosahedronGeometry(.32 * sp, 1), Mt.folhas); fp.position.set(0, .75 * sp, 0); fp.castShadow = true; g.add(fp);
     } else if (tipo === 'luminaria') {
       cl(.12, .02, Mt.metal, 0, 0, 0, 12); cl(.015, alt - .3, Mt.metal, 0, 0, .02, 6); cl(w / 2, .3, Mt.tecido, 0, 0, alt - .3, 16);
+
+    /* ---------- itens novos (23/09) ---------- */
+    } else if (tipo === 'sofaCanto') {   /* L: braço num lado, chaise no outro */
+      var br = dp * .55;
+      bx(w, .42, br, Mt.azul, 0, -dp / 2 + br / 2, 0); bx(w, alt - .42, .22, Mt.azul, 0, -dp / 2 + .11, .42);
+      bx(.9, .42, dp - br, Mt.azul, -w / 2 + .45, dp / 2 - (dp - br) / 2, 0);
+      bx(.18, .24, br, Mt.azul, w / 2 - .09, -dp / 2 + br / 2, .42); bx(.18, alt - .42, dp - br, Mt.azul, -w / 2 + .09, dp / 2 - (dp - br) / 2, .42);
+      nA = Math.max(2, Math.round((w - .36) / .68)); var cwL = (w - .36) / nA;
+      for (var iL = 0; iL < nA; iL++) bx(cwL - .04, .12, br - .28, Mt.azul2, -w / 2 + .18 + cwL * (iL + .5), -dp / 2 + br / 2, .42);
+      bx(.85, .12, dp - br - .1, Mt.azul2, -w / 2 + .45, dp / 2 - (dp - br) / 2, .42);
+      var almC = bx(.42, .42, .12, Mt.tecido, w / 2 - .5, -dp / 2 + .3, .54); almC.rotation.y = -.3;
+    } else if (tipo === 'chaise') {
+      bx(w, .4, dp, Mt.azul, 0, 0); bx(w, .12, dp - .1, Mt.azul2, 0, .02, .4);
+      var encC = bx(w, .12, dp * .34, Mt.azul, 0, -dp / 2 + dp * .16, .48); encC.rotation.x = -.5;
+      pernas(w, dp, .18, .05, Mt.madEsc);
+    } else if (tipo === 'pufe') {
+      cl(w / 2, alt - .04, Mt.tecido2, 0, 0, 0, 18); cl(w / 2 - .03, .06, Mt.tecido, 0, 0, alt - .06, 18);
+    } else if (tipo === 'painelTv') {
+      bx(w, alt, dp, Mt.madEsc, 0, 0);
+      bx(w * .68, alt * .52, .04, Mt.preto, 0, dp / 2 + .02, alt * .3); bx(w * .66, alt * .49, .01, Mt.vidroCarro, 0, dp / 2 + .045, alt * .31);
+      bx(w * .5, .05, .2, Mt.madClara, 0, dp / 2 + .1, alt * .15);
+    } else if (tipo === 'lareira') {
+      bx(w, alt, dp, Mt.cruParede, 0, 0);
+      bx(w * .62, alt * .5, .06, Mt.preto, 0, dp / 2 - .02, alt * .18);
+      var fogo = bx(w * .5, .22, .1, Mt.fogo || Mt.madEsc, 0, dp / 2 - .05, alt * .2); fogo.castShadow = false;
+      bx(w + .12, .08, dp + .06, Mt.laje, 0, 0, alt);
+    } else if (tipo === 'banqueta') {
+      cl(w / 2, .06, Mt.madEsc, 0, 0, alt - .06, 14); cl(.03, alt - .06, Mt.metal, 0, 0, 0, 10); cl(w / 2 - .06, .02, Mt.metal, 0, 0, 0, 14); cl(w / 2 - .08, .02, Mt.metal, 0, 0, .28, 14);
+    } else if (tipo === 'cristaleira') {
+      bx(w, alt, dp, Mt.madClara, 0, 0);
+      bx(w - .08, alt * .55, .02, Mt.vidroBox, 0, dp / 2 - .01, alt * .42);
+      for (var kc = 0; kc < 3; kc++) bx(w - .1, .02, dp - .06, Mt.madClara, 0, 0, alt * .45 + kc * (alt * .5 / 3));
+    } else if (tipo === 'cooktop') {
+      bx(w, alt - .06, dp, Mt.branco, 0, 0); bx(w, .04, dp, Mt.preto, 0, 0, alt - .06);
+      [[-.26, -.22], [.26, -.22], [-.26, .22], [.26, .22]].forEach(function (p) { cl(Math.min(w, dp) * .13, .015, Mt.metal, p[0] * w, p[1] * dp, alt - .02, 14); });
+    } else if (tipo === 'coifa') {
+      var cx0 = new THREE.Mesh(new THREE.CylinderGeometry(w * .45, w * .28, alt * .5, 4), Mt.inox); cx0.position.set(0, alt * .25, 0); cx0.rotation.y = Math.PI / 4; cx0.castShadow = true; g.add(cx0);
+      bx(w * .3, alt * .5, dp * .3, Mt.inox, 0, -dp / 2 + dp * .2, alt * .5);
+    } else if (tipo === 'eletro') {
+      bx(w, alt, dp, Mt.branco, 0, 0); bx(w - .06, alt * .45, .02, Mt.preto, 0, dp / 2, alt * .5);
+      bx(w - .1, .04, .03, Mt.metal, 0, dp / 2 + .01, alt * .28);
+    } else if (tipo === 'adega' || tipo === 'vitrineExp' || tipo === 'freezerExp') {
+      bx(w, alt, dp, tipo === 'freezerExp' ? Mt.branco : Mt.preto, 0, 0);
+      bx(w - .08, alt - .12, .02, Mt.vidroBox, 0, dp / 2 - .01, .06);
+      for (var kp = 1; kp < 4; kp++) bx(w - .1, .02, dp - .08, Mt.metal, 0, 0, alt * kp / 4);
+    } else if (tipo === 'aereo') {
+      bx(w, alt, dp, Mt.branco, 0, 0); bx(w / 2 - .01, alt - .04, .02, Mt.madClara, -w / 4, dp / 2, .02); bx(w / 2 - .01, alt - .04, .02, Mt.madClara, w / 4, dp / 2, .02);
+      bx(.02, .02, .06, Mt.metal, -.04, dp / 2 + .04, alt / 2); bx(.02, .02, .06, Mt.metal, .04, dp / 2 + .04, alt / 2);
+    } else if (tipo === 'penteadeira') {
+      bx(w, .04, dp, Mt.madClara, 0, 0, alt - .04); pernas(w, dp, alt - .04, .05, Mt.madClara);
+      bx(w * .55, .9, .03, Mt.vidroBox, 0, -dp / 2 + .03, alt); bx(w * .58, .94, .02, Mt.madClara, 0, -dp / 2 + .01, alt);
+      bx(w * .4, .16, dp - .08, Mt.madClara, 0, 0, alt - .22);
+    } else if (tipo === 'closet') {
+      bx(w, .06, dp, Mt.madClara, 0, 0, alt - .06); bx(.05, alt, dp, Mt.madClara, -w / 2 + .03, 0); bx(.05, alt, dp, Mt.madClara, w / 2 - .03, 0);
+      var bar = cl(.02, w - .12, Mt.metal, 0, 0, alt * .62, 10); bar.rotation.z = Math.PI / 2;
+      var coresR = [Mt.azul, Mt.tecido, Mt.tecido2, Mt.branco, Mt.madEsc];
+      for (var xr = -w / 2 + .12; xr < w / 2 - .1; xr += .07) bx(.05, .7, dp * .5, coresR[Math.floor(Math.abs(xr * 13)) % coresR.length], xr, 0, alt * .62 - .72);
+      for (var pr3 = 0; pr3 < 2; pr3++) bx(w - .1, .03, dp - .06, Mt.madClara, 0, 0, .3 + pr3 * .35);
+    } else if (tipo === 'espelho' || tipo === 'quadro') {
+      bx(w, alt, Math.max(.03, dp), tipo === 'quadro' ? Mt.madEsc : Mt.metal, 0, 0, tipo === 'quadro' ? 1.05 : 0);
+      bx(w - .08, alt - .08, .01, tipo === 'quadro' ? Mt.tecido2 : Mt.vidroBox, 0, Math.max(.03, dp) / 2, tipo === 'quadro' ? 1.05 : 0);
+    } else if (tipo === 'beliche') {
+      bx(w, .16, dp, Mt.madClara, 0, 0, .35); bx(w - .06, .14, dp - .06, Mt.tecido, 0, 0, .51);
+      bx(w, .16, dp, Mt.madClara, 0, 0, alt * .72); bx(w - .06, .14, dp - .06, Mt.tecido, 0, 0, alt * .72 + .16);
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (p) { bx(.07, alt, .07, Mt.madClara, p[0] * (w / 2 - .04), p[1] * (dp / 2 - .04)); });
+      for (var deg = 0; deg < 4; deg++) bx(.3, .04, .04, Mt.madEsc, w / 2 - .18, dp / 2 - .1, .55 + deg * .28);
+    } else if (tipo === 'escorregador') {
+      bx(w * .45, alt * .55, dp * .5, Mt.tecido2, -w * .25, -dp * .2, 0);
+      bx(w * .45, .05, dp * .5, Mt.madClara, -w * .25, -dp * .2, alt * .55);
+      var ramp = bx(w * .4, .05, dp * .62, Mt.azul2, w * .22, dp * .16, alt * .3); ramp.rotation.x = .55;
+      for (var dg2 = 0; dg2 < 3; dg2++) bx(w * .4, .04, .1, Mt.madEsc, -w * .25, -dp / 2 + .06, .2 + dg2 * .18);
+      bx(.05, alt * .5, .05, Mt.metal, w * .04, dp * .34, alt * .55); bx(.05, alt * .5, .05, Mt.metal, w * .4, dp * .34, alt * .55);
+    } else if (tipo === 'caixaBrinq') {
+      bx(w, alt - .04, dp, Mt.azul2, 0, 0); bx(w + .03, .05, dp + .03, Mt.madClara, 0, 0, alt - .05);
+    } else if (tipo === 'gabinete') {
+      bx(w, alt - .1, dp, Mt.madClara, 0, 0, .1); bx(w + .04, .06, dp + .02, Mt.laje, 0, 0, alt - .06);
+      var cuba = cl(Math.min(w, dp) * .28, .12, Mt.louca, 0, 0, alt - .16, 18); cl(.015, .18, Mt.inox, 0, -dp / 2 + .1, alt, 8);
+      bx(w / 2 - .02, alt - .18, .02, Mt.madEsc, -w / 4, dp / 2, .12); bx(w / 2 - .02, alt - .18, .02, Mt.madEsc, w / 4, dp / 2, .12);
+    } else if (tipo === 'mesaL') {
+      bx(w, .04, dp * .42, Mt.madClara, 0, -dp / 2 + dp * .21, alt - .04);
+      bx(w * .42, .04, dp, Mt.madClara, -w / 2 + w * .21, 0, alt - .04);
+      bx(.05, alt - .04, .05, Mt.metal, w / 2 - .06, -dp / 2 + .06); bx(.05, alt - .04, .05, Mt.metal, -w / 2 + .06, dp / 2 - .06); bx(.05, alt - .04, .05, Mt.metal, -w / 2 + .06, -dp / 2 + .06);
+      bx(.14, .02, .14, Mt.preto, 0, -dp / 2 + .2, alt); bx(.52, .3, .02, Mt.preto, 0, -dp / 2 + .16, alt + .14);
+    } else if (tipo === 'armarioAco') {
+      bx(w, alt, dp, Mt.metal, 0, 0); bx(.02, alt - .1, .02, Mt.preto, -.03, dp / 2 + .01, alt * .5); bx(.02, alt - .1, .02, Mt.preto, .03, dp / 2 + .01, alt * .5);
+      for (var pa3 = 1; pa3 < 4; pa3++) bx(w + .01, .015, dp, Mt.preto, 0, 0, alt * pa3 / 4);
+    } else if (tipo === 'varal') {
+      bx(.05, alt, .05, Mt.metal, -w / 2 + .03, -dp / 2 + .03); bx(.05, alt, .05, Mt.metal, w / 2 - .03, -dp / 2 + .03);
+      bx(.05, alt, .05, Mt.metal, -w / 2 + .03, dp / 2 - .03); bx(.05, alt, .05, Mt.metal, w / 2 - .03, dp / 2 - .03);
+      for (var vy = 0; vy < 5; vy++) { bx(w, .015, .015, Mt.branco, 0, -dp / 2 + .05 + vy * (dp - .1) / 4, alt - .05, true); }
+      bx(.6, .04, .12, Mt.tecido, -w * .2, -dp / 2 + .1, alt - .35); bx(.5, .04, .12, Mt.tecido2, w * .2, dp / 2 - .12, alt - .4);
+    } else if (tipo === 'boiler') {
+      cl(w / 2, alt - .1, Mt.inox, 0, 0, .1, 16); cl(.03, .3, Mt.metal, w / 2 - .04, 0, alt - .3, 8); bx(w * .5, .12, dp * .5, Mt.metal, 0, 0, 0);
+    } else if (tipo === 'freezer') {
+      bx(w, alt - .06, dp, Mt.branco, 0, 0); bx(w, .06, dp, Mt.branco, 0, 0, alt - .06);
+      bx(w - .1, .03, .04, Mt.metal, 0, dp / 2 - .02, alt); bx(.1, .1, .04, Mt.preto, w / 2 - .12, dp / 2, alt * .6);
+    } else if (tipo === 'moto') {
+      cl(.3, .12, Mt.pneu, 0, -dp / 2 + .32, .3, 12).rotation.z = Math.PI / 2;
+      cl(.3, .12, Mt.pneu, 0, dp / 2 - .32, .3, 12).rotation.z = Math.PI / 2;
+      bx(w * .5, .35, dp * .5, Mt.carro, 0, 0, .5); bx(w * .8, .1, .5, Mt.preto, 0, -dp * .1, .78);
+      bx(.06, .5, .06, Mt.metal, 0, -dp / 2 + .38, .55); bx(w, .06, .06, Mt.preto, 0, -dp / 2 + .38, 1.0);
+    } else if (tipo === 'bicicleta') {
+      var r1 = cl(.33, .04, Mt.pneu, 0, -dp / 2 + .35, .33, 16); r1.rotation.z = Math.PI / 2;
+      var r22 = cl(.33, .04, Mt.pneu, 0, dp / 2 - .35, .33, 16); r22.rotation.z = Math.PI / 2;
+      bx(.04, .04, dp - .7, Mt.azul, 0, 0, .55); bx(.04, .45, .04, Mt.azul, 0, dp / 2 - .35, .35);
+      bx(.04, .5, .04, Mt.azul, 0, -dp / 2 + .35, .35); bx(w, .04, .04, Mt.preto, 0, -dp / 2 + .35, .95);
+      bx(.22, .06, .1, Mt.preto, 0, dp / 2 - .5, .78);
+    } else if (tipo === 'bancoJardim') {
+      bx(w, .06, dp * .6, Mt.madEsc, 0, dp * .1, .42); bx(w, dp * .55, .06, Mt.madEsc, 0, -dp / 2 + .05, .48).rotation.x = -.15;
+      bx(.06, .42, .06, Mt.metal, -w / 2 + .1, dp * .12); bx(.06, .42, .06, Mt.metal, w / 2 - .1, dp * .12);
+      bx(.06, .8, .06, Mt.metal, -w / 2 + .1, -dp / 2 + .08); bx(.06, .8, .06, Mt.metal, w / 2 - .1, -dp / 2 + .08);
+    } else if (tipo === 'arbusto') {
+      var ab = new THREE.Mesh(new THREE.IcosahedronGeometry(Math.min(w, dp) * .5, 1), Mt.folhas2); ab.position.set(0, alt * .5, 0); ab.castShadow = true; g.add(ab);
+      var ab2 = new THREE.Mesh(new THREE.IcosahedronGeometry(Math.min(w, dp) * .32, 1), Mt.folhas); ab2.position.set(w * .18, alt * .72, -dp * .12); ab2.castShadow = true; g.add(ab2);
+    } else if (tipo === 'cercaViva') {
+      bx(w, alt, dp, Mt.folhas2, 0, 0);
+      for (var cvx = -w / 2 + .15; cvx < w / 2 - .1; cvx += .3) { var bo = new THREE.Mesh(new THREE.IcosahedronGeometry(.18, 0), Mt.folhas); bo.position.set(cvx, alt, 0); bo.castShadow = true; g.add(bo); }
+    } else if (tipo === 'lixeira') {
+      cl(w / 2, alt - .06, Mt.tecido2, 0, 0, 0, 12); cl(w / 2 + .02, .06, Mt.preto, 0, 0, alt - .06, 12);
+    } else if (tipo === 'guardaSol') {
+      cl(.05, alt - .3, Mt.madEsc, 0, 0, 0, 10);
+      var cone = new THREE.Mesh(new THREE.ConeGeometry(Math.min(w, dp) / 2, .35, 8), Mt.tecido); cone.position.set(0, alt - .18, 0); cone.castShadow = true; g.add(cone);
+      cl(.28, .1, Mt.laje, 0, 0, 0, 12);
+    } else if (tipo === 'jacuzzi') {
+      cl(w / 2, alt, Mt.madEsc, 0, 0, 0, 20); cl(w / 2 - .12, alt - .12, Mt.louca, 0, 0, .1, 20);
+      var agJ = cl(w / 2 - .16, .04, Mt.agua, 0, 0, alt - .16, 20); agJ.receiveShadow = false;
+    } else if (tipo === 'ducha') {
+      cl(.05, alt, Mt.inox, 0, 0, 0, 10); bx(.28, .05, .28, Mt.inox, 0, .12, alt - .05); cl(.03, .12, Mt.inox, 0, 0, .25, 8);
+    } else if (tipo === 'escadaPiscina') {
+      [-1, 1].forEach(function (s3) { var t2 = cl(.025, alt, Mt.inox, s3 * (w / 2 - .06), 0, 0, 10); });
+      for (var de = 0; de < 3; de++) bx(w - .1, .03, .12, Mt.inox, 0, dp * .2, .2 + de * .3);
+      bx(w - .1, .03, .12, Mt.inox, 0, 0, alt - .1);
+    } else if (tipo === 'trampolim') {
+      bx(w, .06, dp * .75, Mt.branco, 0, dp * .1, alt - .06); bx(.12, alt - .1, .12, Mt.metal, 0, -dp / 2 + .12, 0); bx(w - .1, .08, .2, Mt.metal, 0, -dp / 2 + .3, alt - .16);
+    } else if (tipo === 'rede') {
+      bx(.09, alt, .09, Mt.madEsc, -w / 2 + .05, 0); bx(.09, alt, .09, Mt.madEsc, w / 2 - .05, 0);
+      var rd = new THREE.Mesh(new THREE.CylinderGeometry(dp * .3, dp * .3, w - .2, 10, 1, true, 0, Math.PI), Mt.tecido2);
+      rd.rotation.z = Math.PI / 2; rd.position.set(0, alt * .55, 0); rd.castShadow = true; g.add(rd);
+    } else if (tipo === 'esteira') {
+      bx(w, .25, dp * .78, Mt.preto, 0, dp * .1, .1); bx(w - .14, .04, dp * .6, Mt.metal, 0, dp * .12, .33);
+      bx(.06, alt - .4, .06, Mt.metal, -w / 2 + .08, -dp / 2 + .2, .3); bx(.06, alt - .4, .06, Mt.metal, w / 2 - .08, -dp / 2 + .2, .3);
+      bx(w, .3, .1, Mt.preto, 0, -dp / 2 + .22, alt - .3); bx(w - .1, .18, .02, Mt.vidroCarro, 0, -dp / 2 + .17, alt - .26);
+    } else if (tipo === 'bikeErgo') {
+      bx(w * .5, .2, dp * .8, Mt.metal, 0, 0, .05); bx(.08, alt * .55, .08, Mt.metal, 0, dp * .2, .2);
+      bx(.08, alt * .75, .08, Mt.metal, 0, -dp * .25, .2); bx(w * .5, .12, .3, Mt.preto, 0, dp * .18, alt * .55);
+      bx(w, .06, .1, Mt.preto, 0, -dp * .25, alt * .7); var rodaB = cl(.22, .06, Mt.preto, 0, -dp * .05, .28, 14); rodaB.rotation.z = Math.PI / 2;
+    } else if (tipo === 'supino') {
+      bx(.35, .18, dp * .75, Mt.preto, 0, 0, .42); bx(.14, .42, .14, Mt.metal, 0, -dp * .28, 0); bx(.14, .42, .14, Mt.metal, 0, dp * .28, 0);
+      bx(.1, alt - .2, .1, Mt.metal, -w / 2 + .08, -dp * .2, 0); bx(.1, alt - .2, .1, Mt.metal, w / 2 - .08, -dp * .2, 0);
+      var barra = cl(.025, w, Mt.metal, 0, -dp * .2, alt - .2, 10); barra.rotation.z = Math.PI / 2;
+      [-1, 1].forEach(function (s4) { var an2 = cl(.22, .1, Mt.preto, s4 * (w / 2 - .12), -dp * .2, alt - .2, 14); an2.rotation.z = Math.PI / 2; });
+    } else if (tipo === 'halteres') {
+      bx(w, .08, dp * .6, Mt.metal, 0, 0, .72); bx(w, .08, dp * .6, Mt.metal, 0, 0, .34);
+      bx(.08, .8, .08, Mt.metal, -w / 2 + .05, 0); bx(.08, .8, .08, Mt.metal, w / 2 - .05, 0);
+      for (var hx = -w / 2 + .18; hx < w / 2 - .1; hx += .26) { [.8, .42].forEach(function (hy) { var h1 = cl(.11, .34, Mt.preto, hx, 0, hy, 12); h1.rotation.z = Math.PI / 2; }); }
+    } else if (tipo === 'balcaoAtend' || tipo === 'caixaReg') {
+      bx(w, alt - .06, dp * .6, Mt.madEsc, 0, -dp / 2 + dp * .3, 0); bx(w + .06, .06, dp * .66, Mt.laje, 0, -dp / 2 + dp * .3, alt - .06);
+      if (tipo === 'caixaReg') { bx(.34, .12, .26, Mt.preto, w * .2, -dp / 2 + dp * .3, alt); bx(.3, .22, .02, Mt.vidroCarro, w * .2, -dp / 2 + dp * .34, alt + .12).rotation.x = -.3; }
+      else bx(w * .9, .04, dp * .5, Mt.madClara, 0, dp / 2 - dp * .25, alt - .3);
+    } else if (tipo === 'gondola') {
+      bx(.06, alt, dp, Mt.metal, -w / 2 + .03, 0); bx(.06, alt, dp, Mt.metal, w / 2 - .03, 0); bx(w, alt, .04, Mt.metal, 0, 0);
+      var coresG = [Mt.azul2, Mt.tecido, Mt.tecido2, Mt.madClara, Mt.branco];
+      for (var pg2 = 0; pg2 < 4; pg2++) { var yG = .35 + pg2 * (alt - .5) / 3;
+        bx(w - .08, .03, dp - .04, Mt.metal, 0, 0, yG);
+        for (var xg2 = -w / 2 + .12; xg2 < w / 2 - .08; xg2 += .16) [-1, 1].forEach(function (lado) { bx(.11, .2, .12, coresG[(Math.floor(Math.abs(xg2 * 9)) + pg2) % coresG.length], xg2, lado * (dp / 2 - .1), yG + .03); });
+      }
+    } else if (tipo === 'arara') {
+      bx(.05, alt, .05, Mt.metal, -w / 2 + .03, 0); bx(.05, alt, .05, Mt.metal, w / 2 - .03, 0);
+      bx(w, .04, .04, Mt.metal, 0, 0, alt - .04); bx(w * .7, .04, .04, Mt.metal, 0, 0, .06);
+      var coresA = [Mt.azul, Mt.tecido, Mt.tecido2, Mt.branco, Mt.madEsc, Mt.azul2];
+      for (var xa2 = -w / 2 + .12; xa2 < w / 2 - .08; xa2 += .08) bx(.06, .8, dp * .45, coresA[Math.floor(Math.abs(xa2 * 11)) % coresA.length], xa2, 0, alt - .88);
+    } else if (tipo === 'manequim') {
+      cl(w * .5, .04, Mt.metal, 0, 0, 0, 14); cl(.03, alt * .45, Mt.metal, 0, 0, .04, 8);
+      var torso = new THREE.Mesh(new THREE.CapsuleGeometry(w * .42, alt * .3, 4, 10), Mt.tecido); torso.position.set(0, alt * .68, 0); torso.castShadow = true; g.add(torso);
+      var cab = new THREE.Mesh(new THREE.SphereGeometry(w * .22, 10, 8), Mt.tecido); cab.position.set(0, alt * .95, 0); cab.castShadow = true; g.add(cab);
+    } else if (tipo === 'vasoDec') {
+      cl(w * .38, alt * .6, Mt.tecido2, 0, 0, 0, 14);
+      var fl2 = new THREE.Mesh(new THREE.IcosahedronGeometry(w * .45, 1), Mt.folhas); fl2.position.set(0, alt * .8, 0); fl2.castShadow = true; g.add(fl2);
+    } else if (tipo === 'cortina') {
+      var nP2 = Math.max(6, Math.round(w / .12));
+      for (var ic = 0; ic < nP2; ic++) { var on2 = ic % 2 ? .05 : 0; bx(w / nP2 * .9, alt - .1, .06 + on2, Mt.tecido, -w / 2 + w * (ic + .5) / nP2, 0, .1); }
+      bx(w + .1, .04, .04, Mt.metal, 0, 0, alt - .04);
+    } else if (tipo === 'pendente') {
+      cl(.015, 1.2, Mt.preto, 0, 0, alt, 6);
+      var cup = new THREE.Mesh(new THREE.ConeGeometry(w / 2, alt, 14, 1, true), Mt.preto); cup.position.set(0, alt * .5, 0); cup.castShadow = true; g.add(cup);
+      var lamp = cl(.05, .05, Mt.tecido, 0, 0, alt * .2, 8); lamp.castShadow = false;
     } else {
       bx(w, alt, dp, Mt.madClara, 0, 0);
     }
@@ -1030,6 +1255,31 @@ function TRES_ENGINE(THREE, M){
       if (TL - x2 > .2) { caixa(G.terreno, TL - x2, .4, .15, matMuroBase, x2 + (TL - x2) / 2, 0, .075); caixa(G.terreno, TL - x2 - .1, 1.2, .02, Mt.vidro, x2 + (TL - x2) / 2, .4, .075, false); }
       for (var pv = 0; pv <= TL; pv += 2) if (pv < x1 - .1 || pv > x2 + .1) caixa(G.terreno, .08, 1.6, .08, Mt.esquadria, Math.min(TL - .04, pv), 0, .075);
       muroH = 1.6;
+    } else if (F.muro === 'cobogo') {   /* mureta + elementos vazados de concreto */
+      muroH = 1.9;
+      [[0, x1], [x2, TL]].forEach(function (seg2) {
+        var a0 = seg2[0], a1 = seg2[1], lseg = a1 - a0; if (lseg < .2) return;
+        caixa(G.terreno, lseg, .5, .15, matMuroBase, a0 + lseg / 2, 0, .075);
+        var passoK = .28, colsK = Math.max(1, Math.round(lseg / passoK)), cwK = lseg / colsK;
+        for (var kx = 0; kx < colsK; kx++) for (var ky = 0; ky * passoK < muroH - .5; ky++) {
+          caixa(G.terreno, cwK, .04, .14, Mt.cimento, a0 + cwK * (kx + .5), .5 + ky * passoK, .075, false);
+          caixa(G.terreno, .04, passoK, .14, Mt.cimento, a0 + cwK * kx, .5 + ky * passoK, .075, false);
+        }
+        caixa(G.terreno, lseg, .06, .16, matMuroBase, a0 + lseg / 2, muroH - .06, .075);
+      });
+    } else if (F.muro === 'gradil') {   /* mureta baixa + gradil metálico vertical */
+      muroH = 1.7;
+      [[0, x1], [x2, TL]].forEach(function (seg3) {
+        var b0 = seg3[0], b1 = seg3[1], lseg2 = b1 - b0; if (lseg2 < .2) return;
+        caixa(G.terreno, lseg2, .45, .15, matMuroBase, b0 + lseg2 / 2, 0, .075);
+        caixa(G.terreno, lseg2, .06, .06, matPortao, b0 + lseg2 / 2, muroH - .06, .075);
+        caixa(G.terreno, lseg2, .06, .06, matPortao, b0 + lseg2 / 2, .45, .075);
+        for (var gx2 = b0 + .06; gx2 < b1 - .04; gx2 += .12) caixa(G.terreno, .03, muroH - .5, .03, matPortao, gx2, .45, .075, false);
+      });
+    } else if (F.muro === 'pedra') {   /* muro revestido de pedra */
+      muroH = 1.8;
+      if (x1 > .2) { caixa(G.terreno, x1, muroH, .18, matMuroBase, x1 / 2, 0, .09); caixa(G.terreno, x1 - .02, muroH - .02, .03, Mt.pedra, x1 / 2, 0, -.01, false); }
+      if (TL - x2 > .2) { caixa(G.terreno, TL - x2, muroH, .18, matMuroBase, x2 + (TL - x2) / 2, 0, .09); caixa(G.terreno, TL - x2 - .02, muroH - .02, .03, Mt.pedra, x2 + (TL - x2) / 2, 0, -.01, false); }
     } else {
       if (x1 > .2) caixa(G.terreno, x1, muroH, .15, matMuro, x1 / 2, 0, .075);
       if (TL - x2 > .2) caixa(G.terreno, TL - x2, muroH, .15, matMuro, x2 + (TL - x2) / 2, 0, .075);
@@ -1044,6 +1294,22 @@ function TRES_ENGINE(THREE, M){
     } else if (F.portao === 'ripado') {
       caixa(G.terreno, gw - .1, .06, .06, matPortao, gx, pH - .06, .075); caixa(G.terreno, gw - .1, .06, .06, matPortao, gx, .1, .075);
       for (var rp = 0; rp <= Math.round((gw - .1) / .1); rp++) caixa(G.terreno, .06, pH - .16, .03, Mt.esqMadeira, gx - (gw - .1) / 2 + .03 + rp * .1, .1, .075);
+    } else if (F.portao === 'deslizante') {   /* corre para o lado: folha deslocada + trilho no chão */
+      caixa(G.terreno, gw - .1, pH, .05, matPortao, gx + gw * .18, .05, .075);
+      for (var dz = 1; dz < 6; dz++) caixa(G.terreno, gw - .2, .02, .06, Mt.esquadria, gx + gw * .18, pH * dz / 6, .075, false);
+      caixa(G.terreno, gw * 2.1, .04, .1, Mt.metal, gx + gw * .5, 0, .075, false);
+    } else if (F.portao === 'lanca') {   /* gradil com ponta de flecha */
+      caixa(G.terreno, gw - .1, .06, .06, matPortao, gx, pH - .3, .075); caixa(G.terreno, gw - .1, .06, .06, matPortao, gx, .1, .075);
+      var nL2 = Math.round((gw - .1) / .13);
+      for (var gl3 = 0; gl3 <= nL2; gl3++) {
+        var xL = gx - (gw - .1) / 2 + gl3 * ((gw - .1) / nL2);
+        caixa(G.terreno, .035, pH, .035, matPortao, xL, 0, .075, false);
+        var pt2 = new THREE.Mesh(new THREE.ConeGeometry(.045, .12, 4), matPortao); pt2.position.set(xL, pH + .06, .075); pt2.castShadow = true; G.terreno.add(pt2);
+      }
+    } else if (F.portao === 'perfurada') {   /* chapa com furos redondos */
+      caixa(G.terreno, gw - .1, pH, .05, matPortao, gx, .05, .075);
+      for (var fx2 = gx - gw / 2 + .2; fx2 < gx + gw / 2 - .15; fx2 += .16)
+        for (var fy2 = .25; fy2 < pH - .1; fy2 += .16) { var fu = cil(G.terreno, .045, .06, Mt.preto, fx2, fy2, .05, 8); fu.rotation.x = Math.PI / 2; fu.castShadow = false; }
     } else {
       caixa(G.terreno, gw - .1, .06, .06, matPortao, gx, pH - .06, .075); caixa(G.terreno, gw - .1, .06, .06, matPortao, gx, .1, .075);   /* portão gradeado */
       for (var gi = 0; gi <= Math.round((gw - .1) / .13); gi++) caixa(G.terreno, .035, pH, .035, matPortao, gx - (gw - .1) / 2 + gi * ((gw - .1) / Math.round((gw - .1) / .13)), 0, .075);
@@ -1162,6 +1428,42 @@ function TRES_ENGINE(THREE, M){
             peça(len, .04, .06, matEsq, 0, alt * .6, 0);
             var fb = peça(len - .1, alt * .4 - .08, .02, matVidroAb, 0, alt * .6 + .04, 0, false); fb.userData.janela = true;
             if (horiz) fb.rotation.x = -.3; else fb.rotation.z = .3;
+          } else if (J === 'maximar') {   /* folha inteira projetada para fora pela base */
+            var fm = peça(len - .1, alt - .1, .02, matVidroAb, 0, .05, -.06, false); fm.userData.janela = true;
+            if (horiz) fm.rotation.x = -.22; else fm.rotation.z = .22;
+            peça(.04, .26, .16, matEsq, -len / 2 + .06, alt * .55, -.06); peça(.04, .26, .16, matEsq, len / 2 - .06, alt * .55, -.06);   /* braços */
+          } else if (J === 'pivotante') {   /* eixo vertical no meio: uma folha aberta de lado */
+            var fp2 = peça(len / 2 - .04, alt - .08, .02, matVidroAb, -len / 4, .04, -.05, false); fp2.userData.janela = true;
+            if (horiz) fp2.rotation.y = .5; else fp2.rotation.y = .5;
+            peça(.04, alt, .06, matEsq, 0, 0, 0);
+            var fp3 = peça(len / 2 - .04, alt - .08, .02, matVidroAb, len / 4, .04, 0, false); fp3.userData.janela = true;
+          } else if (J === 'sanfonada') {   /* folhas dobradas em zigue-zague de um lado */
+            var nf2 = Math.max(3, Math.round(len / .45));
+            for (var sf = 0; sf < nf2; sf++) {
+              var fw2 = len / nf2, fs2 = peça(fw2 - .02, alt - .06, .02, matVidroAb, -len / 2 + fw2 * (sf + .5), .03, sf % 2 ? -.05 : .0, false);
+              fs2.userData.janela = true; fs2.rotation.y = sf % 2 ? .35 : -.35;
+              peça(.03, alt - .06, .05, matEsq, -len / 2 + fw2 * sf, .03, 0);
+            }
+          } else if (J === 'cobogo') {   /* elemento vazado: grade de peças de concreto, sem vidro */
+            var passoC = Math.min(.25, alt / Math.max(2, Math.round(alt / .25))), cols = Math.max(2, Math.round(len / passoC));
+            for (var ccx = 0; ccx < cols; ccx++) for (var ccy = 0; ccy * passoC < alt - .04; ccy++) {
+              var cw2 = len / cols;
+              peça(cw2, .03, .12, Mt.cimento, -len / 2 + cw2 * (ccx + .5), ccy * passoC, 0);
+              peça(.03, passoC, .12, Mt.cimento, -len / 2 + cw2 * ccx, ccy * passoC, 0);
+            }
+            peça(len, .03, .12, Mt.cimento, 0, alt - .03, 0); peça(.03, alt, .12, Mt.cimento, len / 2 - .015, 0, 0);
+          } else if (J === 'vitro') {   /* vitrô de banheiro: 3 folhas pequenas de vidro jateado */
+            for (var vt = 0; vt < 3; vt++) peça(len - .08, alt / 3 - .04, .02, vidroMat(ab.vidro || 'leitoso'), 0, .02 + vt * alt / 3, 0, false).userData.janela = true;
+            for (var vt2 = 1; vt2 < 3; vt2++) peça(len, .03, .06, matEsq, 0, vt2 * alt / 3, 0);
+          } else if (J === 'persiana') {   /* caixa de persiana + lâminas meio fechadas */
+            peça(len + .14, .22, .18, matEsq, 0, alt - .02, 0);
+            for (var lz = alt * .45; lz < alt - .08; lz += .07) peça(len - .06, .05, .04, Mt.branco, 0, lz, -.05);
+            peça(.03, alt, .04, matEsq, 0, 0, 0);
+          } else if (J === 'arco') {   /* bandeira curva em cima da janela */
+            peça(len, .04, .06, matEsq, 0, alt * .72, 0);
+            var na2 = 7;
+            for (var ar = 0; ar < na2; ar++) { var tA = (ar + .5) / na2, hA = Math.sin(Math.PI * tA) * alt * .22;
+              peça(len / na2 - .01, hA, .05, matEsq, -len / 2 + len * (ar + .5) / na2, alt * .72 + .04, 0); }
           } else if (J === 'quadriculada') {
             for (var qi = 1; qi < 3; qi++) peça(.025, alt, .04, matEsq, -len / 2 + len * qi / 3, 0, 0);
             for (var qj = 1; qj < 3; qj++) peça(len, .025, .04, matEsq, 0, alt * qj / 3, 0);
@@ -1175,6 +1477,20 @@ function TRES_ENGINE(THREE, M){
           peça(len + .2, .06, .3, Mt.laje, 0, -.06, 0);   /* peitoril */
         } else if (ab.tipo === 'portao') {
           var GT = F.garagem || 'basculante';
+          if (GT === 'seccionada') {   /* painéis horizontais com frisos, guia no teto */
+            var nsp = Math.max(3, Math.round(alt / .5));
+            for (var sp2 = 0; sp2 < nsp; sp2++) { peça(len, alt / nsp - .015, .05, matPortao, 0, sp2 * alt / nsp, 0); peça(len - .12, .03, .07, Mt.esquadria, 0, sp2 * alt / nsp + alt / nsp / 2, 0); }
+            peça(.06, alt, .1, matEsq, -len / 2 - .03, 0, 0); peça(.06, alt, .1, matEsq, len / 2 + .03, 0, 0);
+            peça(len + .1, .1, .5, matEsq, 0, alt, -.3);
+          } else if (GT === 'pivotanteG') {   /* folha inteira báscula para fora */
+            var fpg = peça(len, alt, .05, matPortao, 0, 0, -.06); fpg.rotation.x = horiz ? -.18 : 0; if (!horiz) fpg.rotation.z = .18;
+            peça(len - .2, .03, .07, Mt.esquadria, 0, alt * .5, -.1);
+            peça(.06, alt + .1, .12, matEsq, -len / 2 - .03, 0, 0); peça(.06, alt + .1, .12, matEsq, len / 2 + .03, 0, 0);
+          } else if (GT === 'deslizante') {   /* corre para o lado, sobre trilho, com folha à mostra */
+            var fd2 = peça(len * .96, alt, .05, matPortao, len * .14, 0, -.05);
+            for (var dl = 0; dl < 5; dl++) peça(len * .9, .02, .06, Mt.esquadria, len * .14, alt * (dl + 1) / 6, -.05);
+            peça(len * 1.6, .06, .12, Mt.metal, len * .3, 0, -.12);   /* trilho */
+          } else
           if (GT === 'vidro') {
             var vg = peça(len, alt, .02, matVidro, 0, 0, 0, false); vg.userData.janela = true;
             peça(len, .05, .08, matEsq, 0, 0, 0); peça(len, .05, .08, matEsq, 0, alt - .05, 0);
@@ -1198,6 +1514,66 @@ function TRES_ENGINE(THREE, M){
           else if (PT === 'ripada') { peça(len, alt, .05, matPorta, 0, 0, 0); for (var pr2 = .06; pr2 < len - .05; pr2 += .09) peça(.05, alt - .08, .04, Mt.esqMadeira, -len / 2 + pr2, .04, .03); peça(.03, .9, .03, Mt.metal, len / 2 - .12, .6, .06); }
           else if (PT === 'pivotante') { peça(len, alt, .07, matPorta, 0, 0, 0); peça(.03, 1.4, .03, Mt.metal, len / 2 - .16, .45, .07); peça(len, .015, .075, Mt.metal, 0, alt * .33, 0); peça(len, .015, .075, Mt.metal, 0, alt * .66, 0); }
           else if (PT === 'aco') { peça(len, alt, .06, matPorta, 0, 0, 0); for (var pa2 = .3; pa2 < alt - .1; pa2 += .3) peça(len - .1, .012, .07, Mt.metal, 0, pa2, 0); peça(.03, .03, .1, Mt.metal, len / 2 - .12, 1.0, .06); }
+          /* ---- portas novas (23/09) ---- */
+          else if (PT === 'almofadada') {   /* folha com 4 almofadas em relevo */
+            peça(len, alt, .06, matPorta, 0, 0, 0);
+            for (var al = 0; al < 2; al++) for (var al2 = 0; al2 < 2; al2++)
+              peça(len * .34, alt * .36, .02, matPorta, (al ? 1 : -1) * len * .2, .1 + al2 * alt * .45, -.04);
+            peça(.03, .03, .1, Mt.metal, len / 2 - .12, 1.0, .06);
+          } else if (PT === 'vidroLateral') {   /* porta + folha fixa de vidro ao lado */
+            var lp2 = len * .68;
+            peça(lp2, alt, .06, matPorta, -(len - lp2) / 2, 0, 0);
+            var vl = peça(len - lp2 - .06, alt - .06, .02, matVidro, lp2 / 2 + .03, .03, 0, false); vl.userData.janela = true;
+            peça(.05, alt, .08, matEsq, lp2 / 2 - .02, 0, 0);
+            peça(.03, .03, .1, Mt.metal, lp2 / 2 - (len - lp2) / 2 - .14, 1.0, .06);
+          } else if (PT === 'bandeira') {   /* porta com bandeira de vidro em cima */
+            var hb = Math.min(.5, alt * .22);
+            peça(len, alt - hb, .06, matPorta, 0, 0, 0);
+            peça(len, .06, .08, matEsq, 0, alt - hb, 0);
+            var bv = peça(len - .08, hb - .08, .02, matVidro, 0, alt - hb + .06, 0, false); bv.userData.janela = true;
+            peça(.03, .03, .1, Mt.metal, len / 2 - .12, 1.0, .06);
+          } else if (PT === 'francesa') {   /* duas folhas de vidro com caixilho fino */
+            [-1, 1].forEach(function (sg2) {
+              var fv = peça(len / 2 - .06, alt - .08, .02, matVidro, sg2 * len / 4, .04, 0, false); fv.userData.janela = true;
+              peça(len / 2 - .04, .05, .05, matEsq, sg2 * len / 4, .02, 0); peça(len / 2 - .04, .05, .05, matEsq, sg2 * len / 4, alt - .09, 0);
+              peça(.04, alt - .08, .05, matEsq, sg2 * (len / 2 - .02), .04, 0);
+            });
+            peça(.05, alt - .08, .06, matEsq, 0, .04, 0);
+            peça(.03, .6, .03, Mt.metal, -.07, .85, .05); peça(.03, .6, .03, Mt.metal, .07, .85, .05);
+          } else if (PT === 'balcao') {   /* porta-balcão: folhas de correr de vidro com travessa baixa */
+            var nb2 = len > 2.4 ? 4 : 2;
+            for (var bi3 = 0; bi3 < nb2; bi3++) {
+              var bw = len / nb2, bv2 = peça(bw - .05, alt - .12, .02, matVidro, -len / 2 + bw * (bi3 + .5), .06, bi3 % 2 ? -.04 : .0, false); bv2.userData.janela = true;
+              peça(.04, alt - .12, .05, matEsq, -len / 2 + bw * bi3 + .02, .06, bi3 % 2 ? -.04 : .0);
+            }
+            peça(len, .06, .12, matEsq, 0, 0, 0); peça(len, .06, .12, matEsq, 0, alt - .06, 0);
+            peça(.03, .5, .03, Mt.metal, .04, .95, .05);
+          } else if (PT === 'camarao') {   /* folhas sanfonadas dobradas para um lado */
+            var nc3 = Math.max(3, Math.round(len / .5));
+            for (var ci3 = 0; ci3 < nc3; ci3++) {
+              var cw3 = len / nc3, fc2 = peça(cw3 - .02, alt - .06, .03, matPorta, -len / 2 + cw3 * (ci3 + .5), .03, ci3 % 2 ? -.06 : 0);
+              fc2.rotation.y = ci3 % 2 ? .3 : -.3;
+              peça(.03, alt - .06, .06, matEsq, -len / 2 + cw3 * ci3, .03, 0);
+            }
+            peça(len, .05, .1, matEsq, 0, alt - .05, 0);
+          } else if (PT === 'blindex') {   /* porta de vidro temperado sem caixilho */
+            var bl = peça(len - .04, alt - .04, .012, matVidro, 0, .02, 0, false); bl.userData.janela = true;
+            peça(len - .04, .08, .04, Mt.metal, 0, .02, 0); peça(len - .04, .08, .04, Mt.metal, 0, alt - .1, 0);
+            peça(.04, 1.2, .04, Mt.metal, len / 2 - .16, .5, .04);
+          } else if (PT === 'giratoria') {   /* giratória: cabine cilíndrica com 4 folhas */
+            var raio = Math.min(len, 2.2) / 2;
+            [0, 1, 2, 3].forEach(function (q2) {
+              var fg = peça(raio - .05, alt - .06, .015, matVidro, 0, .03, 0, false); fg.userData.janela = true;
+              fg.rotation.y = q2 * Math.PI / 4; fg.position.x += Math.cos(q2 * Math.PI / 4) * raio / 2 * (horiz ? 1 : 0); fg.position.z += Math.sin(q2 * Math.PI / 4) * raio / 2;
+            });
+            peça(.08, alt, .08, Mt.metal, 0, 0, 0);
+            peça(len, .1, .1, Mt.metal, 0, alt - .1, 0);
+          } else if (PT === 'cortinaAr') {   /* vidro de correr + cortina de ar por cima */
+            var ca2 = peça(len - .06, alt - .06, .02, matVidro, 0, .03, 0, false); ca2.userData.janela = true;
+            peça(len, .06, .06, matEsq, 0, .02, 0); peça(.04, alt - .06, .05, matEsq, 0, .03, 0);
+            peça(len + .1, .22, .3, Mt.branco, 0, alt + .02, -.12);   /* equipamento acima da porta */
+            for (var gr2 = 0; gr2 < 6; gr2++) peça(len * .14, .03, .02, Mt.metal, -len / 2 + len * (gr2 + .5) / 6, alt - .04, -.24);
+          }
           /* ---- portas de loja ---- */
           else if (PT === 'enrolar') { peça(len, alt, .04, matPorta, 0, 0, 0); for (var pe = .1; pe < alt - .05; pe += .1) peça(len, .015, .06, Mt.esquadria, 0, pe, 0); peça(len + .2, .24, .24, matEsq, 0, alt - .02, 0); }
           else if (PT === 'subir') { peça(len, alt, .05, matPorta, 0, 0, 0); for (var ps = .35; ps < alt - .1; ps += .35) peça(len - .08, .015, .07, Mt.metal, 0, ps, 0); peça(.06, alt + .1, .12, matEsq, -len / 2 - .03, 0, 0); peça(.06, alt + .1, .12, matEsq, len / 2 + .03, 0, 0); peça(len - .3, .05, .06, Mt.metal, 0, alt * .45, .04); }
@@ -1226,16 +1602,48 @@ function TRES_ENGINE(THREE, M){
             if (F.numero) { var np2 = plano(G.acabamento, .34, .34, numeroMat(F.numero, F.esquadria === 'preto' ? '#1B1F24' : '#F4F4F1', F.esquadria === 'preto' ? '#F4F4F1' : '#1B1F24'), ladoX, 1.55, cz, false); np2.rotation.set(0, Math.PI, 0); np2.position.set(ladoX, 1.55, cz - .08 - .156); }
             luzes.push({tipo:'ponto', x:cx, y:2.15, z:cz - .5, cor:'#FFD9A0', int:8, dist:6});
           }
-        } else {   /* porta interna: aberta a 75° para dentro do ambiente B */
+        } else {   /* porta interna: tipo escolhido por porta (proj.aberturas[chave].pint) */
           fk('portaInt', ab.chave || pc.chave);
+          var oInt = (proj.aberturas || {})[ab.chave || pc.chave] || {}, PI = oInt.pint || F.portaInt || 'lisa';   /* tipo só desta porta, senão o geral */
           peça(.05, alt, .12, Mt.esquadria, -len / 2 + .025, 0, 0); peça(.05, alt, .12, Mt.esquadria, len / 2 - .025, 0, 0); peça(len, .05, .12, Mt.esquadria, 0, alt - .05, 0);
-          var folha = new THREE.Mesh(new THREE.BoxGeometry(len - .06, alt - .05, .04), Mt.porta); folha.castShadow = true;
-          var piv = new THREE.Group(); piv.position.set(horiz ? cx - len / 2 + .03 : cx, y0 + (alt - .05) / 2, horiz ? cz : cz - len / 2 + .03);
-          folha.position.set((len - .06) / 2, 0, 0); piv.add(folha);
-          piv.rotation.y = horiz ? -Math.PI * .42 : Math.PI / 2 - Math.PI * .42;
-          folha.userData.fk = 'portaInt'; folha.userData.fkid = ab.chave || pc.chave;
-          G.acabamento.add(piv);
-          fk(null);
+          if (PI === 'correr' || PI === 'embutida') {   /* corre por fora (ou some na parede): folha encostada ao lado do vão */
+            var fcr = peça(len - .04, alt - .06, .04, Mt.porta, len * (PI === 'embutida' ? .88 : .96), .03, PI === 'embutida' ? 0 : -.07);
+            if (PI === 'embutida') fcr.visible = false;   /* embutida: a folha fica dentro da parede */
+            else { peça(len + .1, .05, .1, Mt.esquadria, len * .5, alt - .02, -.07); peça(.05, .05, .04, Mt.metal, len * .96 - .2, 1.0, -.1); }
+            fk(null);
+          } else if (PI === 'camarao' || PI === 'francesa') {   /* duas folhas: sanfonada ou francesa */
+            var meiaF = (len - .06) / 2;
+            [-1, 1].forEach(function (sg3) {
+              var pivF = new THREE.Group();
+              pivF.position.set(horiz ? cx + sg3 * (len / 2 - .03) : cx, y0 + (alt - .05) / 2, horiz ? cz : cz + sg3 * (len / 2 - .03));
+              var fo2 = new THREE.Mesh(new THREE.BoxGeometry(meiaF, alt - .05, PI === 'camarao' ? .035 : .04), PI === 'francesa' ? Mt.vidroBox : Mt.porta);
+              fo2.position.set(-sg3 * meiaF / 2, 0, 0); fo2.castShadow = PI !== 'francesa';
+              fo2.userData.fk = 'portaInt'; fo2.userData.fkid = ab.chave || pc.chave;
+              pivF.add(fo2);
+              if (PI === 'francesa') { var cx2 = new THREE.Mesh(new THREE.BoxGeometry(meiaF, .06, .05), Mt.esquadria); cx2.position.set(-sg3 * meiaF / 2, -(alt - .05) / 2 + .05, 0); pivF.add(cx2); }
+              pivF.rotation.y = (horiz ? 0 : Math.PI / 2) + sg3 * (PI === 'camarao' ? Math.PI * .46 : Math.PI * .38);
+              G.acabamento.add(pivF);
+            });
+            fk(null);
+          } else {   /* folha única aberta a 75° para dentro do ambiente B (lisa, almofadada, vidro, veneziana) */
+            var folha = new THREE.Mesh(new THREE.BoxGeometry(len - .06, alt - .05, .04), Mt.porta); folha.castShadow = true;
+            var piv = new THREE.Group(); piv.position.set(horiz ? cx - len / 2 + .03 : cx, y0 + (alt - .05) / 2, horiz ? cz : cz - len / 2 + .03);
+            folha.position.set((len - .06) / 2, 0, 0); piv.add(folha);
+            var LF = len - .06, AF = alt - .05;
+            if (PI === 'almofadada') for (var am2 = 0; am2 < 2; am2++) {
+              var alm2 = new THREE.Mesh(new THREE.BoxGeometry(LF * .62, AF * .34, .015), Mt.porta);
+              alm2.position.set(LF / 2, -AF * .22 + am2 * AF * .44, .028); piv.add(alm2);
+            }
+            if (PI === 'vidro') { var vis2 = new THREE.Mesh(new THREE.BoxGeometry(LF * .45, AF * .3, .05), Mt.vidroBox); vis2.position.set(LF / 2, AF * .2, 0); piv.add(vis2); }
+            if (PI === 'veneziana') for (var vz = -AF * .34; vz < AF * .3; vz += .07) {
+              var pal = new THREE.Mesh(new THREE.BoxGeometry(LF * .74, .04, .05), Mt.esqMadeira); pal.position.set(LF / 2, vz, .01); pal.rotation.x = .35; piv.add(pal);
+            }
+            var maca = new THREE.Mesh(new THREE.BoxGeometry(.03, .03, .1), Mt.metal); maca.position.set(LF - .12, -AF * .5 + 1.0, .04); piv.add(maca);
+            piv.rotation.y = horiz ? -Math.PI * .42 : Math.PI / 2 - Math.PI * .42;
+            folha.userData.fk = 'portaInt'; folha.userData.fkid = ab.chave || pc.chave;
+            G.acabamento.add(piv);
+            fk(null);
+          }
         }
       });
     });
@@ -2230,7 +2638,7 @@ function TRES_ENGINE(THREE, M){
     return {inst:inst, desmontar:function () { scroller.removeEventListener('scroll', tick); window.removeEventListener('resize', tick); inst.desmontar(); }};
   }
 
-  return {analise:analise, paradas:paradas, quadro:quadro, frase:frase, montar:montar, passeio:passeio, ETAPAS:ETAPAS, coberto:coberto, FACHADA_PRESETS:FACHADA_PRESETS, FACHADA_EXTRA:FACHADA_EXTRA, COBERTURAS:COBERTURAS, INCLINACOES:INCLINACOES, TELHAS:TELHAS, SEM_LAJE:SEM_LAJE, JANELAS:JANELAS, VIDROS:VIDROS, PORTAS:PORTAS, PORTAS_LOJA:PORTAS_LOJA, LETREIRO_FORMATOS:LETREIRO_FORMATOS, LETREIRO_POS:LETREIRO_POS, LETREIRO_TAMS:LETREIRO_TAMS, LETREIRO_FONTES:LETREIRO_FONTES, GARAGENS:GARAGENS, PISOS_FRENTE:PISOS_FRENTE, fachadaDe:fachadaDe, fachadaPorPrompt:fachadaPorPrompt};
+  return {analise:analise, paradas:paradas, quadro:quadro, frase:frase, montar:montar, passeio:passeio, ETAPAS:ETAPAS, coberto:coberto, FACHADA_PRESETS:FACHADA_PRESETS, FACHADA_EXTRA:FACHADA_EXTRA, COBERTURAS:COBERTURAS, INCLINACOES:INCLINACOES, TELHAS:TELHAS, SEM_LAJE:SEM_LAJE, JANELAS:JANELAS, VIDROS:VIDROS, PORTAS:PORTAS, PORTAS_LOJA:PORTAS_LOJA, PORTAS_INT:PORTAS_INT, LETREIRO_FORMATOS:LETREIRO_FORMATOS, LETREIRO_POS:LETREIRO_POS, LETREIRO_TAMS:LETREIRO_TAMS, LETREIRO_FONTES:LETREIRO_FONTES, GARAGENS:GARAGENS, PISOS_FRENTE:PISOS_FRENTE, fachadaDe:fachadaDe, fachadaPorPrompt:fachadaPorPrompt};
 }
 
 var TRES = (typeof THREE !== 'undefined' && typeof M !== 'undefined') ? TRES_ENGINE(THREE, M) : null;

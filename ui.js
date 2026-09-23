@@ -1469,7 +1469,8 @@ var UI = (function () {
   var CORES_MURO = ['#DDD8CC', '#F2EFE8', '#D9D9D4', '#B7B0A3', '#8B5E3C', '#6B7885', '#2B2F33', '#4E9A5D'];
   var ROT = {cobertura:{platibanda:'Platibanda', telhado2:'2 águas', telhado4:'4 águas'}, telha:{ceramica:'Cerâmica', concreto:'Concreto', metalica:'Metálica'},
     revestimento:{nenhum:'Nenhum', ripado:'Ripado', pedra:'Pedra', tijolo:'Tijolinho', cimento:'Cimento'}, esquadria:{preto:'Preto', branco:'Branco', madeira:'Madeira'},
-    portao:{grade:'Grade', ripado:'Ripado', chapa:'Chapa'}, muro:{baixo:'Baixo', alto:'Alto', vidro:'Vidro'}};
+    portao:{grade:'Grade', ripado:'Ripado', chapa:'Chapa', deslizante:'Deslizante', lanca:'Lança (ponta de flecha)', perfurada:'Chapa perfurada'},
+    muro:{baixo:'Baixo', alto:'Alto', vidro:'Vidro', cobogo:'Cobogó', gradil:'Gradil', pedra:'Pedra'}};
   function fachPanel(pad){
     pad = pad || canvasWrap.querySelector('.view-pad'); if (!pad) return;
     var el = pad.querySelector('#fach-panel'); if (!el || !pad.classList.contains('panel-on')) return;   /* painel fechado: monta quando abrir */
@@ -1513,6 +1514,7 @@ var UI = (function () {
     h += '<section><h6>ESQUADRIAS</h6>' + chips('esquadria', ROT.esquadria) + '<h6 style="margin-top:10px">COR DA ESQUADRIA</h6>' + corLivre('esquadriaCor', CORES_ESQ, F.esquadriaCor) + '</section>';
     h += '<section><h6>JANELAS</h6>' + chips('janela', TRES.JANELAS) + '<h6 style="margin-top:10px">VIDRO</h6>' + chips('vidro', TRES.VIDROS) +
       '<div class="chips" style="margin-top:10px">' + tg('moldura', 'Moldura de destaque') + tg('gradeJanela', 'Grade de proteção') + tg('brise', 'Brise na frente') + '</div></section>';
+    h += '<section><h6>PORTAS INTERNAS</h6>' + chips('portaInt', TRES.PORTAS_INT) + '<div class="ins-empty" style="margin-top:6px">Vale para todas; clique numa porta no 3D para mudar só ela.</div></section>';
     h += '<section><h6>PORTA DE ENTRADA · CASA</h6>' + chips('porta', TRES.PORTAS) + '<h6 style="margin-top:10px">PORTA DE ENTRADA · LOJA</h6>' + chips('porta', TRES.PORTAS_LOJA) +
       '<div class="f-row" style="margin-top:10px">' + campo('fach-pl', 'LARGURA DA PORTA', F.portaLargura ? M.fmtMs(F.portaLargura * 100) : '', 'm') + campo('fach-pa', 'ALTURA', F.portaAltura ? M.fmtMs(F.portaAltura * 100) : '', 'm') + '</div>' +
       '<div class="ins-empty" style="margin-top:-2px">Vazio = 0,90 × 2,10. Loja costuma ter 2,00 a 4,00 m.' + (function () { try { var an = TRES.analise(M.proj); if (an.entrada) { var L = an.entrada.pc.len, r = an.entrada.r; return ' A entrada está na parede de <b>' + esc(r.nome) + '</b> (' + M.fmtMs(L) + ' m) → porta de até <b>' + M.fmtMs(L - 40) + ' m</b>; para mais, alargue esse ambiente na planta.'; } } catch (e) {} return ''; })() + '</div>' +
@@ -1805,8 +1807,9 @@ var UI = (function () {
       h += '<section class="ab-sec"><h6>ESTE PORTÃO <small>' + ondeAb + '</small></h6>' + dicaMover + campoPorta() + ((ov.pw || ov.palt || ov.ppos != null) ? '<div class="chips">' + posChip('ppos') + ((ov.pw || ov.palt) ? '<button class="chip" data-ab-reset>↺ Tamanho automático</button>' : '') + '</div>' : '') + '</section>';
     }
     if (id && fk === 'portaInt') {
-      h += '<section class="ab-sec"><h6>PORTA INTERNA <small>' + ondeAb + '</small></h6>' + dicaMover + '<div class="chips"><button class="chip danger" data-abk="tipo" data-abv="nenhuma">✕ Excluir porta</button>' + posChip('ppos') + (Object.keys(ov).length ? '<button class="chip" data-ab-reset>↺ Automático</button>' : '') + '</div>' + campoPorta() + '</section>' +
-        sec('PORTAS INTERNAS (TODAS)', '<div class="ins-empty">A cor e o material das portas internas seguem a esquadria: ' + chips('esquadria', ROT.esquadria) + '</div>');
+      h += '<section class="ab-sec"><h6>PORTA INTERNA <small>' + ondeAb + '</small></h6>' + dicaMover + '<div class="chips"><button class="chip danger" data-abk="tipo" data-abv="nenhuma">✕ Excluir porta</button>' + posChip('ppos') + (Object.keys(ov).length ? '<button class="chip" data-ab-reset>↺ Automático</button>' : '') + '</div>' +
+        '<h6 style="margin-top:8px">TIPO SÓ DESTA</h6>' + abChips('pint', TRES.PORTAS_INT) + campoPorta() + '</section>' +
+        sec('PORTAS INTERNAS (TODAS)', chips('portaInt', TRES.PORTAS_INT) + '<div class="ins-empty" style="margin-top:6px">A cor e o material seguem a esquadria: ' + chips('esquadria', ROT.esquadria) + '</div>');
     }
     function chips(k, mapa){ return '<div class="chips">' + Object.keys(mapa).map(function (v) { return '<button class="chip' + (F[k] === v ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + v + '">' + mapa[v] + '</button>'; }).join('') + '</div>'; }
     function tg(k, rot){ return '<button class="chip' + (F[k] ? ' on' : '') + '" data-fk="' + k + '" data-fv="' + (F[k] ? '0' : '1') + '">' + rot + '</button>'; }

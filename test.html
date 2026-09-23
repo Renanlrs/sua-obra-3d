@@ -404,6 +404,43 @@ t('elevação 2D desenha galpão (tesoura), arco e shed com a cor da estrutura',
 M.proj.fachada = {cobertura:'galpao'};
 t('custo: galpão entra como cobertura com estrutura e a telha cerâmica não é cobrada como tal', M.custoFachadaItens().some(function (i) { return /galp/i.test(i.rot); }));
 M.proj.fachada = null;
+/* ---- 23/09: catálogo ampliado — móveis, janelas, portas, portões, muros ---- */
+t('catálogo com mais de 100 móveis em 13 categorias', Object.keys(MOVEIS.ITENS).length >= 100 && MOVEIS.CATS.length >= 13, Object.keys(MOVEIS.ITENS).length + ' itens · ' + MOVEIS.CATS.length + ' categorias');
+t('toda categoria tem itens e capa que existe', MOVEIS.CATS.every(function (c) { return MOVEIS.porCat(c.k).length > 0 && MOVEIS.def(c.capa); }), MOVEIS.CATS.filter(function (c) { return !MOVEIS.porCat(c.k).length || !MOVEIS.def(c.capa); }).map(function (c) { return c.k; }).join(','));
+t('todo item tem nome, medidas positivas, figurinha e receita 3D', Object.keys(MOVEIS.ITENS).every(function (k) { var d = MOVEIS.def(k); return d.nome && d.w > 0 && d.d > 0 && d.alt > 0 && MOVEIS.SYM[d.sym] && d.m3d; }));
+t('busca acha os itens novos pelo nome', MOVEIS.buscar('coifa').length === 1 && MOVEIS.buscar('manequim').length === 1 && MOVEIS.buscar('esteira').length >= 1);
+t('quase nenhum item cai na figurinha genérica (só a caixa de brinquedos, que é caixa mesmo)',
+  Object.keys(MOVEIS.ITENS).filter(function (k) { return MOVEIS.def(k).sym === 'caixa'; }).length <= 1);
+t('as figurinhas novas desenham algo de verdade', ['ducha', 'escadaPiscina', 'moto', 'bicicleta', 'espelho', 'quadro', 'cortina', 'cercaViva', 'lixeira', 'esteira', 'arara', 'gondola', 'manequim', 'jacuzzi'].every(function (k) { var svg = MOVEIS.SYM[k](80, 80); return svg && svg.length > 40; }));
+t('12 tipos de janela, 7 vidros, 12 portas de casa, 9 de loja, 8 internas, 7 garagens',
+  Object.keys(TF.JANELAS).length >= 12 && Object.keys(TF.VIDROS).length >= 7 && Object.keys(TF.PORTAS).length >= 12 && Object.keys(TF.PORTAS_LOJA).length >= 9 && Object.keys(TF.PORTAS_INT).length >= 8 && Object.keys(TF.GARAGENS).length >= 7,
+  [Object.keys(TF.JANELAS).length, Object.keys(TF.VIDROS).length, Object.keys(TF.PORTAS).length, Object.keys(TF.PORTAS_LOJA).length, Object.keys(TF.PORTAS_INT).length, Object.keys(TF.GARAGENS).length].join('/'));
+t('todo tipo novo tem preço no PRECO_FACHADA', Object.keys(TF.JANELAS).every(function (k) { return M.PRECO_FACHADA.janela[k] !== undefined; }) &&
+  Object.keys(TF.VIDROS).every(function (k) { return M.PRECO_FACHADA.vidro[k] !== undefined; }) &&
+  Object.keys(TF.PORTAS).concat(Object.keys(TF.PORTAS_LOJA)).every(function (k) { return M.PRECO_FACHADA.porta[k] !== undefined; }) &&
+  Object.keys(TF.PORTAS_INT).every(function (k) { return M.PRECO_FACHADA.portaInt[k] !== undefined; }) &&
+  Object.keys(TF.GARAGENS).every(function (k) { return M.PRECO_FACHADA.garagem[k] !== undefined; }));
+M.novo('casa-terrea', 1200, 2500);
+var autoK = M.proj.moveis.map(function (m) { return m.k; });
+t('mobiliar automático usa os itens novos (coifa, gabinete, varal…)', ['coifa', 'gabinete', 'espelheira', 'varal'].some(function (k) { return autoK.indexOf(k) >= 0; }), autoK.join(','));
+t('móvel com elevação nasce na altura certa (coifa e espelheira não ficam no chão)', M.proj.moveis.every(function (m) { return !m.elev || m.elev > 50; }));
+t('nenhum móvel automático cai fora do ambiente dele', M.proj.moveis.every(function (m) { var a = M.ambienteDe(m); return !m.amb || a; }));
+M.novo('casa-terrea', 1000, 2500);
+M.proj.fachada = {portaInt:'embutida'};
+t('porta interna escolhida entra no custo da fachada', M.custoFachadaItens().some(function (i) { return /Portas internas de correr embutidas/.test(i.rot); }), M.custoFachadaItens().map(function (i) { return i.rot; }).join(' | '));
+var anPI = TF.analise(M.proj, 0), pcPI = anPI.pecas.filter(function (pc) { return !pc.ext && pc.ab.some(function (ab) { return ab.tipo === 'porta'; }); })[0];
+M.setAbertura(pcPI.chave, {pint:'camarao'});
+t('uma porta interna pode ter tipo diferente das outras, e o custo mostra a diferença', M.abertura(pcPI.chave).pint === 'camarao' && M.custoFachadaItens().some(function (i) { return /Porta interna camarão/.test(i.rot); }));
+M.limparAbertura(pcPI.chave); M.proj.fachada = null;
+var ppJ = TF.fachadaPorPrompt('janela maxim-ar com vidro canelado, muro de cobogó, portão deslizante, porta camarão, garagem seccionada, portas internas embutidas', {}).fachada;
+t('prompt entende os tipos novos: maxim-ar, canelado, cobogó, deslizante, camarão, seccionada, internas embutidas',
+  ppJ.janela === 'maximar' && ppJ.vidro === 'canelado' && ppJ.muro === 'cobogo' && ppJ.portao === 'deslizante' && ppJ.porta === 'camarao' && ppJ.garagem === 'seccionada' && ppJ.portaInt === 'embutida', JSON.stringify(ppJ));
+var ppJ2 = TF.fachadaPorPrompt('casa com janela em arco, vidro leitoso no banheiro, gradil na frente, porta francesa', {}).fachada;
+t('prompt: arco, leitoso, gradil e porta francesa', ppJ2.janela === 'arco' && ppJ2.vidro === 'leitoso' && ppJ2.muro === 'gradil' && ppJ2.porta === 'francesa', JSON.stringify(ppJ2));
+var ppAntigo = TF.fachadaPorPrompt('loja moderna com vitrine, ripado, porta de enrolar, muro alto, portão de grade, janela basculante, vidro fumê', {}).fachada;
+t('os tipos antigos continuam entendidos (nada quebrou no prompt)', ppAntigo.porta === 'enrolar' && ppAntigo.muro === 'alto' && ppAntigo.portao === 'grade' && ppAntigo.janela === 'basculante' && ppAntigo.vidro === 'fume', JSON.stringify(ppAntigo));
+M.novo('casa-terrea', 1000, 2500);
+
 /* ---- 22/09: coberturas independentes (telhado à parte sobre os próprios pilares) ---- */
 M.novo('casa-terrea', 1000, 2500);
 t('projeto nasce sem cobertura independente', M.coberturas().length === 0);

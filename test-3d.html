@@ -88,7 +88,46 @@ f.onload = function () {
                     if (!sobreBloco) altos.push([o.position.x.toFixed(1), o.position.z.toFixed(1), o.geometry.parameters.height.toFixed(1)].join(','));
                   });
                   t('pilar de bloco térreo não sobe até o andar de cima (nenhum pilar solto no ar)', altos.length === 0, altos.slice(0, 4).join(' | '));
-                  fim();
+                  /* ---- catálogo inteiro: cada item do catálogo tem que virar peça 3D sem quebrar ---- */
+                  var LIB = W.MOVEIS, chaves = Object.keys(LIB.ITENS), erro = null;
+                  W.M.proj.moveis = chaves.map(function (k, i) {
+                    var d = LIB.def(k);
+                    return {id:'t' + i, k:k, x:150 + (i % 12) * 90, y:150 + Math.floor(i / 12) * 90, rot:0, w:d.w, d:d.d, alt:d.alt};
+                  });
+                  W.M.commit('catálogo inteiro');
+                  try { t3.atualizar(); } catch (e2) { erro = e2.message; }
+                  setTimeout(function () {
+                    var cena4 = t3._cena(), montados = cena4 ? Object.keys(cena4.moveis).length : 0;
+                    t('os ' + chaves.length + ' itens do catálogo viram peça 3D sem erro', !erro && montados === chaves.length, erro || (montados + ' de ' + chaves.length));
+                    var semMalha = chaves.filter(function (k, i) { var gg = cena4 && cena4.moveis['t' + i]; return !gg || !gg.children.length; });
+                    t('nenhum item nasce vazio no 3D', semMalha.length === 0, semMalha.slice(0, 6).join(', '));
+                    var semSym = chaves.filter(function (k) { return !LIB.symDe({k:k}); });
+                    t('todo item tem figurinha 2D (planta)', semSym.length === 0, semSym.slice(0, 6).join(', '));
+                    var semCat = chaves.filter(function (k) { return !LIB.CATS.some(function (c) { return c.k === LIB.def(k).cat; }); });
+                    t('todo item está numa categoria existente', semCat.length === 0, semCat.join(', '));
+                    var capaRuim = LIB.CATS.filter(function (c) { return !LIB.def(c.capa); });
+                    t('toda categoria tem capa válida', capaRuim.length === 0, capaRuim.map(function (c) { return c.k; }).join(', '));
+                    /* ---- todos os tipos de janela, porta, portão e muro montam no 3D ---- */
+                    W.M.novo('loja', 1200, 2500); W.M.proj.moveis = [];
+                    var TF2 = W.TRES, combos = [], falhas = [];
+                    Object.keys(TF2.JANELAS).forEach(function (k) { combos.push({janela:k}); });
+                    Object.keys(TF2.VIDROS).forEach(function (k) { combos.push({vidro:k}); });
+                    Object.keys(TF2.PORTAS).forEach(function (k) { combos.push({porta:k}); });
+                    Object.keys(TF2.PORTAS_LOJA).forEach(function (k) { combos.push({porta:k, portaLargura:2.4}); });
+                    Object.keys(TF2.PORTAS_INT).forEach(function (k) { combos.push({portaInt:k}); });
+                    Object.keys(TF2.GARAGENS).forEach(function (k) { combos.push({garagem:k}); });
+                    Object.keys(W.UI ? {} : {}).forEach(function () {});
+                    ['grade', 'ripado', 'chapa', 'deslizante', 'lanca', 'perfurada'].forEach(function (k) { combos.push({portao:k}); });
+                    ['baixo', 'alto', 'vidro', 'cobogo', 'gradil', 'pedra'].forEach(function (k) { combos.push({muro:k}); });
+                    combos.forEach(function (c) {
+                      W.M.proj.fachada = c;
+                      try { t3.atualizar(); var cn = t3._cena(); if (!cn || !cn.raiz.children.length) falhas.push(JSON.stringify(c)); }
+                      catch (e3) { falhas.push(JSON.stringify(c) + ': ' + e3.message); }
+                    });
+                    t('os ' + combos.length + ' tipos de janela/vidro/porta/porta interna/garagem/portão/muro montam no 3D', falhas.length === 0, falhas.slice(0, 4).join(' | '));
+                    W.M.proj.fachada = null; t3.atualizar();
+                    fim();
+                  }, 600);
                 }, 700);
               }, 200);
             }, 500);

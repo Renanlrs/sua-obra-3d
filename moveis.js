@@ -265,7 +265,165 @@ function MOVEIS_LIB(){
       s += rr(-w / 2 + 5, -d / 2 + 5, w - 10, d * .22, 5, '#D9CDB5', T, 1);
       return s;
     },
-    caixa: function (w, d) { return rr(-w / 2, -d / 2, w, d, 3, '#D9D9D4'); }
+    caixa: function (w, d) { return rr(-w / 2, -d / 2, w, d, 3, '#D9D9D4'); },
+
+    /* ---------- figurinhas novas (23/09) ---------- */
+    eletro: function (w, d) {   /* eletrodoméstico genérico: corpo + visor + botões */
+      var s = rr(-w / 2, -d / 2, w, d, 3, '#E4E7EA');
+      s += rr(-w / 2 + 5, -d / 2 + 5, w - 10, d * .45, 2, '#39414A', T, 1);
+      for (var i = 0; i < 3; i++) s += ci(-w / 2 + 10 + i * 9, d / 2 - 8, 2.6, '#8A9399', T, .9);
+      return s;
+    },
+    cooktop: function (w, d) {   /* vidro preto com 4 bocas */
+      var s = rr(-w / 2, -d / 2, w, d, 3, '#22262B');
+      var pts = [[-.26, -.22], [.26, -.22], [-.26, .22], [.26, .22]];
+      pts.forEach(function (p) { s += ci(p[0] * w, p[1] * d, Math.min(w, d) * .14, '#3A4149', '#697079', 1.2); });
+      return s;
+    },
+    coifa: function (w, d) {   /* trapézio visto de cima, com a boca de sucção */
+      var s = pa('M' + n(-w / 2) + ' ' + n(-d / 2) + ' H' + n(w / 2) + ' L' + n(w * .35) + ' ' + n(d / 2) + ' H' + n(-w * .35) + ' Z', '#C9CED3');
+      s += rr(-w * .28, -d * .18, w * .56, d * .42, 3, '#8A9399', T, 1.2);
+      return s;
+    },
+    adega: function (w, d) {   /* porta de vidro e garrafas deitadas */
+      var s = rr(-w / 2, -d / 2, w, d, 3, '#2E3338');
+      s += rr(-w / 2 + 4, -d / 2 + 4, w - 8, d - 8, 2, '#5E6F7A', T, 1);
+      for (var y = -d / 2 + 10; y < d / 2 - 6; y += 8) s += ln(-w / 2 + 7, y, w / 2 - 7, y, '#B9C4CB', 1.1);
+      return s;
+    },
+    bancoJardim: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 3, '#8B5E3C');
+      for (var i = 1; i < 4; i++) s += ln(-w / 2 + 3, -d / 2 + d * i / 4, w / 2 - 3, -d / 2 + d * i / 4, '#6B4423', 1.3);
+      return s;
+    },
+    guardaSol: function (w, d) {   /* círculo com gomos */
+      var r = Math.min(w, d) / 2, s = ci(0, 0, r, '#E9E2D2');
+      for (var a = 0; a < 8; a++) s += ln(0, 0, r * Math.cos(a * Math.PI / 4), r * Math.sin(a * Math.PI / 4), '#C2B89F', 1.2);
+      s += ci(0, 0, r * .12, '#8B5E3C', T, 1.2);
+      return s;
+    },
+    jacuzzi: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 10, '#CDE7EF');
+      s += rr(-w / 2 + 7, -d / 2 + 7, w - 14, d - 14, 8, '#9FD3E4', T, 1.2);
+      for (var a2 = 0; a2 < 8; a2++) s += ci(Math.cos(a2 * Math.PI / 4) * (w / 2 - 12), Math.sin(a2 * Math.PI / 4) * (d / 2 - 12), 2.4, '#FFFFFF', '#7FB6C9', 1);
+      return s;
+    },
+    escorregador: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w * .5, d, 4, '#E4B23C');
+      s += pa('M' + n(0) + ' ' + n(-d / 2 + 6) + ' Q ' + n(w / 2) + ' ' + n(0) + ' ' + n(w / 2 - 4) + ' ' + n(d / 2 - 6), 'none', '#4E9A5D', 5);
+      for (var i2 = 1; i2 < 4; i2++) s += ln(-w / 2 + 4, -d / 2 + d * i2 / 4, -w / 2 + w * .5 - 4, -d / 2 + d * i2 / 4, '#B5883C', 1.2);
+      return s;
+    },
+    esteira: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 4, '#3A4149');
+      s += rr(-w / 2 + 5, -d / 2 + d * .3, w - 10, d * .62, 3, '#22262B', T, 1);
+      s += rr(-w / 2 + 6, -d / 2 + 2, w - 12, d * .22, 3, '#8A9399', T, 1);
+      return s;
+    },
+    aparelho: function (w, d) {   /* equipamento de academia genérico */
+      var s = rr(-w / 2, -d / 2, w, d, 4, '#4A525A');
+      s += rr(-w * .3, -d * .12, w * .6, d * .24, 3, '#22262B', T, 1);
+      s += ci(-w / 2 + 8, d / 2 - 8, 4, '#C4553B', T, 1); s += ci(w / 2 - 8, d / 2 - 8, 4, '#C4553B', T, 1);
+      return s;
+    },
+    tatame: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 2, '#4E7A6B');
+      for (var x = -w / 2; x < w / 2 - 1; x += w / 3) for (var y2 = -d / 2; y2 < d / 2 - 1; y2 += d / 3) s += rr(x + 1, y2 + 1, w / 3 - 2, d / 3 - 2, 1, '#5C8C7B', '#3E6156', 1);
+      return s;
+    },
+    arara: function (w, d) {   /* arara de roupas: barra + cabides */
+      var s = ln(-w / 2 + 3, 0, w / 2 - 3, 0, '#8A9399', 3);
+      for (var x2 = -w / 2 + 8; x2 < w / 2 - 6; x2 += 7) s += pa('M' + n(x2) + ' ' + n(-d * .2) + ' l' + n(-4) + ' ' + n(d * .4) + ' M' + n(x2) + ' ' + n(-d * .2) + ' l4 ' + n(d * .4), 'none', '#B9C4CB', 1.1);
+      s += ci(-w / 2 + 3, 0, 3, '#8A9399', T, 1); s += ci(w / 2 - 3, 0, 3, '#8A9399', T, 1);
+      return s;
+    },
+    gondola: function (w, d) {   /* prateleira de loja, dupla face */
+      var s = rr(-w / 2, -d / 2, w, d, 2, '#D6DADF');
+      s += ln(-w / 2, 0, w / 2, 0, T, 1.4);
+      for (var i3 = 1; i3 < 5; i3++) s += ln(-w / 2 + w * i3 / 5, -d / 2, -w / 2 + w * i3 / 5, d / 2, '#9AA3AB', 1);
+      return s;
+    },
+    balcaoL: function (w, d) {   /* balcão de atendimento em L */
+      var s = pa('M' + n(-w / 2) + ' ' + n(-d / 2) + ' H' + n(w / 2) + ' V' + n(-d / 2 + d * .45) + ' H' + n(-w / 2 + w * .45) + ' V' + n(d / 2) + ' H' + n(-w / 2) + ' Z', '#B58B5C');
+      s += pa('M' + n(-w / 2 + 4) + ' ' + n(-d / 2 + 4) + ' H' + n(w / 2 - 4) + ' V' + n(-d / 2 + d * .45 - 4) + ' H' + n(-w / 2 + w * .45 - 4) + ' V' + n(d / 2 - 4) + ' H' + n(-w / 2 + 4) + ' Z', '#D6B48C', T, 1);
+      return s;
+    },
+    manequim: function (w, d) {
+      var r2 = Math.min(w, d) / 2;
+      var s = el(0, -r2 * .2, r2 * .75, r2 * .5, '#E4E0D8');
+      s += ci(0, r2 * .45, r2 * .35, '#D6D2C8', T, 1.2);
+      s += ci(0, 0, r2 * .12, '#8A9399', T, 1);
+      return s;
+    },
+    penteadeira: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 2, '#E9E2D2');
+      s += rr(-w * .3, -d / 2 + 2, w * .6, 5, 2, '#BFD4DD', T, 1);   /* espelho encostado na parede */
+      s += ln(-w / 2 + 4, d / 2 - 6, w / 2 - 4, d / 2 - 6, '#C2B89F', 1.2);
+      return s;
+    },
+    pufe: function (w, d) { return ci(0, 0, Math.min(w, d) / 2, '#C98C6B') + ci(0, 0, Math.min(w, d) / 2 - 5, '#E0A882', T, 1); },
+    lareira: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 2, '#B9B1A5');
+      s += rr(-w * .32, -d * .1, w * .64, d * .5, 2, '#3A2F28', T, 1);
+      s += pa('M' + n(-w * .18) + ' ' + n(d * .3) + ' q ' + n(w * .18) + ' ' + n(-d * .3) + ' ' + n(w * .36) + ' 0', 'none', '#E4884F', 2);
+      return s;
+    },
+    ducha: function (w, d) {
+      var r = Math.min(w, d) / 2, s = ci(0, 0, r, '#D6DADF');
+      s += ci(0, 0, r * .55, '#9AA3AB', T, 1.2);
+      for (var a = 0; a < 8; a++) s += ci(Math.cos(a * Math.PI / 4) * r * .3, Math.sin(a * Math.PI / 4) * r * .3, 1.4, '#FFFFFF', '#6B7885', .8);
+      return s;
+    },
+    escadaPiscina: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 3, 'none', '#8A9399', 1.2);
+      s += ln(-w / 2 + 6, -d / 2, -w / 2 + 6, d / 2, '#A6ACB2', 3) + ln(w / 2 - 6, -d / 2, w / 2 - 6, d / 2, '#A6ACB2', 3);
+      for (var i = 1; i < 4; i++) s += ln(-w / 2 + 6, -d / 2 + d * i / 4, w / 2 - 6, -d / 2 + d * i / 4, '#C9CED3', 2.4);
+      return s;
+    },
+    moto: function (w, d) {
+      var s = el(0, 0, w * .28, d * .34, '#5C6B78');
+      s += rr(-w * .14, -d / 2 + 4, w * .28, d * .18, 4, '#25282C', T, 1.2);
+      s += rr(-w * .16, d / 2 - d * .22, w * .32, d * .18, 4, '#25282C', T, 1.2);
+      s += ln(-w / 2 + 4, -d / 2 + d * .3, w / 2 - 4, -d / 2 + d * .3, '#8A9399', 2.4);
+      return s;
+    },
+    bicicleta: function (w, d) {
+      var s = ci(0, -d / 2 + d * .16, d * .14, 'none', '#3A4149', 2);
+      s += ci(0, d / 2 - d * .16, d * .14, 'none', '#3A4149', 2);
+      s += ln(0, -d / 2 + d * .16, 0, d / 2 - d * .16, '#2F5D8A', 2.4);
+      s += ln(-w / 2 + 3, -d / 2 + d * .16, w / 2 - 3, -d / 2 + d * .16, '#3A4149', 2);
+      return s;
+    },
+    espelho: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, Math.max(d, 4), 1, '#BFD4DD', T, 1.4);
+      s += ln(-w / 2 + 6, 0, w / 2 - 6, 0, '#FFFFFF', 1.4);
+      return s;
+    },
+    quadro: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, Math.max(d, 4), 1, '#8B5E3C', T, 1.4);
+      s += ln(-w / 2 + 4, 0, w / 2 - 4, 0, '#E9E2D2', 1.6);
+      return s;
+    },
+    cortina: function (w, d) {
+      var s = '';
+      for (var x = -w / 2; x < w / 2 - 4; x += 8) s += pa('M' + n(x) + ' ' + n(-d / 2) + ' q 4 ' + n(d / 2) + ' 0 ' + n(d), 'none', '#C2B89F', 2);
+      s += ln(-w / 2, -d / 2, w / 2, -d / 2, '#8A9399', 2);
+      return s;
+    },
+    cercaViva: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 4, '#6AA24C');
+      for (var x2 = -w / 2 + 6; x2 < w / 2 - 3; x2 += 12) s += ci(x2, 0, 5, '#4F8A3E', 'none', 0);
+      return s;
+    },
+    lixeira: function (w, d) {
+      var r2 = Math.min(w, d) / 2;
+      return ci(0, 0, r2, '#5C6B78') + ci(0, 0, r2 - 4, '#8A9399', T, 1.2) + ln(-r2 * .4, 0, r2 * .4, 0, '#3A4149', 1.6);
+    },
+    varal: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 2, 'none', '#8A9399', 1.4);
+      for (var y3 = -d / 2 + 6; y3 < d / 2 - 2; y3 += 8) s += ln(-w / 2 + 3, y3, w / 2 - 3, y3, '#B9C4CB', 1.3);
+      return s;
+    }
   };
 
   /* ---------- categorias ---------- */
@@ -274,10 +432,14 @@ function MOVEIS_LIB(){
     {k:'jantar',     rot:'Jantar',        capa:'mesa6'},
     {k:'cozinha',    rot:'Cozinha',       capa:'fogao'},
     {k:'quarto',     rot:'Quarto',        capa:'camaCasal'},
+    {k:'infantil',   rot:'Infantil',      capa:'camaInfantil'},
     {k:'banheiro',   rot:'Banheiro',      capa:'vaso'},
     {k:'escritorio', rot:'Escritório',    capa:'escrivaninha'},
     {k:'servico',    rot:'Serviço',       capa:'lavadora'},
     {k:'externo',    rot:'Externo',       capa:'carro'},
+    {k:'lazer',      rot:'Lazer e piscina', capa:'jacuzzi'},
+    {k:'academia',   rot:'Academia',      capa:'esteira'},
+    {k:'comercial',  rot:'Comércio',      capa:'balcaoAtend'},
     {k:'decoracao',  rot:'Decoração',     capa:'planta'}
   ];
 
@@ -326,7 +488,92 @@ function MOVEIS_LIB(){
     planta:       {nome:'Planta',              cat:'decoracao',  w:50,  d:50,  alt:110, sym:'planta',        m3d:'planta'},
     luminaria:    {nome:'Luminária de chão',   cat:'decoracao',  w:35,  d:35,  alt:160, sym:'luminaria',     m3d:'luminaria'},
     aparador:     {nome:'Aparador',            cat:'decoracao',  w:100, d:35,  alt:80,  sym:'aparador',      m3d:'buffet'},
-    tapeteRedondo:{nome:'Tapete redondo',      cat:'decoracao',  w:120, d:120, alt:1,   sym:'tapeteRedondo', m3d:'tapeteRedondo'}
+    tapeteRedondo:{nome:'Tapete redondo',      cat:'decoracao',  w:120, d:120, alt:1,   sym:'tapeteRedondo', m3d:'tapeteRedondo'},
+
+    /* ---------- itens novos (23/09) ---------- */
+    /* sala */
+    sofaCanto:    {nome:'Sofá de canto',       cat:'sala',       w:260, d:160, alt:85,  sym:'sofa',          m3d:'sofaCanto'},
+    chaise:       {nome:'Chaise',              cat:'sala',       w:80,  d:160, alt:85,  sym:'espreguicadeira', m3d:'chaise'},
+    pufe:         {nome:'Puff',                cat:'sala',       w:50,  d:50,  alt:42,  sym:'pufe',          m3d:'pufe'},
+    homeTheater:  {nome:'Painel de TV',        cat:'sala',       w:220, d:12,  alt:120, sym:'rack',          m3d:'painelTv'},
+    lareira:      {nome:'Lareira',             cat:'sala',       w:110, d:40,  alt:120, sym:'lareira',       m3d:'lareira'},
+    mesaLateral:  {nome:'Mesa lateral',        cat:'sala',       w:45,  d:45,  alt:55,  sym:'mesaRedonda',   m3d:'mesaRedonda'},
+    /* jantar */
+    mesa8:        {nome:'Mesa 8 lugares',      cat:'jantar',     w:240, d:100, alt:75,  sym:'mesa',          m3d:'mesa'},
+    banqueta:     {nome:'Banqueta alta',       cat:'jantar',     w:40,  d:40,  alt:105, sym:'cadeira',       m3d:'banqueta'},
+    cristaleira:  {nome:'Cristaleira',         cat:'jantar',     w:100, d:40,  alt:190, sym:'estante',       m3d:'cristaleira'},
+    /* cozinha */
+    cooktop:      {nome:'Cooktop',             cat:'cozinha',    w:75,  d:52,  alt:90,  sym:'cooktop',       m3d:'cooktop'},
+    coifa:        {nome:'Coifa',               cat:'cozinha',    w:90,  d:50,  alt:60,  sym:'coifa',         m3d:'coifa'},
+    fornoEmb:     {nome:'Forno embutido',      cat:'cozinha',    w:60,  d:55,  alt:60,  sym:'eletro',        m3d:'eletro'},
+    microondas:   {nome:'Micro-ondas',         cat:'cozinha',    w:50,  d:40,  alt:30,  sym:'eletro',        m3d:'eletro'},
+    lavaLoucas:   {nome:'Lava-louças',         cat:'cozinha',    w:60,  d:60,  alt:85,  sym:'eletro',        m3d:'eletro'},
+    adega:        {nome:'Adega climatizada',   cat:'cozinha',    w:60,  d:60,  alt:120, sym:'adega',         m3d:'adega'},
+    armarioAereo: {nome:'Armário aéreo',       cat:'cozinha',    w:180, d:35,  alt:70,  sym:'armario',       m3d:'aereo'},
+    despensa:     {nome:'Torre de despensa',   cat:'cozinha',    w:80,  d:60,  alt:220, sym:'armario',       m3d:'armario'},
+    /* quarto */
+    camaKing:     {nome:'Cama king',           cat:'quarto',     w:195, d:205, alt:55,  sym:'cama',          m3d:'cama'},
+    penteadeira:  {nome:'Penteadeira',         cat:'quarto',     w:110, d:45,  alt:75,  sym:'penteadeira',   m3d:'penteadeira'},
+    closet:       {nome:'Closet (arara)',      cat:'quarto',     w:200, d:60,  alt:220, sym:'arara',         m3d:'closet'},
+    poltronaAmam: {nome:'Poltrona de amamentação', cat:'quarto', w:75,  d:80,  alt:100, sym:'poltrona',      m3d:'poltrona'},
+    espelhoCorpo: {nome:'Espelho de corpo',    cat:'quarto',     w:60,  d:8,   alt:180, sym:'espelho',       m3d:'espelho'},
+    /* infantil */
+    camaInfantil: {nome:'Cama infantil',       cat:'infantil',   w:80,  d:160, alt:50,  sym:'cama',          m3d:'cama'},
+    beliche:      {nome:'Beliche',             cat:'infantil',   w:100, d:195, alt:170, sym:'cama',          m3d:'beliche'},
+    trocador:     {nome:'Cômoda com trocador', cat:'infantil',   w:100, d:55,  alt:95,  sym:'comoda',        m3d:'comoda'},
+    escorregador: {nome:'Escorregador',        cat:'infantil',   w:120, d:180, alt:130, sym:'escorregador',  m3d:'escorregador'},
+    caixaBrinq:   {nome:'Caixa de brinquedos', cat:'infantil',   w:80,  d:45,  alt:45,  sym:'caixa',         m3d:'caixaBrinq'},
+    /* banheiro */
+    boxCanto:     {nome:'Box de canto',        cat:'banheiro',   w:90,  d:90,  alt:200, sym:'box',           m3d:'box'},
+    gabinete:     {nome:'Gabinete com cuba',   cat:'banheiro',   w:80,  d:48,  alt:85,  sym:'lavatorio',     m3d:'gabinete'},
+    bide:         {nome:'Bidê',                cat:'banheiro',   w:36,  d:55,  alt:40,  sym:'vaso',          m3d:'vaso'},
+    espelheira:   {nome:'Espelheira',          cat:'banheiro',   w:80,  d:14,  alt:70,  sym:'espelho',       m3d:'espelho'},
+    /* escritório */
+    mesaL:        {nome:'Mesa em L',           cat:'escritorio', w:180, d:160, alt:75,  sym:'balcaoL',       m3d:'mesaL'},
+    armarioAco:   {nome:'Armário de aço',      cat:'escritorio', w:90,  d:45,  alt:200, sym:'armario',       m3d:'armarioAco'},
+    impressora:   {nome:'Impressora',          cat:'escritorio', w:50,  d:45,  alt:35,  sym:'eletro',        m3d:'eletro'},
+    mesaReuniao:  {nome:'Mesa de reunião',     cat:'escritorio', w:240, d:120, alt:75,  sym:'mesa',          m3d:'mesa'},
+    /* serviço */
+    secadora:     {nome:'Secadora',            cat:'servico',    w:60,  d:60,  alt:85,  sym:'eletro',        m3d:'eletro'},
+    varal:        {nome:'Varal',               cat:'servico',    w:120, d:60,  alt:120, sym:'varal',         m3d:'varal'},
+    aquecedor:    {nome:'Aquecedor / boiler',  cat:'servico',    w:50,  d:50,  alt:150, sym:'eletro',        m3d:'boiler'},
+    freezer:      {nome:'Freezer horizontal',  cat:'servico',    w:130, d:70,  alt:90,  sym:'eletro',        m3d:'freezer'},
+    /* externo e lazer */
+    moto:         {nome:'Moto',                cat:'externo',    w:80,  d:210, alt:120, sym:'moto',          m3d:'moto'},
+    bicicleta:    {nome:'Bicicleta',           cat:'externo',    w:60,  d:180, alt:110, sym:'bicicleta',     m3d:'bicicleta'},
+    bancoJardim:  {nome:'Banco de jardim',     cat:'externo',    w:150, d:55,  alt:85,  sym:'bancoJardim',   m3d:'bancoJardim'},
+    arbusto:      {nome:'Arbusto',             cat:'externo',    w:80,  d:80,  alt:90,  sym:'planta',        m3d:'arbusto'},
+    cerca:        {nome:'Cerca-viva',          cat:'externo',    w:200, d:50,  alt:120, sym:'cercaViva',     m3d:'cercaViva'},
+    lixeira:      {nome:'Lixeira',             cat:'externo',    w:60,  d:60,  alt:110, sym:'lixeira',       m3d:'lixeira'},
+    guardaSol:    {nome:'Guarda-sol',          cat:'lazer',      w:250, d:250, alt:240, sym:'guardaSol',     m3d:'guardaSol'},
+    jacuzzi:      {nome:'Ofurô / jacuzzi',     cat:'lazer',      w:200, d:200, alt:90,  sym:'jacuzzi',       m3d:'jacuzzi'},
+    ducha:        {nome:'Ducha externa',       cat:'lazer',      w:40,  d:40,  alt:220, sym:'ducha',         m3d:'ducha'},
+    escadaPiscina:{nome:'Escada de piscina',   cat:'lazer',      w:60,  d:60,  alt:110, sym:'escadaPiscina', m3d:'escadaPiscina'},
+    trampolim:    {nome:'Trampolim',           cat:'lazer',      w:60,  d:180, alt:80,  sym:'espreguicadeira', m3d:'trampolim'},
+    redeDescanso: {nome:'Rede de descanso',    cat:'lazer',      w:220, d:100, alt:100, sym:'espreguicadeira', m3d:'rede'},
+    bancadaGourmet:{nome:'Bancada gourmet',    cat:'lazer',      w:200, d:70,  alt:105, sym:'bancada',       m3d:'bancada'},
+    /* academia */
+    esteira:      {nome:'Esteira',             cat:'academia',   w:90,  d:180, alt:140, sym:'esteira',       m3d:'esteira'},
+    bikeErgo:     {nome:'Bicicleta ergométrica', cat:'academia', w:60,  d:120, alt:130, sym:'aparelho',      m3d:'bikeErgo'},
+    supino:       {nome:'Banco de supino',     cat:'academia',   w:130, d:140, alt:120, sym:'aparelho',      m3d:'supino'},
+    halteres:     {nome:'Rack de halteres',    cat:'academia',   w:150, d:60,  alt:80,  sym:'aparelho',      m3d:'halteres'},
+    tatame:       {nome:'Tatame',              cat:'academia',   w:200, d:200, alt:4,   sym:'tatame',        m3d:'tapete'},
+    espelhoAcad:  {nome:'Espelho de parede',   cat:'academia',   w:200, d:8,   alt:180, sym:'espelho',       m3d:'espelho'},
+    /* comercial */
+    balcaoAtend:  {nome:'Balcão de atendimento', cat:'comercial', w:180, d:70, alt:105, sym:'balcaoL',       m3d:'balcaoAtend'},
+    vitrineExp:   {nome:'Vitrine expositora',  cat:'comercial',  w:120, d:50,  alt:100, sym:'adega',         m3d:'vitrineExp'},
+    gondola:      {nome:'Gôndola',             cat:'comercial',  w:180, d:60,  alt:180, sym:'gondola',       m3d:'gondola'},
+    arara:        {nome:'Arara de roupas',     cat:'comercial',  w:150, d:60,  alt:170, sym:'arara',         m3d:'arara'},
+    manequim:     {nome:'Manequim',            cat:'comercial',  w:45,  d:35,  alt:180, sym:'manequim',      m3d:'manequim'},
+    caixaReg:     {nome:'Caixa registradora',  cat:'comercial',  w:120, d:60,  alt:105, sym:'balcaoL',       m3d:'caixaReg'},
+    freezerExp:   {nome:'Freezer expositor',   cat:'comercial',  w:90,  d:70,  alt:190, sym:'adega',         m3d:'freezerExp'},
+    mesaBistro:   {nome:'Mesa bistrô',         cat:'comercial',  w:70,  d:70,  alt:75,  sym:'mesaRedonda',   m3d:'mesaRedondaAlta'},
+    /* decoração */
+    quadro:       {nome:'Quadro',              cat:'decoracao',  w:90,  d:5,   alt:70,  sym:'quadro',        m3d:'quadro'},
+    espelhoDec:   {nome:'Espelho decorativo',  cat:'decoracao',  w:70,  d:6,   alt:110, sym:'espelho',       m3d:'espelho'},
+    vasoGrande:   {nome:'Vaso grande',         cat:'decoracao',  w:45,  d:45,  alt:90,  sym:'planta',        m3d:'vasoDec'},
+    cortina:      {nome:'Cortina',             cat:'decoracao',  w:200, d:12,  alt:240, sym:'cortina',       m3d:'cortina'},
+    pendente:     {nome:'Pendente',            cat:'decoracao',  w:30,  d:30,  alt:40,  sym:'luminaria',     m3d:'pendente'}
   };
   Object.keys(ITENS).forEach(function (k) { ITENS[k].k = k; });
 
@@ -374,7 +621,7 @@ function MOVEIS_LIB(){
       var W = (lado === 'esq' || lado === 'dir') ? r.h : r.w, D = (lado === 'esq' || lado === 'dir') ? r.w : r.h;
       var n = norm(r.nome), lista = [];
       /* põe(k, u, v, rotLocal) — encosto -y do móvel: 180 = encosto no fundo; -90 = encosto na parede esquerda; 90 = direita; 0 = encosto na parede da porta */
-      function poe(k, u, v, rot, extra){ var o = {k:k, u:u, v:v, rot:rot || 0}; if (extra) for (var p in extra) o[p] = extra[p]; lista.push(o); }
+      function poe(k, u, v, rot, extra, elev){ var o = {k:k, u:u, v:v, rot:rot || 0}; if (extra) for (var p in extra) o[p] = extra[p]; if (elev) o.elev = elev; lista.push(o); }
       function W_(k){ return ITENS[k].w; } function D_(k){ return ITENS[k].d; }
 
       if (n.indexOf('estar') >= 0 || (r.tipo === 'social' && n.indexOf('sala') >= 0 && n.indexOf('jantar') < 0)) {
@@ -402,6 +649,9 @@ function MOVEIS_LIB(){
           poe('fogao', bw * .72 + 5, D - 30, 180);
           poe('bancada', bw / 2 + 5, D - 30, 180, {w: bw});
           if (gel) poe('geladeira', W - 40, D - 40, 180);
+          poe('coifa', bw * .72 + 5, D - 28, 180, {w: Math.min(90, bw * .5)}, 160);
+          if (W >= 300) poe('microondas', bw * .12 + 5, D - 26, 180, null, 140);
+          if (W >= 340) poe('lavaLoucas', bw * .5 + 5, D - 30, 180);
           if (D >= 300 && W >= 240) poe('bancada', 30, (D - 60) / 2 - 15, -90, {w: Math.min(200, D - 100), d: 60});
         }
       } else if (r.tipo === 'intimo' || n.indexOf('quarto') >= 0 || n.indexOf('suite') >= 0) {
@@ -414,23 +664,28 @@ function MOVEIS_LIB(){
           var aw = Math.min(200, D - cd - 50);
           if (W >= 260 && aw >= 80) poe('guardaRoupa', 32, 20 + aw / 2, -90, {w: aw});
           if (W > 280) poe('planta', W - 30, 34, 0);
+          if (W >= 320 && D >= 300) poe(n.indexOf('suite') >= 0 ? 'penteadeira' : 'comoda', W - 60, 24, 0);
+          if (W >= 360) poe('espelhoCorpo', W - 20, D / 2, 90);
         }
       } else if (r.tipo === 'molhado' && (n.indexOf('banh') >= 0 || n.indexOf('lavabo') >= 0 || n.indexOf('wc') >= 0)) {
         if (W >= 110 && D >= 140) {
           var temBox = n.indexOf('lavabo') < 0 && W >= 170 && D >= 200;
           poe('vaso', W - 26, D - 40, 180);
-          poe('lavatorio', 26, Math.min(D - 100, 60), -90);
+          if (W >= 200) { poe('gabinete', 44, Math.min(D - 110, 60), -90); poe('espelheira', 14, Math.min(D - 110, 60), -90, null, 110); }
+          else poe('lavatorio', 26, Math.min(D - 100, 60), -90);
           if (temBox) poe('box', 48, D - 48, 180, {w: Math.min(90, W - 80), d: Math.min(90, D - 100)});
         }
       } else if (r.tipo === 'servico') {
         if (W >= 120 && D >= 120 && n.indexOf('serv') >= 0) {
           poe('lavadora', 36, D - 34, 180); poe('tanque', 100, D - 32, 180);
           if (W >= 200) poe('armarioServ', W - 44, D - 24, 180);
+          if (D >= 220) poe('varal', W / 2, 40, 0, {w: Math.min(120, W - 40)}, 100);
         } else if (W >= 100 && D >= 100) {
           poe('prateleira', W / 2, D - 22, 180, {w: Math.min(W - 30, 180)});
         }
       } else if (r.tipo === 'garagem') {
         if (W >= 220 && D >= 430) poe('carro', W / 2, D / 2 + 5, 0);
+        if (W >= 330 && D >= 430) poe('bicicleta', W - 40, 120, 0);
       } else if (n.indexOf('varanda') >= 0 || n.indexOf('gourmet') >= 0 || n.indexOf('churras') >= 0) {
         if (W >= 200 && D >= 160) {
           poe('mesaExt', W / 2, D / 2, 0);
