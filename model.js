@@ -202,6 +202,8 @@ var M = (function () {
   function addMovel(k, x, y, rot, extra){
     if (!proj.moveis) proj.moveis = [];
     var m = {id:uid(), k:k, x:Math.round(x), y:Math.round(y), rot:((rot || 0) + 360) % 360, pav:pavAtual};
+    var dd = window.MOVEIS && MOVEIS.def(k);
+    if (dd && dd.elev) m.elev = dd.elev;   /* item de parede ou teto nasce na altura certa (TV, split, câmera, exaustor) */
     if (extra) for (var p in extra) m[p] = extra[p];
     if (!m.pav) delete m.pav;
     var a = ambienteDe(m); if (a) m.amb = a.id;

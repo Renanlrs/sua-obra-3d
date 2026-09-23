@@ -745,6 +745,8 @@ function TRES_ENGINE(THREE, M){
       tecido:   std('#E8E2D6'), tecido2: std('#B9C4B0'), madEsc: std('#8B5E3C'), madClara: std('#D8B98C'),
       branco:   std('#F5F5F2'), preto: std('#25282C'), metal: std('#A6ACB2', {roughness:.35, metalness:.6}),
       tronco:   std('#6F4E37'), folhas: std('#4F8A3E'), folhas2: std('#6AA24C'), pele: std('#D9C7A6'),
+      telaTv:   std('#12171C', {roughness:.12, metalness:.2}),          /* tela apagada, levemente espelhada */
+      painelSolar: std('#1F2A38', {roughness:.18, metalness:.55}),
       fogo:     std('#E4884F', {emissive:'#C2451B', emissiveIntensity:.8, roughness:.9}),   /* brasa da lareira */
       carro:    std('#8FA3B5', {roughness:.35, metalness:.5}), pneu: std('#1E1F22'), vidroCarro: std('#2C3A44', {roughness:.2, metalness:.5}),
       terraExt: std('#9DB088'),
@@ -1107,6 +1109,170 @@ function TRES_ENGINE(THREE, M){
       var nP2 = Math.max(6, Math.round(w / .12));
       for (var ic = 0; ic < nP2; ic++) { var on2 = ic % 2 ? .05 : 0; bx(w / nP2 * .9, alt - .1, .06 + on2, Mt.tecido, -w / 2 + w * (ic + .5) / nP2, 0, .1); }
       bx(w + .1, .04, .04, Mt.metal, 0, 0, alt - .04);
+    /* ---------- veículos, eletrônicos, palco e instalações (23/09) ---------- */
+    } else if (tipo === 'veiculo' || tipo === 'picape') {   /* hatch / SUV / picape: capô, cabine e caçamba */
+      var hRoda = Math.min(.34, alt * .22), corpoH = alt * .42;
+      bx(w, corpoH, dp, Mt.carro, 0, 0, hRoda * .6);
+      var cabD = tipo === 'picape' ? dp * .4 : dp * .55, cabZ = tipo === 'picape' ? -dp * .12 : 0;
+      bx(w * .92, alt * .34, cabD, Mt.vidroCarro, 0, cabZ, hRoda * .6 + corpoH);
+      bx(w * .9, .06, cabD * .94, Mt.carro, 0, cabZ, hRoda * .6 + corpoH + alt * .34);
+      if (tipo === 'picape') { bx(w * .96, alt * .2, dp * .4, Mt.carro, 0, dp * .28, hRoda * .6 + corpoH); bx(w * .88, .04, dp * .36, Mt.preto, 0, dp * .28, hRoda * .6 + corpoH + .02); }
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (p) { var pn2 = cl(hRoda, .2, Mt.pneu, p[0] * (w / 2 - .08), p[1] * dp * .32, 0, 12); pn2.rotation.z = Math.PI / 2; pn2.position.y = hRoda; });
+      bx(.18, .08, .04, Mt.tecido, -w * .3, -dp / 2 + .02, hRoda * .6 + corpoH * .5); bx(.18, .08, .04, Mt.tecido, w * .3, -dp / 2 + .02, hRoda * .6 + corpoH * .5);
+    } else if (tipo === 'van' || tipo === 'caminhao' || tipo === 'onibus') {
+      var hR2 = .42, cabLen = tipo === 'van' ? dp * .32 : (tipo === 'onibus' ? dp : dp * .26);
+      if (tipo === 'onibus') {
+        bx(w, alt - hR2, dp, Mt.carro, 0, 0, hR2);
+        bx(w + .02, alt * .3, dp * .94, Mt.vidroCarro, 0, 0, hR2 + (alt - hR2) * .45);
+        bx(w * .94, alt * .32, .05, Mt.vidroCarro, 0, -dp / 2 + .02, hR2 + (alt - hR2) * .38);
+      } else {
+        bx(w, (alt - hR2) * .62, cabLen, Mt.carro, 0, -dp / 2 + cabLen / 2, hR2);
+        bx(w * .94, (alt - hR2) * .3, .06, Mt.vidroCarro, 0, -dp / 2 + .03, hR2 + (alt - hR2) * .3);
+        bx(w, alt - hR2, dp - cabLen - .05, tipo === 'van' ? Mt.carro : Mt.branco, 0, -dp / 2 + cabLen + (dp - cabLen) / 2, hR2);
+        if (tipo === 'caminhao') for (var fr = 1; fr < 5; fr++) bx(w + .01, .04, .05, Mt.metal, 0, -dp / 2 + cabLen + (dp - cabLen) * fr / 5, hR2 + (alt - hR2) / 2);
+      }
+      var eixos = tipo === 'van' ? [-.3, .3] : [-.34, .22, .36];
+      eixos.forEach(function (ez) { [-1, 1].forEach(function (lx2) { var pn3 = cl(hR2, .26, Mt.pneu, lx2 * (w / 2 - .12), ez * dp, 0, 12); pn3.rotation.z = Math.PI / 2; pn3.position.y = hR2; }); });
+      bx(w * .8, .1, .06, Mt.metal, 0, -dp / 2 + .01, hR2 * .5);
+    } else if (tipo === 'tv' || tipo === 'telao' || tipo === 'telaProjecao') {
+      var molE = tipo === 'telaProjecao' ? .01 : .03;
+      bx(w, alt, Math.max(.03, dp), tipo === 'telaProjecao' ? Mt.branco : Mt.preto, 0, 0, 0);
+      var telaM = tipo === 'telaProjecao' ? Mt.branco : (Mt.telaTv || Mt.vidroCarro);
+      bx(w - molE * 2, alt - molE * 2, .012, telaM, 0, Math.max(.03, dp) / 2, 0);
+      if (tipo === 'telao') { bx(.1, .1, .1, Mt.metal, -w / 2 + .1, 0, -alt / 2 - .05); bx(.1, .1, .1, Mt.metal, w / 2 - .1, 0, -alt / 2 - .05); }
+      if (tipo === 'telaProjecao') bx(w + .12, .1, .12, Mt.metal, 0, 0, alt);   /* caixa da tela retrátil */
+    } else if (tipo === 'monitor') {
+      bx(w, alt * .8, .04, Mt.preto, 0, -dp / 2 + .05, alt * .2);
+      bx(w - .04, alt * .74, .01, Mt.vidroCarro, 0, -dp / 2 + .072, alt * .23);
+      bx(.06, alt * .2, .1, Mt.preto, 0, -dp / 2 + .1, 0); bx(w * .4, .02, dp * .5, Mt.preto, 0, -dp / 2 + dp * .3, 0);
+    } else if (tipo === 'soundbar') {
+      bx(w, alt, Math.max(.05, dp), Mt.preto, 0, 0, 0);
+      for (var sb = -w / 2 + .1; sb < w / 2 - .06; sb += .06) cl(.018, .01, Mt.metal, sb, Math.max(.05, dp) / 2, alt / 2, 8).rotation.x = Math.PI / 2;
+    } else if (tipo === 'caixaSom' || tipo === 'lineArray') {
+      bx(w, alt, dp, Mt.preto, 0, 0, 0);
+      var nAlt = tipo === 'lineArray' ? 3 : 1;
+      for (var cs = 0; cs < nAlt; cs++) {
+        var yc2 = alt * (cs + .62) / (nAlt + .2);
+        var fal = cl(Math.min(w, dp) * .32, .03, Mt.metal, 0, dp / 2, yc2, 16); fal.rotation.x = Math.PI / 2;
+      }
+      var tw2 = cl(Math.min(w, dp) * .12, .03, Mt.metal, 0, dp / 2, alt * .2, 12); tw2.rotation.x = Math.PI / 2;
+      if (tipo === 'lineArray') { bx(w * .2, .06, .06, Mt.metal, 0, -dp / 2, alt); bx(w, .04, dp * .6, Mt.metal, 0, 0, 0); }
+    } else if (tipo === 'caixaTeto') {
+      cl(w / 2, alt, Mt.branco, 0, 0, 0, 16);
+      var gr3 = cl(w / 2 - .01, .01, Mt.metal, 0, 0, 0, 16); gr3.position.y = 0;
+    } else if (tipo === 'cameraBullet') {
+      var corpo = cl(Math.min(w, alt) / 2, dp * .8, Mt.branco, 0, 0, alt / 2, 12); corpo.rotation.x = Math.PI / 2;
+      cl(Math.min(w, alt) * .42, .03, Mt.preto, 0, dp * .42, alt / 2, 12).rotation.x = Math.PI / 2;
+      bx(.05, alt * .5, .05, Mt.metal, 0, -dp * .3, alt * .5); bx(.1, .03, .1, Mt.metal, 0, -dp * .3, alt);
+    } else if (tipo === 'cameraDome') {
+      var dome = new THREE.Mesh(new THREE.SphereGeometry(w / 2, 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), Mt.vidroCarro);
+      dome.position.set(0, alt * .3, 0); dome.castShadow = true; g.add(dome);
+      cl(w / 2, alt * .35, Mt.branco, 0, 0, alt * .3, 14);
+    } else if (tipo === 'projetor') {
+      bx(w, alt, dp, Mt.branco, 0, 0, 0);
+      cl(w * .16, .04, Mt.vidroCarro, 0, dp / 2, alt / 2, 12).rotation.x = Math.PI / 2;
+      bx(.03, .12, .03, Mt.metal, -w / 3, 0, alt); bx(.03, .12, .03, Mt.metal, w / 3, 0, alt);
+    } else if (tipo === 'palco') {
+      bx(w, alt - .06, dp, Mt.madEsc, 0, 0, .06);
+      bx(w + .04, .06, dp + .04, Mt.preto, 0, 0, alt - .06);
+      for (var pe2 = -w / 2 + .3; pe2 < w / 2 - .2; pe2 += .9) { bx(.08, .06, .08, Mt.metal, pe2, -dp / 2 + .2, 0); bx(.08, .06, .08, Mt.metal, pe2, dp / 2 - .2, 0); }
+      for (var dg3 = 0; dg3 < 2; dg3++) bx(w * .3, .04, .3, Mt.madEsc, 0, dp / 2 + .16 + dg3 * .3, (alt - .06) * (1 - (dg3 + 1) / 3));
+    } else if (tipo === 'trelica') {
+      var bn = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+      bn.forEach(function (p) { bx(w, .05, .05, Mt.metal, 0, p[1] * (dp / 2 - .03), alt / 2 + p[0] * (alt / 2 - .03)); });
+      for (var tz = -w / 2; tz < w / 2 - .1; tz += .35) {
+        bx(.03, dp - .06, .03, Mt.metal, tz, 0, alt - .03); bx(.03, dp - .06, .03, Mt.metal, tz, 0, .03);
+        bx(.03, .03, alt - .06, Mt.metal, tz, -dp / 2 + .03, .03); bx(.03, .03, alt - .06, Mt.metal, tz, dp / 2 - .03, .03);
+      }
+    } else if (tipo === 'refletor') {
+      var cor2 = new THREE.Mesh(new THREE.CylinderGeometry(w * .42, w * .5, alt * .7, 12), Mt.preto);
+      cor2.position.set(0, alt * .35, 0); cor2.rotation.x = .5; cor2.castShadow = true; g.add(cor2);
+      var lente = cl(w * .38, .03, Mt.tecido, 0, dp * .25, alt * .12, 12); lente.rotation.x = Math.PI / 2 + .5;
+      bx(.06, alt * .3, .06, Mt.metal, 0, 0, alt * .7); bx(w, .04, .04, Mt.metal, 0, 0, alt);
+    } else if (tipo === 'mesaSom') {
+      bx(w, .08, dp, Mt.preto, 0, 0, alt - .08); pernas(w, dp, alt - .08, .05, Mt.metal);
+      var painel = bx(w - .08, .03, dp * .7, Mt.esquadria, 0, dp * .05, alt); painel.rotation.x = -.12;
+      for (var ms = -w / 2 + .1; ms < w / 2 - .06; ms += .07) { bx(.02, .02, .12, Mt.metal, ms, dp * .1, alt + .02); cl(.012, .02, Mt.branco, ms, -dp * .2, alt + .02, 6); }
+    } else if (tipo === 'microfone') {
+      cl(.14, .03, Mt.preto, 0, 0, 0, 12); cl(.02, alt - .2, Mt.metal, 0, 0, .03, 8);
+      var braco = bx(.02, .02, .35, Mt.metal, 0, .12, alt - .12); braco.rotation.x = .4;
+      var mic = cl(.03, .12, Mt.preto, 0, .22, alt - .06, 10); mic.rotation.x = 1.2;
+    } else if (tipo === 'arSplit') {
+      bx(w, alt, dp, Mt.branco, 0, 0, 0);
+      for (var asx = -w / 2 + .06; asx < w / 2 - .04; asx += .05) bx(.03, .02, dp * .5, Mt.esquadria, asx, dp * .2, .04, true);
+      bx(w * .96, .02, .02, Mt.esquadria, 0, dp / 2 - .02, alt * .25);
+    } else if (tipo === 'arCassete' || tipo === 'exaustorTeto') {
+      bx(w, alt, dp, Mt.branco, 0, 0, 0);
+      bx(w * .6, .02, dp * .6, Mt.esquadria, 0, 0, 0);
+      if (tipo === 'arCassete') [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(function (p) { bx(p[0] ? .04 : w * .58, .03, p[1] ? .04 : dp * .58, Mt.esqBranca, p[0] * w * .34, p[1] * dp * .34, .01); });
+    } else if (tipo === 'arJanela') {
+      bx(w, alt, dp, Mt.branco, 0, 0, 0);
+      for (var ajx = -w / 2 + .05; ajx < w / 2 - .03; ajx += .04) bx(.02, alt * .6, .02, Mt.esquadria, ajx, dp / 2 - .01, alt * .2, true);
+    } else if (tipo === 'condensadora') {
+      bx(w, alt, dp, Mt.esqBranca, 0, 0, .04);
+      var vent = cl(Math.min(w, alt) * .34, .03, Mt.metal, w * .1, dp / 2, alt * .5, 14); vent.rotation.x = Math.PI / 2;
+      bx(w - .1, .02, .02, Mt.metal, 0, dp / 2 - .01, alt * .9);
+      bx(w, .04, .06, Mt.metal, 0, 0, 0);
+    } else if (tipo === 'exaustorParede') {
+      cl(w / 2, dp, Mt.branco, 0, 0, alt / 2, 14).rotation.x = Math.PI / 2;
+      var hel = cl(w * .36, .02, Mt.esqBranca, 0, dp / 2, alt / 2, 10); hel.rotation.x = Math.PI / 2;
+      for (var hx2 = 0; hx2 < 4; hx2++) { var pa4 = bx(w * .36, .015, .06, Mt.branco, 0, dp / 2 + .01, alt / 2); pa4.rotation.z = hx2 * Math.PI / 4; }
+    } else if (tipo === 'exaustorEolico') {
+      cl(w * .3, alt * .35, Mt.metal, 0, 0, 0, 12);
+      var bola = new THREE.Mesh(new THREE.SphereGeometry(w / 2, 14, 10, 0, Math.PI * 2, 0, Math.PI * .6), Mt.metal);
+      bola.position.set(0, alt * .72, 0); bola.castShadow = true; g.add(bola);
+      for (var ee = 0; ee < 10; ee++) { var al3 = bx(.02, w * .5, .1, Mt.metal, Math.cos(ee * Math.PI / 5) * w * .35, Math.sin(ee * Math.PI / 5) * w * .35, alt * .55); al3.rotation.y = ee * Math.PI / 5; }
+    } else if (tipo === 'caixaAgua') {
+      cl(w / 2, alt - .08, Mt.esqBranca, 0, 0, 0, 16);
+      cl(w / 2 - .02, .08, Mt.branco, 0, 0, alt - .08, 16);
+      cl(w * .1, .06, Mt.esquadria, w * .22, 0, alt, 10);
+    } else if (tipo === 'caixaAguaTorre') {
+      var hT = alt * .72;
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (p) { bx(.12, hT, .12, Mt.concreto, p[0] * (w / 2 - .12), p[1] * (dp / 2 - .12), 0); });
+      for (var tt = 1; tt < 3; tt++) { bx(w - .1, .08, .08, Mt.concreto, 0, -dp / 2 + .1, hT * tt / 3); bx(.08, .08, dp - .1, Mt.concreto, -w / 2 + .1, 0, hT * tt / 3); }
+      bx(w, .12, dp, Mt.laje, 0, 0, hT);
+      cl(w * .38, alt - hT - .2, Mt.esqBranca, 0, 0, hT + .12, 16);
+      cl(w * .36, .1, Mt.branco, 0, 0, alt - .1, 16);
+    } else if (tipo === 'cisterna') {
+      cl(w / 2, alt * .25, Mt.concreto, 0, 0, 0, 16);   /* tampa e boca; o corpo fica enterrado */
+      cl(w * .18, .12, Mt.metal, 0, 0, alt * .25, 12);
+      bx(w * .5, .04, dp * .5, Mt.preto, 0, 0, alt * .25 + .12, true);
+    } else if (tipo === 'placaSolar') {
+      var pl3 = bx(w, Math.max(.04, alt), dp, Mt.painelSolar, 0, 0, .12); pl3.rotation.x = -.35;
+      bx(.05, .3, .05, Mt.metal, -w / 2 + .1, -dp / 2 + .1, 0); bx(.05, .3, .05, Mt.metal, w / 2 - .1, -dp / 2 + .1, 0);
+      bx(.05, .12, .05, Mt.metal, -w / 2 + .1, dp / 2 - .1, 0); bx(.05, .12, .05, Mt.metal, w / 2 - .1, dp / 2 - .1, 0);
+    } else if (tipo === 'quadroEnergia') {
+      bx(w, alt, dp, Mt.esqBranca, 0, 0, 0);
+      bx(w - .06, alt - .06, .01, Mt.preto, 0, dp / 2, 0);
+      for (var qd = 0; qd < 5; qd++) bx(.03, .05, .02, Mt.tecido, -w * .3 + qd * .06, dp / 2 + .01, alt * .5);
+    } else if (tipo === 'vitrineLoja') {
+      bx(w, alt, .06, Mt.esquadria, 0, -dp / 2 + .03, 0);
+      var vidroV = bx(w - .1, alt - .1, .02, Mt.vidroBox, 0, -dp / 2 + .03, .05);
+      bx(w, .08, dp, Mt.madClara, 0, 0, 0);
+      for (var vp = 0; vp < 3; vp++) bx(w - .12, .04, dp - .1, Mt.madClara, 0, 0, .35 + vp * (alt - .5) / 2);
+      bx(.06, alt, dp, Mt.esquadria, -w / 2 + .03, 0, 0); bx(.06, alt, dp, Mt.esquadria, w / 2 - .03, 0, 0);
+      bx(w, .06, dp, Mt.esquadria, 0, 0, alt - .06);
+    } else if (tipo === 'balcaoVitrine' || tipo === 'vitrineIlha') {
+      bx(w, alt * .45, dp, Mt.metal, 0, 0, 0);
+      bx(w - .06, alt * .5, dp - .06, Mt.vidroBox, 0, 0, alt * .45);
+      bx(w, .06, dp, Mt.inox, 0, 0, alt - .06);
+      bx(w - .2, .03, dp - .2, Mt.inox, 0, 0, alt * .68);
+      if (tipo === 'balcaoVitrine') bx(w, .1, .06, Mt.inox, 0, dp / 2 - .03, alt * .45);
+    } else if (tipo === 'expositorParede') {
+      bx(w, alt, .05, Mt.madClara, 0, -dp / 2 + .025, 0);
+      bx(.05, alt, dp, Mt.madClara, -w / 2 + .025, 0, 0); bx(.05, alt, dp, Mt.madClara, w / 2 - .025, 0, 0);
+      var coresE = [Mt.azul2, Mt.tecido, Mt.tecido2, Mt.branco];
+      for (var ep = 0; ep < 5; ep++) { var yE = .25 + ep * (alt - .4) / 4;
+        bx(w - .1, .03, dp - .06, Mt.madClara, 0, 0, yE);
+        for (var xe2 = -w / 2 + .15; xe2 < w / 2 - .1; xe2 += .22) bx(.16, .22, dp * .6, coresE[(ep + Math.floor(Math.abs(xe2 * 7))) % coresE.length], xe2, 0, yE + .03);
+      }
+    } else if (tipo === 'provador') {
+      bx(w, alt, .05, Mt.parede, 0, -dp / 2 + .025, 0);
+      bx(.05, alt, dp, Mt.parede, -w / 2 + .025, 0, 0); bx(.05, alt, dp, Mt.parede, w / 2 - .025, 0, 0);
+      var cort = bx(w - .1, alt * .9, .04, Mt.tecido2, 0, dp / 2 - .04, .1);
+      bx(w, .05, .05, Mt.metal, 0, dp / 2 - .04, alt - .05);
+      bx(w * .5, alt * .55, .02, Mt.vidroBox, 0, -dp / 2 + .06, alt * .3);
+      bx(.3, .03, .03, Mt.metal, 0, 0, alt * .55);
     } else if (tipo === 'pendente') {
       cl(.015, 1.2, Mt.preto, 0, 0, alt, 6);
       var cup = new THREE.Mesh(new THREE.ConeGeometry(w / 2, alt, 14, 1, true), Mt.preto); cup.position.set(0, alt * .5, 0); cup.castShadow = true; g.add(cup);

@@ -405,7 +405,14 @@ M.proj.fachada = {cobertura:'galpao'};
 t('custo: galpão entra como cobertura com estrutura e a telha cerâmica não é cobrada como tal', M.custoFachadaItens().some(function (i) { return /galp/i.test(i.rot); }));
 M.proj.fachada = null;
 /* ---- 23/09: catálogo ampliado — móveis, janelas, portas, portões, muros ---- */
-t('catálogo com mais de 100 móveis em 13 categorias', Object.keys(MOVEIS.ITENS).length >= 100 && MOVEIS.CATS.length >= 13, Object.keys(MOVEIS.ITENS).length + ' itens · ' + MOVEIS.CATS.length + ' categorias');
+t('catálogo com mais de 160 itens em 17 categorias', Object.keys(MOVEIS.ITENS).length >= 160 && MOVEIS.CATS.length >= 17, Object.keys(MOVEIS.ITENS).length + ' itens · ' + MOVEIS.CATS.length + ' categorias');
+t('categorias novas existem e têm itens: veículos, eletrônicos, palco, instalações', ['veiculos', 'eletronicos', 'palco', 'instalacoes'].every(function (c) { return MOVEIS.CATS.some(function (x) { return x.k === c; }) && MOVEIS.porCat(c).length >= 4; }));
+t('o que o Marilton pediu está no catálogo', ['suv', 'caminhao', 'onibus', 'cameraDome', 'tv65', 'caixaTorre', 'mesaSom', 'palco', 'exaustorEolico', 'arSplit', 'caixaAgua1000', 'vitrineLoja'].every(function (k) { return MOVEIS.def(k); }),
+  ['suv', 'caminhao', 'onibus', 'cameraDome', 'tv65', 'caixaTorre', 'mesaSom', 'palco', 'exaustorEolico', 'arSplit', 'caixaAgua1000', 'vitrineLoja'].filter(function (k) { return !MOVEIS.def(k); }).join(','));
+t('item de parede/teto tem elevação padrão e nasce lá (TV, split, câmera, caixa de teto)', ['tv65', 'arSplit', 'cameraDome', 'caixaTeto', 'trelica'].every(function (k) { return MOVEIS.def(k).elev > 90; }));
+var mvTv = M.addMovel('tv65', 300, 300, 0);
+t('addMovel usa a elevação padrão do catálogo', mvTv.elev === MOVEIS.def('tv65').elev, String(mvTv.elev));
+M.proj.moveis = M.proj.moveis.filter(function (m) { return m.id !== mvTv.id; });
 t('toda categoria tem itens e capa que existe', MOVEIS.CATS.every(function (c) { return MOVEIS.porCat(c.k).length > 0 && MOVEIS.def(c.capa); }), MOVEIS.CATS.filter(function (c) { return !MOVEIS.porCat(c.k).length || !MOVEIS.def(c.capa); }).map(function (c) { return c.k; }).join(','));
 t('todo item tem nome, medidas positivas, figurinha e receita 3D', Object.keys(MOVEIS.ITENS).every(function (k) { var d = MOVEIS.def(k); return d.nome && d.w > 0 && d.d > 0 && d.alt > 0 && MOVEIS.SYM[d.sym] && d.m3d; }));
 t('busca acha os itens novos pelo nome', MOVEIS.buscar('coifa').length === 1 && MOVEIS.buscar('manequim').length === 1 && MOVEIS.buscar('esteira').length >= 1);

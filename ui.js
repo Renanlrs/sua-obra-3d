@@ -107,6 +107,14 @@ var UI = (function () {
       if (q.get('estilo')) { M.proj.fachada = {estilo:q.get('estilo'), numero:q.get('num') || ''}; if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true); } }
       if (q.get('fprompt') && viewAtual === 'tresd') { fachadaPorPrompt(q.get('fprompt')); var pq = document.querySelector('#fach-prompt'); if (pq) pq.value = q.get('fprompt'); if (t3) t3.verFachada(true, +q.get('fz') || 1); }
       if (q.get('fach')) { try { M.proj.fachada = Object.assign(M.proj.fachada || {}, JSON.parse(q.get('fach'))); } catch (e) {} if (t3) t3.atualizar(); if (viewAtual === 'tresd') { fachPanel(); t3.verFachada(true, +q.get('fz') || 1); } }   /* &fach={"cobertura":"galpao"} (conferência) */
+      if (q.get('add')) {   /* &add=suv,palco,caixaAguaTorre@x,y (conferência: solta itens do catálogo na planta) */
+        q.get('add').split(',').forEach(function (spec, i2) {
+          var pr2 = spec.split('@'), k2 = pr2[0], xy = (pr2[1] || '').split('_');   /* k@x_y_rot (cm) */
+          if (!MOVEIS.def(k2)) return;
+          M.addMovel(k2, +xy[0] || (200 + i2 * 260), +xy[1] || 1200, +xy[2] || 0);
+        });
+        M.commit('Itens de conferência'); if (t3) t3.atualizar(); if (viewAtual === 'planta') PLAN.render();
+      }
       if (q.get('cob')) {   /* &cob=garagem|piscina|pergolado|quadra|1 (conferência) */
         var ks = q.get('cob').split(','); ks.forEach(function (k2) { novaCobertura(COB_PRESETS[k2] || {}); });
         if (viewAtual === 'planta') { PLAN.render(); } if (t3) t3.atualizar();

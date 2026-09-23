@@ -423,6 +423,96 @@ function MOVEIS_LIB(){
       var s = rr(-w / 2, -d / 2, w, d, 2, 'none', '#8A9399', 1.4);
       for (var y3 = -d / 2 + 6; y3 < d / 2 - 2; y3 += 8) s += ln(-w / 2 + 3, y3, w / 2 - 3, y3, '#B9C4CB', 1.3);
       return s;
+    },
+
+    /* ---------- veículos, eletrônicos, palco e instalações (23/09) ---------- */
+    veiculo: function (w, d) {   /* silhueta vista de cima: capô, cabine, rodas */
+      var s = rr(-w / 2, -d / 2, w, d, Math.min(w, d) * .18, '#8FA3B5');
+      s += rr(-w * .42, -d * .12, w * .84, d * .46, 6, '#2C3A44', T, 1.2);   /* vidros */
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (p) { s += rr(p[0] * (w / 2 - 3) - 3, p[1] * (d * .3) - 7, 6, 14, 2, '#1E1F22', 'none', 0); });
+      return s;
+    },
+    caminhao: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d * .28, 3, '#5C6B78');                  /* cabine */
+      s += rr(-w / 2, -d / 2 + d * .3, w, d * .7, 3, '#E4E7EA', T, 1.4);     /* baú */
+      for (var i = 1; i < 5; i++) s += ln(-w / 2, -d / 2 + d * .3 + d * .7 * i / 5, w / 2, -d / 2 + d * .3 + d * .7 * i / 5, '#B9C4CB', 1.1);
+      return s;
+    },
+    camera: function (w, d) {   /* corpo + cone de visão */
+      var s = pa('M0 0 L' + n(-w * .7) + ' ' + n(d * 1.1) + ' A ' + n(w) + ' ' + n(d) + ' 0 0 0 ' + n(w * .7) + ' ' + n(d * 1.1) + ' Z', '#22B8D6', 'none', 0);
+      s = '<g opacity=".25">' + s + '</g>';
+      s += rr(-w / 2, -d / 2, w, d, 2, '#3A4149');
+      s += ci(0, d * .18, Math.min(w, d) * .2, '#0B0E11', '#8A9399', 1);
+      return s;
+    },
+    tv: function (w, d) {
+      var s = rr(-w / 2, -Math.max(d, 4) / 2, w, Math.max(d, 4), 1, '#22262B');
+      s += ln(-w / 2 + 4, 0, w / 2 - 4, 0, '#5E6F7A', 1.6);
+      return s;
+    },
+    somCaixa: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 3, '#3A4149');
+      s += ci(0, -d * .15, Math.min(w, d) * .3, '#22262B', '#8A9399', 1.2);
+      s += ci(0, d * .28, Math.min(w, d) * .14, '#22262B', '#8A9399', 1);
+      return s;
+    },
+    mesaSom: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 3, '#2E3338');
+      for (var x = -w / 2 + 8; x < w / 2 - 4; x += 10) s += ln(x, -d * .2, x, d * .3, '#8A9399', 2.2);
+      s += rr(-w / 2 + 5, -d / 2 + 4, w - 10, d * .18, 2, '#22B8D6', 'none', 0);
+      return s;
+    },
+    palco: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 2, '#4A3A2C');
+      for (var x2 = -w / 2 + 20; x2 < w / 2 - 10; x2 += 20) s += ln(x2, -d / 2 + 3, x2, d / 2 - 3, '#6B5343', 1.1);
+      s += rr(-w / 2 + 3, -d / 2 + 3, w - 6, d - 6, 1, 'none', '#E4B23C', 1.6);
+      return s;
+    },
+    trelica: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 1, 'none', '#8A9399', 2);
+      for (var x3 = -w / 2; x3 < w / 2 - 4; x3 += 14) s += pa('M' + n(x3) + ' ' + n(-d / 2) + ' L' + n(x3 + 14) + ' ' + n(d / 2) + ' M' + n(x3 + 14) + ' ' + n(-d / 2) + ' L' + n(x3) + ' ' + n(d / 2), 'none', '#A6ACB2', 1.1);
+      return s;
+    },
+    arSplit: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, Math.min(w, d) * .3, '#F2F4F6');
+      for (var x4 = -w / 2 + 6; x4 < w / 2 - 4; x4 += 7) s += ln(x4, -d * .1, x4, d * .3, '#C9CED3', 1.1);
+      return s;
+    },
+    arCassete: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 3, '#F2F4F6');
+      s += rr(-w * .3, -d * .3, w * .6, d * .6, 2, '#D6DADF', T, 1);
+      for (var a = 0; a < 4; a++) s += ln(a % 2 ? -w / 2 + 4 : w / 2 - 4, a < 2 ? -d / 2 + 4 : d / 2 - 4, a % 2 ? -w * .3 : w * .3, a < 2 ? -d * .3 : d * .3, '#9AA3AB', 1.2);
+      return s;
+    },
+    exaustor: function (w, d) {
+      var r = Math.min(w, d) / 2, s = ci(0, 0, r, '#D6DADF');
+      for (var a2 = 0; a2 < 6; a2++) s += pa('M0 0 q ' + n(r * .8 * Math.cos(a2 * Math.PI / 3)) + ' ' + n(r * .3 * Math.sin(a2 * Math.PI / 3)) + ' ' + n(r * .9 * Math.cos(a2 * Math.PI / 3 + .5)) + ' ' + n(r * .9 * Math.sin(a2 * Math.PI / 3 + .5)), 'none', '#8A9399', 1.6);
+      s += ci(0, 0, r * .18, '#5C6B78', T, 1);
+      return s;
+    },
+    caixaAgua: function (w, d) {
+      var r2 = Math.min(w, d) / 2, s = ci(0, 0, r2, '#BFD4DD');
+      s += ci(0, 0, r2 * .72, '#D8E7EE', T, 1.2);
+      s += ci(0, -r2 * .45, r2 * .18, '#8FA3B1', T, 1);
+      return s;
+    },
+    placaSolar: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 2, '#2B3A4A');
+      for (var x5 = -w / 2 + 6; x5 < w / 2 - 3; x5 += 12) s += ln(x5, -d / 2 + 3, x5, d / 2 - 3, '#5E7A94', 1.2);
+      for (var y4 = -d / 2 + 8; y4 < d / 2 - 3; y4 += 12) s += ln(-w / 2 + 3, y4, w / 2 - 3, y4, '#5E7A94', 1.2);
+      return s;
+    },
+    quadroEnergia: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 2, '#E4E7EA');
+      s += rr(-w * .3, -d * .2, w * .6, d * .5, 1, '#3A4149', T, 1);
+      for (var i2 = 0; i2 < 4; i2++) s += rr(-w * .26 + i2 * w * .15, -d * .12, w * .1, d * .2, 1, '#F2C14E', 'none', 0);
+      return s;
+    },
+    vitrineLoja: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 2, '#CFE9F2');
+      s += rr(-w / 2 + 3, -d / 2 + 3, w - 6, d - 6, 1, '#EAF6FA', T, 1);
+      for (var x6 = -w / 2 + w / 4; x6 < w / 2 - 2; x6 += w / 4) s += ln(x6, -d / 2 + 3, x6, d / 2 - 3, '#8FA3B1', 1.4);
+      return s;
     }
   };
 
@@ -440,6 +530,10 @@ function MOVEIS_LIB(){
     {k:'lazer',      rot:'Lazer e piscina', capa:'jacuzzi'},
     {k:'academia',   rot:'Academia',      capa:'esteira'},
     {k:'comercial',  rot:'Comércio',      capa:'balcaoAtend'},
+    {k:'veiculos',   rot:'Veículos',      capa:'carro'},
+    {k:'eletronicos',rot:'TV, som e câmeras', capa:'tv65'},
+    {k:'palco',      rot:'Palco e eventos', capa:'palco'},
+    {k:'instalacoes',rot:'Instalações',   capa:'arSplit'},
     {k:'decoracao',  rot:'Decoração',     capa:'planta'}
   ];
 
@@ -480,7 +574,7 @@ function MOVEIS_LIB(){
     tanque:       {nome:'Tanque',              cat:'servico',    w:60,  d:55,  alt:90,  sym:'tanque',        m3d:'tanque'},
     armarioServ:  {nome:'Armário',             cat:'servico',    w:80,  d:40,  alt:180, sym:'armario',       m3d:'armario'},
     prateleira:   {nome:'Prateleira',          cat:'servico',    w:90,  d:40,  alt:180, sym:'estante',       m3d:'prateleira'},
-    carro:        {nome:'Carro',               cat:'externo',    w:172, d:420, alt:145, sym:'carro',         m3d:'carro'},
+    carro:        {nome:'Carro (sedã)',         cat:'veiculos',   w:172, d:420, alt:145, sym:'carro',         m3d:'carro'},
     churrasqueira:{nome:'Churrasqueira',       cat:'externo',    w:120, d:60,  alt:210, sym:'churrasqueira', m3d:'churrasqueira'},
     mesaExt:      {nome:'Mesa externa',        cat:'externo',    w:120, d:80,  alt:75,  sym:'mesa',          m3d:'mesa'},
     espreguicadeira:{nome:'Espreguiçadeira',   cat:'externo',    w:60,  d:160, alt:35,  sym:'espreguicadeira', m3d:'espreguicadeira'},
@@ -539,8 +633,8 @@ function MOVEIS_LIB(){
     aquecedor:    {nome:'Aquecedor / boiler',  cat:'servico',    w:50,  d:50,  alt:150, sym:'eletro',        m3d:'boiler'},
     freezer:      {nome:'Freezer horizontal',  cat:'servico',    w:130, d:70,  alt:90,  sym:'eletro',        m3d:'freezer'},
     /* externo e lazer */
-    moto:         {nome:'Moto',                cat:'externo',    w:80,  d:210, alt:120, sym:'moto',          m3d:'moto'},
-    bicicleta:    {nome:'Bicicleta',           cat:'externo',    w:60,  d:180, alt:110, sym:'bicicleta',     m3d:'bicicleta'},
+    moto:         {nome:'Moto',                cat:'veiculos',   w:80,  d:210, alt:120, sym:'moto',          m3d:'moto'},
+    bicicleta:    {nome:'Bicicleta',           cat:'veiculos',   w:60,  d:180, alt:110, sym:'bicicleta',     m3d:'bicicleta'},
     bancoJardim:  {nome:'Banco de jardim',     cat:'externo',    w:150, d:55,  alt:85,  sym:'bancoJardim',   m3d:'bancoJardim'},
     arbusto:      {nome:'Arbusto',             cat:'externo',    w:80,  d:80,  alt:90,  sym:'planta',        m3d:'arbusto'},
     cerca:        {nome:'Cerca-viva',          cat:'externo',    w:200, d:50,  alt:120, sym:'cercaViva',     m3d:'cercaViva'},
@@ -573,7 +667,64 @@ function MOVEIS_LIB(){
     espelhoDec:   {nome:'Espelho decorativo',  cat:'decoracao',  w:70,  d:6,   alt:110, sym:'espelho',       m3d:'espelho'},
     vasoGrande:   {nome:'Vaso grande',         cat:'decoracao',  w:45,  d:45,  alt:90,  sym:'planta',        m3d:'vasoDec'},
     cortina:      {nome:'Cortina',             cat:'decoracao',  w:200, d:12,  alt:240, sym:'cortina',       m3d:'cortina'},
-    pendente:     {nome:'Pendente',            cat:'decoracao',  w:30,  d:30,  alt:40,  sym:'luminaria',     m3d:'pendente'}
+    pendente:     {nome:'Pendente',            cat:'decoracao',  w:30,  d:30,  alt:40,  sym:'luminaria',     m3d:'pendente'},
+
+    /* ---------- veículos ---------- */
+    carroHatch:   {nome:'Carro compacto',      cat:'veiculos',   w:170, d:395, alt:148, sym:'veiculo',       m3d:'veiculo'},
+    suv:          {nome:'SUV',                 cat:'veiculos',   w:185, d:470, alt:175, sym:'veiculo',       m3d:'veiculo'},
+    picape:       {nome:'Picape',              cat:'veiculos',   w:190, d:530, alt:185, sym:'veiculo',       m3d:'picape'},
+    van:          {nome:'Van / utilitário',    cat:'veiculos',   w:200, d:540, alt:230, sym:'caminhao',      m3d:'van'},
+    caminhao:     {nome:'Caminhão (baú)',      cat:'veiculos',   w:250, d:900, alt:380, sym:'caminhao',      m3d:'caminhao'},
+    onibus:       {nome:'Ônibus / micro-ônibus', cat:'veiculos', w:250, d:900, alt:320, sym:'caminhao',      m3d:'onibus'},
+    /* ---------- TV, som e câmeras ---------- */
+    tv50:         {nome:'TV 50"',              cat:'eletronicos', w:112, d:8,  alt:65,  elev:110, sym:'tv',   m3d:'tv'},
+    tv65:         {nome:'TV 65"',              cat:'eletronicos', w:145, d:8,  alt:83,  elev:105, sym:'tv',   m3d:'tv'},
+    tv85:         {nome:'TV 85"',              cat:'eletronicos', w:190, d:9,  alt:108, elev:100, sym:'tv',   m3d:'tv'},
+    monitor:      {nome:'Monitor',             cat:'eletronicos', w:60,  d:20, alt:45,  elev:75,  sym:'tv',   m3d:'monitor'},
+    painelLed:    {nome:'Painel de LED',       cat:'eletronicos', w:300, d:15, alt:170, elev:100, sym:'tv',   m3d:'tv'},
+    projetor:     {nome:'Projetor',            cat:'eletronicos', w:35,  d:30, alt:14,  elev:250, sym:'eletro', m3d:'projetor'},
+    telaProjecao: {nome:'Tela de projeção',    cat:'eletronicos', w:250, d:10, alt:160, elev:90,  sym:'tv',   m3d:'telaProjecao'},
+    caixaTorre:   {nome:'Caixa de som torre',  cat:'eletronicos', w:30,  d:32, alt:110, sym:'somCaixa',      m3d:'caixaSom'},
+    caixaParede:  {nome:'Caixa de som de parede', cat:'eletronicos', w:26, d:20, alt:34, elev:200, sym:'somCaixa', m3d:'caixaSom'},
+    caixaTeto:    {nome:'Caixa de som de teto', cat:'eletronicos', w:22, d:22, alt:12,  elev:265, sym:'exaustor', m3d:'caixaTeto'},
+    subwoofer:    {nome:'Subwoofer',           cat:'eletronicos', w:45,  d:45, alt:45,  sym:'somCaixa',      m3d:'caixaSom'},
+    soundbar:     {nome:'Soundbar',            cat:'eletronicos', w:110, d:12, alt:8,   elev:95,  sym:'tv',   m3d:'soundbar'},
+    cameraBullet: {nome:'Câmera bullet (CFTV)', cat:'eletronicos', w:12, d:26, alt:12,  elev:270, sym:'camera', m3d:'cameraBullet'},
+    cameraDome:   {nome:'Câmera dome',         cat:'eletronicos', w:14,  d:14, alt:11,  elev:275, sym:'camera', m3d:'cameraDome'},
+    camera360:    {nome:'Câmera 360°',         cat:'eletronicos', w:16,  d:16, alt:10,  elev:280, sym:'camera', m3d:'cameraDome'},
+    dvr:          {nome:'DVR / gravador',      cat:'eletronicos', w:36,  d:30, alt:6,   elev:150, sym:'eletro', m3d:'eletro'},
+    /* ---------- palco e eventos ---------- */
+    palco:        {nome:'Palco',               cat:'palco',      w:600, d:400, alt:60,  sym:'palco',         m3d:'palco'},
+    praticavel:   {nome:'Praticável',          cat:'palco',      w:200, d:100, alt:40,  sym:'palco',         m3d:'palco'},
+    trelica:      {nome:'Treliça de iluminação', cat:'palco',    w:600, d:40,  alt:40,  elev:420, sym:'trelica', m3d:'trelica'},
+    refletor:     {nome:'Refletor',            cat:'palco',      w:28,  d:28,  alt:38,  elev:400, sym:'luminaria', m3d:'refletor'},
+    lineArray:    {nome:'Caixa de som de palco', cat:'palco',    w:60,  d:55,  alt:180, sym:'somCaixa',      m3d:'lineArray'},
+    mesaSom:      {nome:'Mesa de som',         cat:'palco',      w:120, d:65,  alt:95,  sym:'mesaSom',       m3d:'mesaSom'},
+    microfone:    {nome:'Microfone com pedestal', cat:'palco',   w:30,  d:30,  alt:160, sym:'luminaria',     m3d:'microfone'},
+    telao:        {nome:'Telão',               cat:'palco',      w:400, d:25,  alt:250, elev:80, sym:'tv',    m3d:'telao'},
+    /* ---------- instalações ---------- */
+    arSplit:      {nome:'Ar-condicionado split', cat:'instalacoes', w:100, d:22, alt:30, elev:215, sym:'arSplit', m3d:'arSplit'},
+    arCassete:    {nome:'Ar cassete (teto)',   cat:'instalacoes', w:60,  d:60, alt:25,  elev:255, sym:'arCassete', m3d:'arCassete'},
+    arPisoTeto:   {nome:'Ar piso-teto',        cat:'instalacoes', w:130, d:25, alt:55,  elev:200, sym:'arSplit', m3d:'arSplit'},
+    arJanela:     {nome:'Ar de janela',        cat:'instalacoes', w:60,  d:55, alt:40,  elev:150, sym:'eletro', m3d:'arJanela'},
+    condensadora: {nome:'Condensadora (externa)', cat:'instalacoes', w:90, d:35, alt:70, sym:'eletro',       m3d:'condensadora'},
+    exaustorParede:{nome:'Exaustor de parede', cat:'instalacoes', w:40,  d:25, alt:40,  elev:220, sym:'exaustor', m3d:'exaustorParede'},
+    exaustorEolico:{nome:'Exaustor eólico (telhado)', cat:'instalacoes', w:60, d:60, alt:70, elev:290, sym:'exaustor', m3d:'exaustorEolico'},
+    exaustorBanho:{nome:'Exaustor de banheiro', cat:'instalacoes', w:20, d:20,  alt:10,  elev:250, sym:'exaustor', m3d:'exaustorTeto'},
+    caixaAgua500: {nome:'Caixa d’água 500 L',  cat:'instalacoes', w:95,  d:95, alt:75,  sym:'caixaAgua',     m3d:'caixaAgua'},
+    caixaAgua1000:{nome:'Caixa d’água 1.000 L', cat:'instalacoes', w:115, d:115, alt:95, sym:'caixaAgua',    m3d:'caixaAgua'},
+    caixaAguaTorre:{nome:'Caixa d’água em torre', cat:'instalacoes', w:150, d:150, alt:420, sym:'caixaAgua', m3d:'caixaAguaTorre'},
+    cisterna:     {nome:'Cisterna',            cat:'instalacoes', w:200, d:200, alt:150, sym:'caixaAgua',    m3d:'cisterna'},
+    aquecedorSolar:{nome:'Aquecedor solar',    cat:'instalacoes', w:200, d:120, alt:15,  elev:290, sym:'placaSolar', m3d:'placaSolar'},
+    placaFoto:    {nome:'Placa fotovoltaica',  cat:'instalacoes', w:170, d:105, alt:6,   elev:295, sym:'placaSolar', m3d:'placaSolar'},
+    quadroEnergia:{nome:'Quadro de energia',   cat:'instalacoes', w:40,  d:14, alt:60,  elev:150, sym:'quadroEnergia', m3d:'quadroEnergia'},
+    bomba:        {nome:'Bomba / pressurizador', cat:'instalacoes', w:40, d:28, alt:32,  sym:'eletro',       m3d:'eletro'},
+    /* ---------- vitrines (comércio) ---------- */
+    vitrineLoja:  {nome:'Vitrine de loja',     cat:'comercial',  w:250, d:60,  alt:220, sym:'vitrineLoja',   m3d:'vitrineLoja'},
+    balcaoVitrine:{nome:'Balcão vitrine refrigerado', cat:'comercial', w:150, d:70, alt:110, sym:'vitrineLoja', m3d:'balcaoVitrine'},
+    vitrineIlha:  {nome:'Vitrine ilha',        cat:'comercial',  w:120, d:120, alt:110, sym:'vitrineLoja',   m3d:'vitrineIlha'},
+    expositorParede:{nome:'Expositor de parede', cat:'comercial', w:150, d:40, alt:200, sym:'gondola',       m3d:'expositorParede'},
+    provador:     {nome:'Provador',            cat:'comercial',  w:110, d:110, alt:220, sym:'box',           m3d:'provador'}
   };
   Object.keys(ITENS).forEach(function (k) { ITENS[k].k = k; });
 
