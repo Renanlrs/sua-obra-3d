@@ -43,7 +43,14 @@ var M = (function () {
     {nome:'Banheiro acessível', tipo:'molhado',  w:240, h:240},
     {nome:'Controle de acesso', tipo:'circulacao', w:220, h:100},
     {nome:'Administração',    tipo:'social',     w:400, h:350},
-    {nome:'Deck',             tipo:'social',     w:600, h:200}
+    {nome:'Deck',             tipo:'social',     w:600, h:200},
+    {nome:'Academia',         tipo:'social',     w:800, h:1000},
+    {nome:'Sala de spinning', tipo:'social',     w:600, h:700},
+    {nome:'Sala de pilates',  tipo:'social',     w:500, h:600},
+    {nome:'Sala de ginástica', tipo:'social',    w:600, h:700},
+    {nome:'Sala de lutas',    tipo:'social',     w:600, h:600},
+    {nome:'Área funcional',   tipo:'social',     w:600, h:700},
+    {nome:'Avaliação física', tipo:'social',     w:300, h:300}
   ];
 
   /* programas iniciais por tipo de projeto */
@@ -62,6 +69,8 @@ var M = (function () {
       itens:['Piscina','Varanda','Banheiro','Depósito','Jardim']},
     'escola-natacao':{rot:'Escola de natação', desc:'loja, recepção, vestiários, piscina com raias', terreno:{l:1500, p:2000},
       itens:['Loja','Corredor','Recepção','Controle de acesso','Vestiário','Vestiário','Banheiro acessível','Salão da piscina','Piscina','Administração','Deck']},
+    'academia':     {rot:'Academia',         desc:'musculação, cardio, spinning, pilates, lutas, vestiários', terreno:{l:1500, p:3000},
+      itens:['Recepção','Hall','Avaliação física','Academia','Área funcional','Sala de spinning','Vestiário','Banheiro acessível','Depósito','Vestiário','Administração','Sala de pilates','Sala de ginástica','Sala de lutas']},
     'zero':         {rot:'Do zero',          desc:'terreno vazio', itens:[]}
   };
 
@@ -97,6 +106,7 @@ var M = (function () {
       versoes: []
     };
     if (tipoKey === 'escola-natacao') { gerarEscola(); mobiliarAuto(); }
+    else if (tipoKey === 'academia') { gerarAcademia(); mobiliarAuto(); }
     else if (pr.itens.length) { gerar(pr.itens); if (tipoKey === 'sobrado') subirIntimos(); mobiliarAuto(); }
     pavAtual = 0;
     hist = []; fut = []; base = snap();
@@ -326,6 +336,42 @@ var M = (function () {
     proj.meta = 70000000;
   }
 
+  /* ---------- academia: recepção na frente, salão de musculação largo, salas de aula, vestiários no fundo;
+     1º andar com pilates, ginástica, lutas e administração. Proporcional ao terreno (padrão 15 × 30 m). ---------- */
+  function gerarAcademia(){
+    var t = proj.terreno;
+    t.recuoFrontal = 500; t.recuoLateral = 0; t.recuoFundo = 400;   /* frente = estacionamento; fundo = área técnica (ocupação ~70%) */
+    var W = t.largura, y0 = t.recuoFrontal, fim = t.profundidade - t.recuoFundo, disp = fim - y0;
+    function cl(v, a, b){ return Math.max(a, Math.min(b, Math.round(v))); }
+    var hA = cl(disp * .19, 400, 600), hC = cl(disp * .27, 500, 800), hD = cl(disp * .2, 420, 600), hB = Math.max(500, disp - hA - hC - hD);
+    var out = [];
+    function add(nome, tipo, x, y, w, h, extra){ var a = {id:uid(), nome:nome, tipo:tipo, x:Math.round(x), y:Math.round(y), w:Math.round(w), h:Math.round(h)}; if (extra) for (var k in extra) a[k] = extra[k]; out.push(a); return a; }
+    var av = cl(W * .25, 300, 450), hw = 150, hx = W - av - hw;   /* hall da escada entre a recepção e a avaliação */
+    add('Recepção', 'social', 0, y0, hx, hA);
+    add('Hall', 'circulacao', hx, y0, hw, hA);
+    add('Avaliação física', 'social', W - av, y0, av, hA);
+    var yB = y0 + hA;
+    add('Academia', 'social', 0, yB, W, hB);
+    var yC = yB + hB, meio = Math.round(W / 2);
+    add('Área funcional', 'social', 0, yC, meio, hC);
+    add('Sala de spinning', 'social', meio, yC, W - meio, hC);
+    var yD = yC + hC, vw = cl(W * .27, 300, 450), hD2 = fim - yD;
+    add('Vestiário masculino', 'molhado', 0, yD, vw, hD2);
+    add('Banheiro acessível', 'molhado', vw, yD, 240, hD2);
+    add('Depósito', 'servico', vw + 240, yD, W - vw * 2 - 240, hD2);
+    add('Vestiário feminino', 'molhado', W - vw, yD, vw, hD2);
+    /* 1º andar sobre a frente e o salão: administração, hall, professores; pilates, ginástica e lutas lado a lado */
+    add('Administração', 'social', 0, y0, hx, hA, {pav:1});
+    add('Hall', 'circulacao', hx, y0, hw, hA, {pav:1});
+    add('Sala dos professores', 'social', W - av, y0, av, hA, {pav:1});
+    var terco = Math.round(W / 3);
+    add('Sala de pilates', 'social', 0, yB, terco, hB, {pav:1});
+    add('Sala de ginástica', 'social', terco, yB, W - terco * 2, hB, {pav:1});
+    add('Sala de lutas', 'social', W - terco, yB, terco, hB, {pav:1});
+    proj.ambientes = out;
+    proj.peDireito = 320;
+  }
+
   /* ---------- derivadas (funções puras) ---------- */
   /* ---------- pavimentos: cada ambiente tem `pav` (0 = térreo); a lista de ambientes continua única ----------
      pavAtual é estado de tela (não é dado do projeto). */
@@ -520,7 +566,8 @@ var M = (function () {
     return itens;
   }
   function custoFachada(){ return custoFachadaItens().reduce(function (s2, i) { return s2 + i.valor; }, 0); }
-  function custoGeral(){ return custoTotal() + custoFachada() + custoPiscina() + custoCoberturas(); }
+  function custoEquipamentos(){ return equipamentosItens().reduce(function (s2, i) { return s2 + i.valor; }, 0); }
+  function custoGeral(){ return custoTotal() + custoFachada() + custoPiscina() + custoCoberturas() + custoEquipamentos(); }
   function custoPorM2(){
     var ac = areaConstruida() / 10000;
     return ac ? Math.round(custoTotal() / ac) : 0;
@@ -636,6 +683,22 @@ var M = (function () {
     {k:'projeto',    rot:'Projeto, engenharia e gestão', pct:6,  etapa:0}
   ];
   var ETAPAS_OBRA = ['Terreno e projeto', 'Fundação e piso', 'Estrutura', 'Alvenaria', 'Cobertura', 'Acabamento'];
+  /* equipamentos com preço no catálogo (academia): agrupados por tipo, derivados de proj.moveis */
+  function equipamentosItens(){
+    if (!window.MOVEIS) return [];
+    var por = {}, ordem = [];
+    (proj.moveis || []).forEach(function (m) {
+      var d = MOVEIS.def(m.k); if (!d || !(d.preco || d.precoM2)) return;
+      var dm = MOVEIS.dims(m), g = por[m.k];
+      if (!g) { g = por[m.k] = {d:d, n:0, m2:0}; ordem.push(m.k); }
+      g.n++; g.m2 += dm.w * (d.k === 'espelhoAcad' ? dm.alt : dm.d) / 10000;
+    });
+    return ordem.map(function (k) {
+      var g = por[k], d = g.d;
+      if (d.precoM2) return {k:k, rot:d.nome + ' (' + num(g.m2) + ' m²)', valor:Math.round(g.m2 * d.precoM2), base:fmtBRL(d.precoM2) + '/m²'};
+      return {k:k, rot:d.nome + (g.n > 1 ? ' × ' + g.n : ''), valor:g.n * d.preco, base:fmtBRL(d.preco) + ' a peça'};
+    });
+  }
   function orcamento(){
     var cob = ambientesCobertos().reduce(function (s2, a) { return s2 + custoDe(a); }, 0);
     var agua = piscinas().reduce(function (s2, a) { return s2 + custoDe(a); }, 0);
@@ -645,6 +708,7 @@ var M = (function () {
     custoPiscinaItens().forEach(function (i) { linhas.push({grupo:'Piscina', rot:i.rot, valor:i.valor, base:i.campo ? 'campo editável' : 'calculado da piscina', etapa:5, campo:i.campo}); });
     custoFachadaItens().forEach(function (i) { linhas.push({grupo:'Fachada', rot:i.rot, valor:i.valor, base:'escolha na aba Fachada', etapa:5}); });
     coberturas().forEach(function (c) { custoCoberturaItens(c).forEach(function (i) { linhas.push({grupo:'Coberturas', rot:c.nome + ' · ' + i.rot, valor:i.valor, base:'cobertura independente', etapa:/pilar/i.test(i.rot) ? 1 : 4}); }); });
+    equipamentosItens().forEach(function (i) { linhas.push({grupo:'Equipamentos', rot:i.rot, valor:i.valor, base:i.base, etapa:5}); });
     if (ext) linhas.push({grupo:'Externo', rot:'Jardim e áreas descobertas', valor:ext, base:'por m² descoberto', etapa:5});
     var subtotal = linhas.reduce(function (s2, l) { return s2 + l.valor; }, 0);
     var pct = proj.reservaPct == null ? 10 : proj.reservaPct, reserva = Math.round(subtotal * pct / 100), total = subtotal + reserva;
@@ -880,7 +944,7 @@ var M = (function () {
     areaOf:areaOf, areaTerreno:areaTerreno, areaConstruida:areaConstruida,
     areaTotalAmbientes:areaTotalAmbientes, ocupacao:ocupacao, projecao:projecao, espelhoAgua:espelhoAgua,
     get pav(){ return pavAtual; }, setPav:setPav, pavDe:pavDe, nPavs:nPavs, ambsPav:ambsPav, nomePav:nomePav, apoio:apoio, addPavimento:addPavimento, removerPavimento:removerPavimento, escada:escada,
-    COB_TIPOS:COB_TIPOS, COB_TELHAS:COB_TELHAS, PILAR_MATS:PILAR_MATS, COB_PADRAO:COB_PADRAO, PRECO_COB:PRECO_COB,
+    equipamentosItens:equipamentosItens, custoEquipamentos:custoEquipamentos, COB_TIPOS:COB_TIPOS, COB_TELHAS:COB_TELHAS, PILAR_MATS:PILAR_MATS, COB_PADRAO:COB_PADRAO, PRECO_COB:PRECO_COB,
     coberturas:coberturas, cobsPav:cobsPav, coberturaDe:coberturaDe, cobCfg:cobCfg, addCobertura:addCobertura, removerCobertura:removerCobertura,
     lugarLivreCob:lugarLivreCob, areaCob:areaCob, nPilares:nPilares, custoCoberturaItens:custoCoberturaItens, custoCoberturas:custoCoberturas, areaCoberturas:areaCoberturas,
     custoDe:custoDe, custoTotal:custoTotal, custoPorM2:custoPorM2, custoFachada:custoFachada, custoFachadaItens:custoFachadaItens, custoGeral:custoGeral, fachadaCfg:fachadaCfg, testada:testada, PRECO_FACHADA:PRECO_FACHADA, bbox:bbox, problemas:problemas,

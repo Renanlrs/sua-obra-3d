@@ -352,6 +352,7 @@ var UI = (function () {
       h2 += '<tr class="tot"><td>AMBIENTES</td><td class="n">' + M.fmtM2(M.areaTotalAmbientes()) + '</td><td></td><td class="n">' + M.fmtBRL(M.custoTotal()) + '</td></tr>';
       M.custoFachadaItens().forEach(function (it) { h2 += '<tr><td><span class="sw" style="background:#2B2F33"></span>Fachada · ' + esc(it.rot) + '</td><td class="n"></td><td class="n"></td><td class="n">' + M.fmtBRL(it.valor) + '</td></tr>'; });
       M.custoPiscinaItens().forEach(function (it) { h2 += '<tr><td><span class="sw" style="background:#7FD6E8"></span>Piscina · ' + esc(it.rot) + '</td><td class="n"></td><td class="n"></td><td class="n">' + M.fmtBRL(it.valor) + '</td></tr>'; });
+      M.equipamentosItens().forEach(function (it) { h2 += '<tr><td><span class="sw" style="background:#C4553B"></span>Equipamento · ' + esc(it.rot) + '</td><td class="n"></td><td class="n">' + esc(it.base) + '</td><td class="n">' + M.fmtBRL(it.valor) + '</td></tr>'; });
       h2 += '<tr class="tot"><td>TOTAL SEM RESERVA</td><td class="n"></td><td></td><td class="n">' + M.fmtBRL(M.custoGeral()) + '</td></tr></table>';
       /* composição por etapa da obra — a mesma sequência do slider 4D do 3D */
       var oc = M.orcamento();

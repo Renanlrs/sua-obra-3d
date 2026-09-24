@@ -903,6 +903,7 @@ function TRES_ENGINE(THREE, M){
       /* estrutura (etapa 2) */
       concretoEstr: std('#C9C6BE', {roughness:.9}), ferro: std('#D9722B', {roughness:.5, metalness:.3}),
       inox: std('#C9CED3', {roughness:.25, metalness:.7}), louca: std('#FAFAF8', {roughness:.3}),
+      borracha: std('#34383C', {roughness:.97}), estofado: std('#2A2E33', {roughness:.7}), acento: std('#C4553B', {roughness:.5}), amarelo: std('#E9B83B', {roughness:.55}),
       azul: std('#6E7F9A'), azul2: std('#8FA0BA'), bege: std('#B8A88F'), vidroBox: new THREE.MeshStandardMaterial({color:'#CFE9F2', transparent:true, opacity:.28, roughness:.05, side:THREE.DoubleSide, depthWrite:false})
     };
     return mats;
@@ -959,6 +960,7 @@ function TRES_ENGINE(THREE, M){
 
   /* ---- um móvel do catálogo, em coordenadas locais: x = largura, z = profundidade,
           encosto em -z, frente em +z, centro em (0, 0). Medidas em metros. ---- */
+  var PISO_ACAB = .101;   /* altura do piso acabado dos ambientes (ver `plano(G.pisos…, .101…)`): itens rentes ao chão vão por cima */
   function movel3d(mv){
     var lib = (typeof MOVEIS !== 'undefined') ? MOVEIS : null;
     var d = lib ? lib.def(mv.k) : null, dm = lib ? lib.dims(mv) : {w:60, d:60, alt:60};
@@ -969,6 +971,24 @@ function TRES_ENGINE(THREE, M){
     function pernas(W, D, H, esp, mat){ [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (p) { bx(esp, H, esp, mat, p[0] * (W / 2 - esp / 2 - .02), p[1] * (D / 2 - esp / 2 - .02)); }); }
     function cadeira(W, D, H, mat){ bx(W, .05, D, mat, 0, 0, .43); bx(W, H - .45, .05, mat, 0, -D / 2 + .025, .45); pernas(W, D, .43, .04, Mt.madEsc); }
     var nA;
+    /* academia: tubo entre dois pontos (m, locais), esfera, anilha (disco com eixo em x) e torre de placas encostada no fundo */
+    function tubo(x1, y1, z1, x2, y2, z2, r, mat){
+      var a1 = new THREE.Vector3(x1, y1, z1), a2 = new THREE.Vector3(x2, y2, z2), dv = a2.clone().sub(a1), L = dv.length();
+      var m = new THREE.Mesh(new THREE.CylinderGeometry(r || .03, r || .03, L, 8), mat || Mt.metal);
+      m.position.copy(a1.clone().add(a2).multiplyScalar(.5)); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dv.normalize());
+      m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
+    }
+    function esf(r, mat, x, z, y){ var m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; }
+    function anilha(r, esp, x, z, y){ var m = cl(r, esp, Mt.preto, x, z, 0, 16); m.rotation.z = Math.PI / 2; m.position.y = y; return m; }
+    function pilha(x, z, H, larg){
+      var L = larg || .42;
+      bx(.05, H, .05, Mt.metal, x - L / 2, z); bx(.05, H, .05, Mt.metal, x + L / 2, z);
+      bx(L + .05, .06, .1, Mt.metal, x, z, H - .06); bx(L + .1, .05, .3, Mt.metal, x, z);
+      for (var pp = 0; pp < 12; pp++) bx(L - .08, .035, .16, Mt.preto, x, z, .1 + pp * .04);
+      bx(L + .04, H * .55, .02, Mt.acento, x, z + .12, .08);   /* capa da torre */
+    }
+    function banco(W, D, x, z, y, incl){ var b = bx(W, .08, D, Mt.estofado, x, z, y); if (incl) b.rotation.x = incl; return b; }
+    function eixoX(r, L, mat, x, z, y){ var m = cl(r, L, mat, x, z, 0, 10); m.rotation.z = Math.PI / 2; m.position.y = y; return m; }
 
     if (tipo === 'sofa' || tipo === 'poltrona') {
       bx(w, .42, dp, Mt.azul, 0, 0); bx(w, alt - .42, .22, Mt.azul, 0, -dp / 2 + .11, .42);
@@ -988,9 +1008,9 @@ function TRES_ENGINE(THREE, M){
       for (var k3 = 0; k3 < 4; k3++) bx(w, .03, dp, Mt.madClara, 0, 0, .4 + k3 * (alt - .4) / 3);
       bx(.03, alt, dp, Mt.metal, -w / 2 + .015, 0); bx(.03, alt, dp, Mt.metal, w / 2 - .015, 0);
     } else if (tipo === 'tapete') {
-      var tp = plano(g, w, dp, Mt.tecido2, 0, .012, 0, false); tp.castShadow = false;
+      var tp = plano(g, w, dp, Mt.tecido2, 0, PISO_ACAB + .004, 0, false); tp.castShadow = false;   /* sobre o piso acabado (a 10 cm), senão some */
     } else if (tipo === 'tapeteRedondo') {
-      var tr = cl(w / 2, .01, Mt.tecido2, 0, 0, .005, 28); tr.castShadow = false;
+      var tr = cl(w / 2, .01, Mt.tecido2, 0, 0, PISO_ACAB, 28); tr.castShadow = false;
     } else if (tipo === 'mesa') {
       bx(w, .04, dp, Mt.madEsc, 0, 0, alt - .04); pernas(w, dp, alt - .04, .05, Mt.madEsc);
     } else if (tipo === 'cadeira') {
@@ -1222,6 +1242,125 @@ function TRES_ENGINE(THREE, M){
       bx(w, .08, dp * .6, Mt.metal, 0, 0, .72); bx(w, .08, dp * .6, Mt.metal, 0, 0, .34);
       bx(.08, .8, .08, Mt.metal, -w / 2 + .05, 0); bx(.08, .8, .08, Mt.metal, w / 2 - .05, 0);
       for (var hx = -w / 2 + .18; hx < w / 2 - .1; hx += .26) { [.8, .42].forEach(function (hy) { var h1 = cl(.11, .34, Mt.preto, hx, 0, hy, 12); h1.rotation.z = Math.PI / 2; }); }
+    } else if (tipo === 'spinning' || tipo === 'bikeHoriz') {
+      bx(w * .85, .06, .08, Mt.metal, 0, -dp / 2 + .12); bx(w * .85, .06, .08, Mt.metal, 0, dp / 2 - .12); bx(.08, .08, dp - .2, Mt.metal, 0, 0);
+      eixoX(.24, .05, Mt.inox, 0, -dp * .28, .32);
+      if (tipo === 'spinning') {
+        tubo(0, .08, dp * .3, 0, alt * .74, dp * .2, .03); tubo(0, .08, -dp * .12, 0, alt * .9, -dp * .3, .03);
+        bx(.16, .06, .28, Mt.estofado, 0, dp * .22, alt * .74); bx(w * .8, .04, .14, Mt.estofado, 0, -dp * .32, alt * .9);
+        tubo(0, alt * .74, dp * .2, 0, alt * .88, -dp * .28, .025);
+      } else {
+        bx(.5, .1, .45, Mt.estofado, 0, dp * .22, .5); banco(.5, .55, 0, dp * .42, .8, .35); bx(.12, .5, .12, Mt.metal, 0, dp * .22);
+        bx(.26, .6, .3, Mt.preto, 0, -dp * .3); bx(.4, .22, .06, Mt.vidroCarro, 0, -dp * .3, .75).rotation.x = -.5;
+      }
+    } else if (tipo === 'eliptico') {
+      bx(w * .45, .12, dp * .9, Mt.preto, 0, 0); bx(.36, .5, .42, Mt.preto, 0, -dp / 2 + .24, .08);
+      [-1, 1].forEach(function (sx) { bx(.14, .04, .42, Mt.estofado, sx * .13, dp * .12, .32); tubo(sx * .13, .34, dp * .02, sx * .24, alt * .95, -dp * .26, .025, Mt.acento); });
+      tubo(0, .55, -dp / 2 + .3, 0, alt * .82, -dp * .34, .04); bx(.42, .28, .06, Mt.preto, 0, -dp * .34, alt * .82); bx(.34, .18, .01, Mt.vidroCarro, 0, -dp * .34 + .035, alt * .86);
+    } else if (tipo === 'remo') {
+      bx(.14, .06, dp * .78, Mt.metal, 0, dp * .08, .28); bx(.4, .28, .08, Mt.metal, 0, dp / 2 - .08);
+      bx(.42, .5, .4, Mt.preto, 0, -dp / 2 + .22); eixoX(.26, .12, Mt.inox, 0, -dp / 2 + .22, .32);
+      bx(.3, .08, .3, Mt.estofado, 0, dp * .1, .34); [-1, 1].forEach(function (sx) { bx(.14, .03, .26, Mt.preto, sx * .1, -dp * .18, .34).rotation.x = -.7; });
+      tubo(0, .5, -dp / 2 + .3, 0, .95, -dp / 2 + .2, .03); bx(.28, .18, .05, Mt.preto, 0, -dp / 2 + .2, .95);
+    } else if (tipo === 'escadaErgo') {
+      bx(w, .2, dp, Mt.preto, 0, 0);
+      for (var de2 = 0; de2 < 6; de2++) bx(w - .16, .05, .24, Mt.metal, 0, dp * .3 - de2 * .17, .25 + de2 * .2);
+      [-1, 1].forEach(function (sx) { tubo(sx * (w / 2 - .04), .2, dp * .4, sx * (w / 2 - .04), alt * .6, -dp * .35, .03); bx(.06, alt - .2, .06, Mt.metal, sx * (w / 2 - .04), -dp / 2 + .08, .2); });
+      bx(w, .3, .1, Mt.preto, 0, -dp / 2 + .1, alt - .3); bx(w - .1, .18, .02, Mt.vidroCarro, 0, -dp / 2 + .16, alt - .26);
+    } else if (tipo === 'extensora' || tipo === 'abdutora' || tipo === 'peitoral' || tipo === 'puxador') {
+      pilha(0, -dp / 2 + .12, alt);
+      bx(.1, .08, dp * .85, Mt.metal, 0, dp * .05); bx(w * .7, .06, .08, Mt.metal, 0, dp / 2 - .1);
+      var zs = tipo === 'puxador' ? dp * .22 : dp * .08, ys = tipo === 'puxador' ? .48 : .5;
+      bx(.1, ys, .1, Mt.metal, 0, zs); banco(.5, .45, 0, zs, ys);
+      if (tipo === 'extensora') { banco(.5, .6, 0, zs - .26, ys + .3, Math.PI / 2 - .15); eixoX(.07, .45, Mt.estofado, 0, zs + .38, .3); tubo(0, ys, zs + .2, 0, .3, zs + .38, .03); }
+      else if (tipo === 'abdutora') { banco(.5, .6, 0, zs - .24, ys + .3, Math.PI / 2 - .3); [-1, 1].forEach(function (sx) { bx(.08, .35, .5, Mt.estofado, sx * .36, zs + .1, ys + .08); }); }
+      else if (tipo === 'peitoral') { bx(.45, .75, .1, Mt.estofado, 0, zs - .22, ys + .08); [-1, 1].forEach(function (sx) { tubo(sx * .3, alt - .15, -dp / 2 + .2, sx * .5, 1.2, zs + .15, .03); bx(.06, .22, .06, Mt.estofado, sx * .5, zs + .15, 1.1); }); }
+      else { bx(.55, .1, .12, Mt.estofado, 0, zs - .08, .78); tubo(0, alt - .06, -dp / 2 + .12, 0, alt - .06, zs, .035); eixoX(.02, 1.1, Mt.metal, 0, zs, alt - .55); tubo(0, alt - .06, zs, 0, alt - .55, zs, .006, Mt.preto); }
+    } else if (tipo === 'flexora') {
+      pilha(0, -dp / 2 + .12, alt * .9);
+      bx(.1, .08, dp * .85, Mt.metal, 0, dp * .05); bx(.1, .62, .1, Mt.metal, 0, dp * .1); bx(.1, .62, .1, Mt.metal, 0, dp * .38);
+      banco(.4, dp * .6, 0, dp * .18, .66, .08); eixoX(.07, .45, Mt.estofado, 0, -dp * .16, .82);
+      [-1, 1].forEach(function (sx) { bx(.04, .25, .04, Mt.metal, sx * .26, dp * .42, .5); });
+    } else if (tipo === 'legPress') {
+      bx(w * .8, .1, dp * .9, Mt.metal, 0, 0);
+      [-1, 1].forEach(function (sx) { tubo(sx * .32, .3, dp / 2 - .5, sx * .32, alt - .1, -dp / 2 + .25, .04); anilha(.23, .05, sx * (w / 2 - .12), -dp * .2, .9); anilha(.23, .05, sx * (w / 2 - .18), -dp * .2, .9); });
+      bx(.72, .7, .06, Mt.inox, 0, -dp * .2, .7).rotation.x = -.78;
+      banco(.55, .55, 0, dp / 2 - .45, .42); banco(.55, .75, 0, dp / 2 - .15, .7, .9); bx(.1, .4, .1, Mt.metal, 0, dp / 2 - .45);
+    } else if (tipo === 'multiEstacao') {
+      pilha(-w / 2 + .35, -dp / 2 + .12, alt); pilha(w / 2 - .35, -dp / 2 + .12, alt);
+      bx(w, .08, .1, Mt.metal, 0, -dp / 2 + .12, alt - .08); bx(.1, .08, dp * .8, Mt.metal, 0, 0); bx(w * .8, .06, .1, Mt.metal, 0, dp / 2 - .1);
+      bx(.1, .45, .1, Mt.metal, 0, .05); banco(.5, .45, 0, .05, .45); bx(.45, .7, .1, Mt.estofado, 0, -.22, .55);
+      [-1, 1].forEach(function (sx) { tubo(sx * .25, 1.7, -.3, sx * .45, 1.15, .25, .03); });
+      eixoX(.02, 1.2, Mt.metal, 0, dp * .3, alt - .6);
+    } else if (tipo === 'crossover') {
+      pilha(-w / 2 + .35, 0, alt, .5); pilha(w / 2 - .35, 0, alt, .5);
+      bx(w, .1, .1, Mt.metal, 0, 0, alt - .1); bx(w * .9, .06, .08, Mt.metal, 0, -dp / 2 + .08); bx(w * .9, .06, .08, Mt.metal, 0, dp / 2 - .08);
+      [-1, 1].forEach(function (sx) { tubo(sx * (w / 2 - .6), alt - .1, 0, sx * (w / 2 - .6), 1.5, dp * .3, .005, Mt.preto); bx(.18, .04, .06, Mt.preto, sx * (w / 2 - .6), dp * .3, 1.45); });
+      bx(1.1, .06, .06, Mt.metal, 0, 0, alt - .6);
+    } else if (tipo === 'smith' || tipo === 'rackAgach') {
+      var px = w / 2 - .05, pz = dp / 2 - .05;
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (q) { bx(.07, alt, .07, Mt.metal, q[0] * px, q[1] * pz); });
+      [-1, 1].forEach(function (sx) { bx(.07, .07, dp, Mt.metal, sx * px, 0, alt - .07); bx(.07, .07, dp, Mt.metal, sx * px, 0, .02); bx(.05, .05, dp * .8, Mt.metal, sx * (px - .08), 0, .75); });
+      bx(w, .07, .07, Mt.metal, 0, -pz, alt - .07); bx(w, .07, .07, Mt.metal, 0, pz, alt - .07);
+      var yb = tipo === 'smith' ? 1.25 : 1.4, zb = tipo === 'smith' ? -pz + .15 : 0;
+      eixoX(.016, w + .3, Mt.inox, 0, zb, yb);
+      [-1, 1].forEach(function (sx) { anilha(.225, .05, sx * (w / 2 + .05), zb, yb); anilha(.18, .04, sx * (w / 2 + .1), zb, yb); });
+      if (tipo === 'smith') { [-1, 1].forEach(function (sx) { bx(.04, alt, .04, Mt.inox, sx * (px - .06), zb); }); banco(.3, 1.1, 0, .05, .42); bx(.08, .4, .08, Mt.metal, 0, .05); }
+      else bx(w - .1, .02, dp - .1, Mt.borracha, 0, 0, .01);
+    } else if (tipo === 'bancoReg' || tipo === 'scott') {
+      bx(.08, .08, dp * .9, Mt.metal, 0, 0); bx(.45, .06, .08, Mt.metal, 0, -dp / 2 + .1); bx(.45, .06, .08, Mt.metal, 0, dp / 2 - .1);
+      if (tipo === 'bancoReg') { bx(.08, .38, .08, Mt.metal, 0, dp * .15); banco(.3, dp * .38, 0, dp * .18, .42); banco(.3, dp * .5, 0, -dp * .18, .5, -.45); }
+      else { bx(.08, .5, .08, Mt.metal, 0, dp * .2); banco(.35, .35, 0, dp * .25, .55); bx(.08, .9, .08, Mt.metal, 0, -dp * .15); banco(.6, .4, 0, -dp * .22, .9, .6); }
+    } else if (tipo === 'anilhas') {
+      bx(w, .08, dp, Mt.metal, 0, 0); bx(.08, alt, .08, Mt.metal, 0, 0);
+      [-1, 1].forEach(function (sx) { [.35, .75, 1.1].forEach(function (hy, i3) { var r3 = [.225, .18, .13][i3]; anilha(r3, .05, sx * .12, 0, hy); anilha(r3, .05, sx * .18, 0, hy); }); });
+      [-1, 1].forEach(function (sz) { bx(.03, alt * .9, .03, Mt.inox, w / 2 - .1, sz * .12, .08); });
+    } else if (tipo === 'kettlebells') {
+      bx(w, .04, dp, Mt.metal, 0, 0, .3); bx(w, .04, dp, Mt.metal, 0, 0, alt - .04); [-1, 1].forEach(function (sx) { bx(.04, alt, dp, Mt.metal, sx * (w / 2 - .02), 0); });
+      for (var kx = -w / 2 + .14; kx < w / 2 - .1; kx += .2) { [.34, alt].forEach(function (ky, i4) { var rk = i4 ? .07 : .1; esf(rk, i4 ? Mt.preto : Mt.amarelo, kx, 0, ky + rk); }); }
+    } else if (tipo === 'barraFixa') {
+      [-1, 1].forEach(function (sx) { bx(.08, alt, .08, Mt.metal, sx * (w / 2 - .04), -dp / 2 + .1); bx(.06, .06, dp * .8, Mt.metal, sx * (w / 2 - .04), 0, .02); });
+      eixoX(.017, w, Mt.inox, 0, -dp / 2 + .1, alt - .1);
+      [-1, 1].forEach(function (sx) { tubo(sx * .25, 1.25, -dp / 2 + .1, sx * .25, 1.25, dp / 2 - .1, .02, Mt.inox); tubo(sx * .25, 1.25, dp / 2 - .1, sx * .25, 0, dp / 2 - .1, .025); });
+    } else if (tipo === 'sacoPancada') {
+      bx(.5, .06, dp, Mt.metal, 0, 0); bx(.08, alt, .08, Mt.metal, 0, -dp / 2 + .08); bx(.08, .08, dp * .75, Mt.metal, 0, -dp / 2 + .08 + dp * .35, alt - .08);
+      tubo(0, alt - .08, dp * .2, 0, 1.72, dp * .2, .006, Mt.preto); cl(.18, 1.1, Mt.acento, 0, dp * .2, .62, 16);
+    } else if (tipo === 'plio' || tipo === 'chairPilates') {
+      bx(w, alt, dp, Mt.madClara, 0, 0);
+      if (tipo === 'chairPilates') { banco(w - .04, dp - .1, 0, -.02, alt); bx(w - .1, .03, .2, Mt.estofado, 0, dp / 2 + .1, .2).rotation.x = -.3; }
+    } else if (tipo === 'bola') {
+      esf(Math.min(w, dp) / 2, Mt.azul2, 0, 0, Math.min(w, dp) / 2);
+    } else if (tipo === 'colchonete' || tipo === 'pisoBorracha') {
+      var cc = bx(w, Math.max(alt, .01), dp, tipo === 'colchonete' ? Mt.azul : Mt.borracha, 0, 0, PISO_ACAB + (tipo === 'colchonete' ? .012 : 0)); cc.castShadow = false;
+    } else if (tipo === 'reformer' || tipo === 'cadillac') {
+      bx(w, .1, dp, Mt.madClara, 0, 0, .25); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (q) { bx(.06, .25, .06, Mt.madClara, q[0] * (w / 2 - .05), q[1] * (dp / 2 - .05)); });
+      if (tipo === 'reformer') {
+        banco(w - .12, .6, 0, -dp * .02, .36); bx(w - .12, .3, .08, Mt.estofado, 0, dp * .16, .44).rotation.x = .2;
+        tubo(-w / 2 + .06, .6, -dp / 2 + .18, w / 2 - .06, .6, -dp / 2 + .18, .02, Mt.inox); tubo(-w / 2 + .06, .35, -dp / 2 + .18, -w / 2 + .06, .6, -dp / 2 + .18, .02, Mt.inox); tubo(w / 2 - .06, .35, -dp / 2 + .18, w / 2 - .06, .6, -dp / 2 + .18, .02, Mt.inox);
+        [-1, 1].forEach(function (sx) { bx(.04, .45, .04, Mt.madClara, sx * (w / 2 - .05), dp / 2 - .05, .35); });
+      } else {
+        banco(w - .06, dp - .06, 0, 0, .35);
+        [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (q) { bx(.05, alt - .35, .05, Mt.inox, q[0] * (w / 2 - .03), q[1] * (dp / 2 - .03), .35); });
+        [-1, 1].forEach(function (sx) { bx(.05, .05, dp, Mt.inox, sx * (w / 2 - .03), 0, alt - .05); }); bx(w, .05, .05, Mt.inox, 0, -dp / 2 + .03, alt - .05); bx(w, .05, .05, Mt.inox, 0, dp / 2 - .03, alt - .05);
+        eixoX(.015, w - .1, Mt.inox, 0, 0, alt - .6);
+      }
+    } else if (tipo === 'espaldar') {
+      [-1, 1].forEach(function (sx) { bx(.06, alt, dp, Mt.madClara, sx * (w / 2 - .03), 0); });
+      for (var eh = .15; eh < alt - .05; eh += .15) eixoX(.017, w - .1, Mt.madClara, 0, 0, eh);
+    } else if (tipo === 'maca') {
+      pernas(w, dp, alt - .1, .05, Mt.inox); bx(w, .1, dp, Mt.estofado, 0, 0, alt - .1); bx(w - .06, .08, .5, Mt.estofado, 0, -dp / 2 + .28, alt).rotation.x = .25;
+    } else if (tipo === 'bioimpedancia') {
+      bx(w, .08, dp * .7, Mt.branco, 0, dp * .12); bx(.12, alt - .1, .1, Mt.branco, 0, -dp / 2 + .08, .08);
+      bx(.3, .2, .06, Mt.telaTv, 0, -dp / 2 + .1, alt - .22).rotation.x = -.4; [-1, 1].forEach(function (sx) { tubo(sx * .06, alt - .3, -dp / 2 + .1, sx * .26, alt - .35, -dp / 2 + .22, .018, Mt.inox); });
+    } else if (tipo === 'catraca') {
+      bx(w, alt, dp * .7, Mt.inox, 0, -dp * .15); bx(w + .02, .02, dp * .7, Mt.preto, 0, -dp * .15, alt);
+      [0, 2.09, 4.19].forEach(function (a3) { var br2 = tubo(w / 2, alt * .8, -dp * .15, w / 2 + .45 * Math.cos(a3) * .3 + .02, alt * .8 + .45 * Math.sin(a3) * .6, -dp * .15 + .45 * Math.cos(a3), .018, Mt.inox); });
+    } else if (tipo === 'bebedouro') {
+      bx(w, alt - .1, dp, Mt.inox, 0, 0); bx(w + .02, .1, dp + .02, Mt.branco, 0, 0, alt - .1); cl(.025, .06, Mt.metal, 0, 0, alt, 8);
+    } else if (tipo === 'guardaVolumes') {
+      bx(w, alt, dp, Mt.metal, 0, 0);
+      var nc2 = Math.max(1, Math.round(w / .3)), nr = 4, cw2 = w / nc2, ch = (alt - .1) / nr;
+      for (var ci2 = 0; ci2 < nc2; ci2++) for (var ri = 0; ri < nr; ri++) bx(cw2 - .02, ch - .02, .01, (ci2 + ri) % 2 ? Mt.azul : Mt.azul2, -w / 2 + cw2 * (ci2 + .5), dp / 2, .1 + ch * ri + .01);
     } else if (tipo === 'balcaoAtend' || tipo === 'caixaReg') {
       bx(w, alt - .06, dp * .6, Mt.madEsc, 0, -dp / 2 + dp * .3, 0); bx(w + .06, .06, dp * .66, Mt.laje, 0, -dp / 2 + dp * .3, alt - .06);
       if (tipo === 'caixaReg') { bx(.34, .12, .26, Mt.preto, w * .2, -dp / 2 + dp * .3, alt); bx(.3, .22, .02, Mt.vidroCarro, w * .2, -dp / 2 + dp * .34, alt + .12).rotation.x = -.3; }

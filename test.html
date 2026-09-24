@@ -133,7 +133,7 @@ t('catálogo: todos com medidas e categoria válidas', semDim.length === 0, semD
 var thumbsRuins = itens.filter(function(k){ var th = MOVEIS.thumb(k, 64); return th.indexOf('<svg') !== 0 || th.indexOf('NaN') >= 0 || th.indexOf('undefined') >= 0; });
 t('catálogo: miniaturas sem NaN/undefined', thumbsRuins.length === 0, thumbsRuins.join(', '));
 t('catálogo: categorias com capa existente', MOVEIS.CATS.every(function(c){ return !!MOVEIS.ITENS[c.capa]; }));
-t('busca sem acento acha "Máquina de lavar"', MOVEIS.buscar('maquina').length === 1);
+t('busca sem acento acha "Máquina de lavar"', MOVEIS.buscar('maquina').some(function (d) { return d.nome === 'Máquina de lavar'; }));
 
 M.novo('casa-terrea', 1000, 2500);
 var mvs = M.proj.moveis || [];
@@ -529,6 +529,49 @@ M.novo('casa-terrea', 1000, 2500);
 M.proj.logo = 'data:image/png;base64,iVBORw0KGgo='; M.proj.ambientes[0].nome = 'Z'; M.commit('n'); M.undo();
 t('logo fica fora do undo e entra em fachadaDe/custo', M.proj.logo && TF.fachadaDe(M.proj).logo === M.proj.logo && M.custoFachadaItens().some(function (i) { return /arte/i.test(i.rot); }));
 delete M.proj.logo;
+M.novo('casa-terrea', 1000, 2500);
+
+/* ---- 24/09: academia — equipamentos, salas e programa ---- */
+var acadK = MOVEIS.porCat('academia').map(function (d) { return d.k; });
+t('academia: 30+ equipamentos no catálogo, todos com preço', acadK.length >= 30 && acadK.every(function (k) { var d = MOVEIS.def(k); return d.preco > 0 || d.precoM2 > 0; }), acadK.length + ' itens');
+t('o que uma academia precisa está no catálogo', ['esteira', 'eliptico', 'spinning', 'remo', 'legPress', 'extensora', 'flexora', 'puxador', 'crossover', 'smith', 'rackAgach', 'halteres', 'anilhas', 'kettlebells', 'reformer', 'cadillac', 'sacoPancada', 'pisoBorracha', 'bioimpedancia'].every(function (k) { return MOVEIS.def(k); }));
+M.novo('academia', 1500, 3000);
+var acNomes = M.proj.ambientes.map(function (a) { return a.nome; });
+t('programa Academia: musculação, spinning, funcional, vestiários no térreo; pilates, ginástica e lutas no 1º andar',
+  ['Academia', 'Sala de spinning', 'Área funcional', 'Vestiário masculino', 'Vestiário feminino', 'Avaliação física'].every(function (n) { return M.ambsPav(0).some(function (a) { return a.nome === n; }); }) &&
+  ['Sala de pilates', 'Sala de ginástica', 'Sala de lutas'].every(function (n) { return M.ambsPav(1).some(function (a) { return a.nome === n; }); }), acNomes.join(', '));
+t('programa Academia cabe no terreno sem sobreposição', M.problemas().filter(function (q) { return /sobre|fora/.test(q.tipo); }).length === 0, JSON.stringify(M.problemas().map(function (q) { return q.tipo; })));
+function moveisSala(nome){ var a = M.proj.ambientes.filter(function (x) { return x.nome === nome; })[0]; return (M.proj.moveis || []).filter(function (m) { return m.amb === a.id; }).map(function (m) { return m.k; }); }
+var mus = moveisSala('Academia');
+t('salão de musculação mobiliado: cardio, máquinas, pesos livres, espelho e piso', ['esteira', 'legPress', 'halteres', 'espelhoAcad', 'pisoBorracha', 'rackAgach'].every(function (k) { return mus.indexOf(k) >= 0; }), mus.join(','));
+t('spinning tem instrutor + 10 ou mais bikes', moveisSala('Sala de spinning').filter(function (k) { return k === 'spinning'; }).length >= 11);
+t('pilates tem reformer, lutas tem tatame e saco, avaliação tem bioimpedância', moveisSala('Sala de pilates').indexOf('reformer') >= 0 && moveisSala('Sala de lutas').indexOf('tatame') >= 0 && moveisSala('Sala de lutas').indexOf('sacoPancada') >= 0 && moveisSala('Avaliação física').indexOf('bioimpedancia') >= 0);
+var baixosA = {pisoBorracha:1, tatame:1, colchonete:1, espelhoAcad:1, tapete:1}, sobA = 0, foraA = 0;
+M.proj.moveis.forEach(function (m, i) {
+  var a = M.proj.ambientes.filter(function (x) { return x.id === m.amb; })[0], b = MOVEIS.aabb(m);
+  if (b.x < a.x - 1 || b.y < a.y - 1 || b.x + b.w > a.x + a.w + 1 || b.y + b.h > a.y + a.h + 1) foraA++;
+  M.proj.moveis.slice(i + 1).forEach(function (m2) { if (baixosA[m.k] || baixosA[m2.k] || m.elev || m2.elev || (m.pav || 0) !== (m2.pav || 0)) return; var c = MOVEIS.aabb(m2); if (b.x < c.x + c.w - 1 && c.x < b.x + b.w - 1 && b.y < c.y + c.h - 1 && c.y < b.y + b.h - 1) sobA++; });
+});
+t('mobiliar da academia: nenhum aparelho fora da sala nem um em cima do outro', foraA === 0 && sobA === 0, 'fora ' + foraA + ' · sobrepostos ' + sobA);
+var ocA = M.orcamento(), eqA = ocA.grupos.filter(function (g) { return g.grupo === 'Equipamentos'; })[0];
+var somaEq = M.equipamentosItens().reduce(function (s, i) { return s + i.valor; }, 0);
+t('orçamento ganha o grupo Equipamentos = soma do que está na planta', eqA && eqA.valor === somaEq && somaEq > 0, eqA && M.fmtBRL(eqA.valor));
+t('custo geral (total sem reserva da tabela) inclui os equipamentos', M.custoGeral() === M.custoTotal() + M.custoFachada() + M.custoPiscina() + M.custoCoberturas() + somaEq);
+var nEst = M.proj.moveis.filter(function (m) { return m.k === 'esteira'; }).length;
+M.addMovel('esteira', 800, 1500, 0);
+t('pôr mais uma esteira soma o preço dela no orçamento', M.orcamento().grupos.filter(function (g) { return g.grupo === 'Equipamentos'; })[0].valor === somaEq + MOVEIS.def('esteira').preco && M.equipamentosItens().some(function (i) { return i.k === 'esteira' && new RegExp('× ' + (nEst + 1)).test(i.rot); }));
+var pisoA = M.proj.moveis.filter(function (m) { return m.k === 'pisoBorracha'; })[0], vPiso = M.equipamentosItens().filter(function (i) { return i.k === 'pisoBorracha'; })[0].valor;
+M.proj.moveis.forEach(function (m) { if (m.k === 'pisoBorracha') m.w = MOVEIS.dims(m).w * 2; });
+t('piso emborrachado é cobrado por m² (dobrar a largura dobra o custo)', Math.abs(M.equipamentosItens().filter(function (i) { return i.k === 'pisoBorracha'; })[0].valor - 2 * vPiso) <= 2 * M.proj.moveis.filter(function (m) { return m.k === 'pisoBorracha'; }).length);
+M.novo('casa-terrea', 1000, 2500);
+t('casa sem aparelho de academia não ganha grupo Equipamentos', !M.orcamento().grupos.some(function (g) { return g.grupo === 'Equipamentos'; }));
+var salasA = ['Academia', 'Sala de spinning', 'Sala de pilates', 'Sala de ginástica', 'Sala de lutas', 'Área funcional', 'Avaliação física'], ruimA = [];
+salasA.forEach(function (nome) { [260, 400, 700, 1200].forEach(function (W) { [300, 600, 1000].forEach(function (D) { ['frente', 'fundo', 'esq', 'dir'].forEach(function (lado) {
+  var r0 = {id:'x', nome:nome, tipo:'social', x:0, y:0, w:W, h:D}, ms = MOVEIS.auto({ambientes:[r0]}, {x:lado});
+  ms.forEach(function (m, i) { var b = MOVEIS.aabb(m); if (b.x < -1 || b.y < -1 || b.x + b.w > W + 1 || b.y + b.h > D + 1) ruimA.push(nome + ' ' + W + '×' + D + ' ' + lado + ' fora:' + m.k);
+    ms.slice(i + 1).forEach(function (m2) { if (baixosA[m.k] || baixosA[m2.k] || m.elev || m2.elev) return; var c = MOVEIS.aabb(m2); if (b.x < c.x + c.w - 1 && c.x < b.x + b.w - 1 && b.y < c.y + c.h - 1 && c.y < b.y + b.h - 1) ruimA.push(nome + ' ' + W + '×' + D + ' ' + lado + ' ' + m.k + '×' + m2.k); }); });
+}); }); }); });
+t('as 7 salas de academia mobiliam limpo em 48 tamanhos × 4 lados de porta', ruimA.length === 0, ruimA.slice(0, 4).join(' | '));
 M.novo('casa-terrea', 1000, 2500);
 
 var r=document.getElementById('resumo');

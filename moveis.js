@@ -331,6 +331,103 @@ function MOVEIS_LIB(){
       for (var x = -w / 2; x < w / 2 - 1; x += w / 3) for (var y2 = -d / 2; y2 < d / 2 - 1; y2 += d / 3) s += rr(x + 1, y2 + 1, w / 3 - 2, d / 3 - 2, 1, '#5C8C7B', '#3E6156', 1);
       return s;
     },
+    /* ---- academia: figurinhas próprias (encosto -y = lado da parede) ---- */
+    bike: function (w, d) {   /* spinning / ergométrica: volante na frente da parede, selim atrás */
+      var s = rr(-w * .35, -d / 2 + 4, w * .7, d - 8, 4, 'none', '#8A9399', 1.2);
+      s += rr(-w * .1, -d / 2 + 4, w * .2, d * .3, 6, '#9AA3AA');                 /* volante */
+      s += ln(0, -d * .2, 0, d * .3, '#4A525A', 3);
+      s += rr(-w * .4, -d * .28, w * .8, 7, 3, '#22262B', T, 1);                 /* guidão */
+      s += el(0, d * .28, w * .16, d * .12, '#22262B', T, 1);                     /* selim */
+      return s;
+    },
+    eliptico: function (w, d) {
+      var s = rr(-w * .25, -d / 2 + 2, w * .5, d - 4, 6, '#3A4149');
+      s += rr(-w * .3, -d / 2 + 2, w * .6, d * .2, 5, '#22262B', T, 1);            /* volante + console */
+      s += rr(-w * .42, -d * .05, w * .22, d * .38, 4, '#8A9399', T, 1); s += rr(w * .2, -d * .05, w * .22, d * .38, 4, '#8A9399', T, 1);   /* pedais */
+      s += ln(-w * .4, -d * .3, -w * .32, 0, '#C4553B', 2.4); s += ln(w * .4, -d * .3, w * .32, 0, '#C4553B', 2.4);                         /* braços */
+      return s;
+    },
+    remo: function (w, d) {
+      var s = rr(-w * .1, -d / 2 + d * .22, w * .2, d * .76, 3, '#8A9399');        /* trilho */
+      s += ci(0, -d / 2 + d * .12, Math.min(w, d * .24) * .45, '#22262B');         /* volante */
+      s += rr(-w * .38, -d * .18, w * .76, d * .08, 3, '#4A525A', T, 1);           /* apoio dos pés */
+      s += rr(-w * .22, d * .08, w * .44, d * .1, 4, '#22262B', T, 1);             /* banco */
+      return s;
+    },
+    maquina: function (w, d) {   /* máquina de placas: torre de pesos na parede, assento na frente */
+      var s = rr(-w / 2, -d / 2, w, d, 4, 'none', '#8A9399', 1.4);
+      s += rr(-w * .22, -d / 2 + 3, w * .44, Math.min(26, d * .2), 2, '#22262B', T, 1);   /* torre de placas */
+      s += rr(-w * .2, -d * .05, w * .4, d * .34, 4, '#3A4149', T, 1.2);                 /* assento */
+      s += ln(-w / 2 + 6, -d / 2 + 6, -w / 2 + 6, d / 2 - 6, '#8A9399', 3); s += ln(w / 2 - 6, -d / 2 + 6, w / 2 - 6, d / 2 - 6, '#8A9399', 3);
+      s += ci(0, d / 2 - 10, 5, '#C4553B', T, 1);
+      return s;
+    },
+    legpress: function (w, d) {
+      var s = rr(-w / 2 + 6, -d / 2, w - 12, d, 4, 'none', '#8A9399', 1.4);
+      s += ln(-w * .3, -d / 2 + 8, -w * .3, d * .2, '#8A9399', 4); s += ln(w * .3, -d / 2 + 8, w * .3, d * .2, '#8A9399', 4);   /* trilhos */
+      s += rr(-w * .3, -d / 2 + 10, w * .6, d * .16, 3, '#9AA3AA', T, 1.2);       /* plataforma */
+      s += rr(-w * .22, d * .12, w * .44, d * .34, 5, '#3A4149', T, 1.2);          /* banco reclinado */
+      s += ci(-w / 2 + 10, -d * .1, 8, '#22262B'); s += ci(w / 2 - 10, -d * .1, 8, '#22262B');   /* anilhas */
+      return s;
+    },
+    gaiola: function (w, d) {   /* rack, smith, crossover: 4 montantes + barra */
+      var p = 8, s = rr(-w / 2, -d / 2, w, d, 2, 'none', '#8A9399', 1.2);
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (q) { s += rr(q[0] * (w / 2 - p / 2) - p / 2, q[1] * (d / 2 - p / 2) - p / 2, p, p, 1, '#4A525A', T, 1); });
+      s += ln(-w / 2 + 4, 0, w / 2 - 4, 0, '#6B7885', 3);
+      s += ci(-w / 2 + 14, 0, 7, '#22262B', T, 1); s += ci(w / 2 - 14, 0, 7, '#22262B', T, 1);
+      return s;
+    },
+    banco: function (w, d) {
+      var s = rr(-w * .12, -d / 2 + 6, w * .24, d - 12, 2, '#8A9399', T, 1);
+      s += rr(-w / 2 + 4, -d / 2 + 4, w - 8, d * .45, 5, '#3A4149', T, 1.2);
+      s += rr(-w / 2 + 4, d * .02, w - 8, d * .44, 5, '#3A4149', T, 1.2);
+      return s;
+    },
+    pesos: function (w, d) {   /* anilhas / kettlebells em suporte */
+      var s = rr(-w / 2, -d / 2, w, d, 3, '#6B7885');
+      var nn = Math.max(2, Math.floor(w / 26)), r = Math.min(d * .36, w / nn * .42);
+      for (var i = 0; i < nn; i++) s += ci(-w / 2 + w * (i + .5) / nn, 0, r, '#22262B', '#111', 1);
+      return s;
+    },
+    saco: function (w, d) {
+      var s = ci(0, 0, Math.min(w, d) / 2, '#C4553B');
+      s += ci(0, 0, Math.min(w, d) * .18, '#22262B', T, 1);
+      return s;
+    },
+    bola: function (w, d) {
+      var r = Math.min(w, d) / 2, s = ci(0, 0, r, '#5B8FC9');
+      s += pa('M' + n(-r * .7) + ' ' + n(-r * .3) + ' Q 0 ' + n(-r * .9) + ' ' + n(r * .7) + ' ' + n(-r * .3), 'none', '#FFFFFF', 1.2);
+      return s;
+    },
+    reformer: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 6, '#D8B98C');
+      s += rr(-w / 2 + 6, -d * .12, w - 12, d * .3, 4, '#3A4149', T, 1.2);          /* carrinho */
+      s += ln(-w / 2 + 6, -d / 2 + 18, w / 2 - 6, -d / 2 + 18, '#6B7885', 3);      /* barra dos pés */
+      for (var i = -2; i <= 2; i++) s += ln(i * w * .12, -d / 2 + 24, i * w * .12, -d * .14, '#C4553B', 1);   /* molas */
+      return s;
+    },
+    plio: function (w, d) {
+      return rr(-w / 2, -d / 2, w, d, 3, '#D8B98C') + ln(-w / 2 + 5, -d / 2 + 5, w / 2 - 5, d / 2 - 5, '#B5883C', 1.2) + ln(w / 2 - 5, -d / 2 + 5, -w / 2 + 5, d / 2 - 5, '#B5883C', 1.2);
+    },
+    colchonete: function (w, d) {
+      return rr(-w / 2, -d / 2, w, d, 5, '#5B6FA6') + ln(-w / 2 + 4, -d * .3, w / 2 - 4, -d * .3, '#8FA0BA', 1);
+    },
+    borracha: function (w, d) {   /* piso emborrachado em placas de 50 cm */
+      var s = rr(-w / 2, -d / 2, w, d, 1, '#3A3F44', '#2B2F33', 1.2);
+      for (var x = -w / 2 + 50; x < w / 2 - 1; x += 50) s += ln(x, -d / 2, x, d / 2, '#4E545A', .8);
+      for (var y = -d / 2 + 50; y < d / 2 - 1; y += 50) s += ln(-w / 2, y, w / 2, y, '#4E545A', .8);
+      return s;
+    },
+    espaldar: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 1, '#D8B98C');
+      for (var x = -w / 2 + 8; x < w / 2 - 4; x += 12) s += ln(x, -d / 2 + 2, x, d / 2 - 2, '#B5883C', 1);
+      return s;
+    },
+    guardaVolumes: function (w, d) {
+      var s = rr(-w / 2, -d / 2, w, d, 2, '#8FA0BA');
+      for (var x = -w / 2 + 30; x < w / 2 - 1; x += 30) s += ln(x, -d / 2, x, d / 2, '#5B6FA6', 1);
+      return s;
+    },
     arara: function (w, d) {   /* arara de roupas: barra + cabides */
       var s = ln(-w / 2 + 3, 0, w / 2 - 3, 0, '#8A9399', 3);
       for (var x2 = -w / 2 + 8; x2 < w / 2 - 6; x2 += 7) s += pa('M' + n(x2) + ' ' + n(-d * .2) + ' l' + n(-4) + ' ' + n(d * .4) + ' M' + n(x2) + ' ' + n(-d * .2) + ' l4 ' + n(d * .4), 'none', '#B9C4CB', 1.1);
@@ -647,12 +744,48 @@ function MOVEIS_LIB(){
     redeDescanso: {nome:'Rede de descanso',    cat:'lazer',      w:220, d:100, alt:100, sym:'espreguicadeira', m3d:'rede'},
     bancadaGourmet:{nome:'Bancada gourmet',    cat:'lazer',      w:200, d:70,  alt:105, sym:'bancada',       m3d:'bancada'},
     /* academia */
-    esteira:      {nome:'Esteira',             cat:'academia',   w:90,  d:180, alt:140, sym:'esteira',       m3d:'esteira'},
-    bikeErgo:     {nome:'Bicicleta ergométrica', cat:'academia', w:60,  d:120, alt:130, sym:'aparelho',      m3d:'bikeErgo'},
-    supino:       {nome:'Banco de supino',     cat:'academia',   w:130, d:140, alt:120, sym:'aparelho',      m3d:'supino'},
-    halteres:     {nome:'Rack de halteres',    cat:'academia',   w:150, d:60,  alt:80,  sym:'aparelho',      m3d:'halteres'},
-    tatame:       {nome:'Tatame',              cat:'academia',   w:200, d:200, alt:4,   sym:'tatame',        m3d:'tapete'},
-    espelhoAcad:  {nome:'Espelho de parede',   cat:'academia',   w:200, d:8,   alt:180, sym:'espelho',       m3d:'espelho'},
+    /* preco = centavos por peça, linha comercial nova (entra no orçamento, grupo Equipamentos);
+       precoM2 = centavos por m² para o que se estica (piso, tatame, espelho) */
+    esteira:      {nome:'Esteira',             cat:'academia',   w:90,  d:180, alt:140, sym:'esteira',       m3d:'esteira',     preco:1800000},
+    bikeErgo:     {nome:'Bicicleta ergométrica', cat:'academia', w:60,  d:120, alt:130, sym:'bike',          m3d:'bikeErgo',    preco:650000},
+    spinning:     {nome:'Bike de spinning',    cat:'academia',   w:55,  d:115, alt:115, sym:'bike',          m3d:'spinning',    preco:450000},
+    bikeHoriz:    {nome:'Bicicleta horizontal', cat:'academia',  w:65,  d:160, alt:120, sym:'bike',          m3d:'bikeHoriz',   preco:900000},
+    eliptico:     {nome:'Elíptico',            cat:'academia',   w:75,  d:200, alt:165, sym:'eliptico',      m3d:'eliptico',    preco:1500000},
+    remo:         {nome:'Remo ergométrico',    cat:'academia',   w:60,  d:240, alt:55,  sym:'remo',          m3d:'remo',        preco:850000},
+    escadaErgo:   {nome:'Simulador de escada', cat:'academia',   w:85,  d:150, alt:210, sym:'esteira',       m3d:'escadaErgo',  preco:2200000},
+    legPress:     {nome:'Leg press 45°',       cat:'academia',   w:160, d:230, alt:150, sym:'legpress',      m3d:'legPress',    preco:1400000},
+    extensora:    {nome:'Cadeira extensora',   cat:'academia',   w:110, d:140, alt:150, sym:'maquina',       m3d:'extensora',   preco:850000},
+    flexora:      {nome:'Mesa flexora',        cat:'academia',   w:110, d:190, alt:150, sym:'maquina',       m3d:'flexora',     preco:850000},
+    abdutora:     {nome:'Cadeira abdutora',    cat:'academia',   w:100, d:160, alt:150, sym:'maquina',       m3d:'abdutora',    preco:850000},
+    puxador:      {nome:'Puxador (pulley)',    cat:'academia',   w:130, d:150, alt:220, sym:'maquina',       m3d:'puxador',     preco:900000},
+    peitoral:     {nome:'Supino máquina / voador', cat:'academia', w:140, d:150, alt:200, sym:'maquina',     m3d:'peitoral',    preco:950000},
+    multiEstacao: {nome:'Estação multiexercício', cat:'academia', w:200, d:200, alt:210, sym:'maquina',      m3d:'multiEstacao', preco:1500000},
+    crossover:    {nome:'Crossover',           cat:'academia',   w:380, d:80,  alt:230, sym:'gaiola',        m3d:'crossover',   preco:1800000},
+    smith:        {nome:'Smith',               cat:'academia',   w:210, d:140, alt:225, sym:'gaiola',        m3d:'smith',       preco:1200000},
+    rackAgach:    {nome:'Rack de agachamento (gaiola)', cat:'academia', w:150, d:170, alt:230, sym:'gaiola', m3d:'rackAgach',   preco:850000},
+    supino:       {nome:'Banco de supino',     cat:'academia',   w:130, d:140, alt:120, sym:'aparelho',      m3d:'supino',      preco:350000},
+    bancoReg:     {nome:'Banco regulável',     cat:'academia',   w:60,  d:140, alt:50,  sym:'banco',         m3d:'bancoReg',    preco:150000},
+    scott:        {nome:'Banco Scott',         cat:'academia',   w:90,  d:110, alt:95,  sym:'banco',         m3d:'scott',       preco:180000},
+    halteres:     {nome:'Rack de halteres',    cat:'academia',   w:150, d:60,  alt:80,  sym:'aparelho',      m3d:'halteres',    preco:1200000},
+    anilhas:      {nome:'Suporte de anilhas e barras', cat:'academia', w:100, d:60, alt:140, sym:'pesos',    m3d:'anilhas',     preco:450000},
+    kettlebells:  {nome:'Rack de kettlebells', cat:'academia',   w:120, d:45,  alt:70,  sym:'pesos',         m3d:'kettlebells', preco:300000},
+    barraFixa:    {nome:'Barra fixa e paralela', cat:'academia', w:120, d:100, alt:230, sym:'gaiola',        m3d:'barraFixa',   preco:250000},
+    sacoPancada:  {nome:'Saco de pancada com suporte', cat:'academia', w:60, d:90, alt:220, sym:'saco',      m3d:'sacoPancada', preco:120000},
+    plio:         {nome:'Caixa de pliometria', cat:'academia',   w:75,  d:60,  alt:60,  sym:'plio',          m3d:'plio',        preco:60000},
+    bolaPilates:  {nome:'Bola suíça',          cat:'academia',   w:65,  d:65,  alt:65,  sym:'bola',          m3d:'bola',        preco:12000},
+    colchonete:   {nome:'Colchonete',          cat:'academia',   w:60,  d:180, alt:3,   sym:'colchonete',    m3d:'colchonete',  preco:8000},
+    reformer:     {nome:'Pilates reformer',    cat:'academia',   w:75,  d:240, alt:40,  sym:'reformer',      m3d:'reformer',    preco:1200000},
+    cadillac:     {nome:'Pilates cadillac',    cat:'academia',   w:80,  d:220, alt:210, sym:'reformer',      m3d:'cadillac',    preco:1600000},
+    chairPilates: {nome:'Pilates chair',       cat:'academia',   w:60,  d:75,  alt:70,  sym:'plio',          m3d:'chairPilates', preco:350000},
+    espaldar:     {nome:'Espaldar',            cat:'academia',   w:90,  d:20,  alt:240, sym:'espaldar',      m3d:'espaldar',    preco:150000},
+    tatame:       {nome:'Tatame',              cat:'academia',   w:200, d:200, alt:4,   sym:'tatame',        m3d:'tapete',      precoM2:9000},
+    pisoBorracha: {nome:'Piso emborrachado',   cat:'academia',   w:300, d:300, alt:2,   sym:'borracha',      m3d:'pisoBorracha', precoM2:18000},
+    espelhoAcad:  {nome:'Espelho de parede',   cat:'academia',   w:200, d:8,   alt:180, elev:30, sym:'espelho', m3d:'espelho',   precoM2:35000},
+    maca:         {nome:'Maca de avaliação',   cat:'academia',   w:65,  d:185, alt:75,  sym:'banco',         m3d:'maca',        preco:150000},
+    bioimpedancia:{nome:'Balança de bioimpedância', cat:'academia', w:45, d:70, alt:100, sym:'eletro',       m3d:'bioimpedancia', preco:1200000},
+    catraca:      {nome:'Catraca de acesso',   cat:'academia',   w:30,  d:90,  alt:100, sym:'eletro',        m3d:'catraca',     preco:450000},
+    bebedouro:    {nome:'Bebedouro',           cat:'academia',   w:35,  d:35,  alt:105, sym:'eletro',        m3d:'bebedouro',   preco:180000},
+    guardaVolumes:{nome:'Guarda-volumes',      cat:'academia',   w:120, d:45,  alt:190, sym:'guardaVolumes', m3d:'guardaVolumes', preco:250000},
     /* comercial */
     balcaoAtend:  {nome:'Balcão de atendimento', cat:'comercial', w:180, d:70, alt:105, sym:'balcaoL',       m3d:'balcaoAtend'},
     vitrineExp:   {nome:'Vitrine expositora',  cat:'comercial',  w:120, d:50,  alt:100, sym:'adega',         m3d:'vitrineExp'},
@@ -774,8 +907,85 @@ function MOVEIS_LIB(){
       /* põe(k, u, v, rotLocal) — encosto -y do móvel: 180 = encosto no fundo; -90 = encosto na parede esquerda; 90 = direita; 0 = encosto na parede da porta */
       function poe(k, u, v, rot, extra, elev){ var o = {k:k, u:u, v:v, rot:rot || 0}; if (extra) for (var p in extra) o[p] = extra[p]; if (elev) o.elev = elev; lista.push(o); }
       function W_(k){ return ITENS[k].w; } function D_(k){ return ITENS[k].d; }
+      /* enfileira itens encostados numa parede, de ini a fim (cm ao longo dela); para quando o próximo não cabe.
+         Devolve quanto a fila ocupa para dentro da sala (profundidade + folga da parede). */
+      function fila(keys, lado, ini, fim, gap){
+        var c = ini, prof = 0;
+        for (var i = 0; i < keys.length; i++) {
+          var key = keys[i], w = W_(key), d = D_(key);
+          if (c + w > fim) break;
+          var mid = c + w / 2;
+          if (lado === 'esq') poe(key, d / 2 + 10, mid, -90);
+          else if (lado === 'dir') poe(key, W - d / 2 - 10, mid, 90);
+          else if (lado === 'fundo') poe(key, mid, D - d / 2 - 10, 180);
+          else poe(key, mid, d / 2 + 10, 0);
+          c += w + gap; prof = Math.max(prof, d + 10);
+        }
+        return prof;
+      }
+      /* grade de itens (todos com a mesma rotação) dentro do retângulo u0..u1 × v0..v1; devolve quantos couberam */
+      function grade(keys, u0, u1, v0, v1, gu, gv, rot, max){
+        var u = u0, v = v0, lin = 0, n2 = 0, k = 0;
+        while (n2 < (max || 99)) {
+          var key = keys[Math.min(k, keys.length - 1)], w = W_(key), d = D_(key);
+          if (u + w > u1) { if (!lin) break; u = u0; v += lin + gv; lin = 0; continue; }
+          if (v + d > v1) break;
+          poe(key, u + w / 2, v + d / 2, rot || 0);
+          u += w + gu; lin = Math.max(lin, d); n2++; k++;
+        }
+        return n2;
+      }
+      var acad = /academia|muscula|spinning|pilates|ginastica|danca|luta|funcional|crossfit|treino/.test(n);
 
-      if (n.indexOf('estar') >= 0 || (r.tipo === 'social' && n.indexOf('sala') >= 0 && n.indexOf('jantar') < 0)) {
+      if (/avalia/.test(n)) {
+        if (W < 320 || D < 320) { if (W >= 220 && D >= 220) poe('maca', D_('maca') / 2 + 10, D / 2, -90); }
+        else {
+          var ue = Math.max(W / 2, (D_('maca') + 20 + W) / 2); poe('escrivaninha', ue, D - 42, 180, {w: Math.min(140, W - D_('maca') - 40)}); poe('cadeiraEscr', ue, D - 110, 180);
+          poe('maca', D_('maca') / 2 + 10, D / 2, -90); poe('bioimpedancia', W - D_('bioimpedancia') / 2 - 10, D / 2 - 40, 90);
+          if (W >= 330) poe('espelhoAcad', W - 6, D / 2 + 120 > D - 80 ? D / 2 : D / 2 + 90, 90, {w: 100}, 30);
+        }
+      } else if (acad) {
+        if (W >= 250 && D >= 250) {
+          if (/spinning/.test(n)) {
+            /* alunos de frente para o instrutor, que pedala no fundo olhando para a porta */
+            poe('spinning', W / 2, D - 70, 0);
+            poe('espelhoAcad', W / 2, D - 6, 180, {w: Math.min(W - 80, 500)}, 30);
+            poe('caixaParede', 30, D - 30, 180, null, 220); poe('caixaParede', W - 30, D - 30, 180, null, 220);
+            grade(['spinning'], 50, W - 40, 100, D - 150, 45, 60, 180);
+          } else if (/pilates/.test(n)) {
+            var fp = fila(['espaldar', 'chairPilates', 'bolaPilates', 'chairPilates', 'bolaPilates', 'espaldar'], 'fundo', 40, W - 40, 40);
+            grade(W >= 420 ? ['cadillac', 'reformer'] : ['reformer'], 50, W - 40, 110, D - fp - 60, 70, 70, 0);
+          } else if (/luta|marcial|jiu|boxe|muay/.test(n)) {
+            poe('tatame', W / 2, D / 2 + 20, 0, {w: W - 60, d: D - 160});
+            poe('espelhoAcad', W / 2, D - 6, 180, {w: Math.min(W - 80, 600)}, 30);
+            fila(['sacoPancada', 'sacoPancada', 'sacoPancada', 'sacoPancada'], 'esq', 130, D - 60, 60);
+          } else if (/funcional|crossfit/.test(n)) {
+            poe('pisoBorracha', W / 2, D / 2 + 20, 0, {w: W - 40, d: D - 120});
+            var ff = fila(['rackAgach', 'barraFixa', 'rackAgach'], 'fundo', 40, W - 40, 60);
+            fila(['kettlebells', 'plio', 'plio', 'bolaPilates', 'plio'], 'esq', 130, D - ff - 30, 40);
+            if (W >= 500) fila(['remo', 'remo', 'sacoPancada'], 'dir', 130, D - ff - 30, 50);
+          } else if (/ginastica|danca/.test(n)) {
+            poe('espelhoAcad', W / 2, D - 6, 180, {w: W - 60}, 30);
+            poe('caixaParede', 30, D - 30, 180, null, 220); poe('caixaParede', W - 30, D - 30, 180, null, 220);
+            grade(['colchonete'], 50, W - 40, 150, D - 60, 50, 50, 0, 30);
+            poe('bolaPilates', W - 50, 60, 0);
+          } else {
+            /* musculação: cardio na parede esquerda, máquinas na direita, pesos livres no fundo
+               (com espelho), estações de barra no miolo sobre piso emborrachado */
+            var vIni = 120, vFim = D - 90;
+            var pe = fila(['esteira', 'esteira', 'eliptico', 'esteira', 'bikeErgo', 'eliptico', 'esteira', 'spinning', 'bikeHoriz', 'escadaErgo'], 'esq', vIni, vFim, 25);
+            var pd = W - pe >= 420 ? fila(['legPress', 'extensora', 'flexora', 'puxador', 'peitoral', 'abdutora', 'scott', 'multiEstacao'], 'dir', vIni, vFim, 45) : 0;
+            poe('espelhoAcad', W / 2, D - 6, 180, {w: Math.max(100, Math.min(W - pe - pd - 40, 800))}, 30);
+            var pf = fila(['halteres', 'anilhas', 'kettlebells', 'halteres'], 'fundo', pe + 30, W - pd - 30, 30);
+            var u0 = pe + 90, u1 = W - pd - 90, v0 = 160, v1 = D - pf - 110;
+            if (u1 - u0 >= 150 && v1 - v0 >= 150) {
+              poe('pisoBorracha', (u0 + u1) / 2, (v0 + v1) / 2, 0, {w: Math.round(u1 - u0 + 80), d: Math.round(v1 - v0 + 80)});
+              grade(u1 - u0 >= 400 ? ['crossover', 'rackAgach', 'smith', 'supino', 'bancoReg', 'supino', 'bancoReg'] : ['rackAgach', 'supino', 'bancoReg', 'supino', 'bancoReg'], u0, u1, v0, v1, 90, 110, 0);
+            }
+            poe('bebedouro', W - 30, 28, 0);
+          }
+        }
+      } else if (n.indexOf('estar') >= 0 ||(r.tipo === 'social' && n.indexOf('sala') >= 0 && n.indexOf('jantar') < 0)) {
         if (W >= 260 && D >= 260) {
           var sk = W >= 330 ? 'sofa3' : 'sofa2';
           poe(sk, W / 2, D - D_(sk) / 2 - 8, 180);
@@ -845,7 +1055,7 @@ function MOVEIS_LIB(){
           if (W >= 300 && D >= 240) poe('churrasqueira', W - 70, D - 34, 180);
           poe('planta', 30, D - 30, 0);
         }
-      } else if (n.indexOf('escrit') >= 0) {
+      } else if (n.indexOf('escrit') >= 0 || n.indexOf('admin') >= 0) {
         if (W >= 200 && D >= 200) {
           poe('escrivaninha', W / 2, D - 42, 180, {w: Math.min(160, W - 80)}); poe('cadeiraEscr', W / 2, D - 110, 180);
           poe('estanteLivros', W / 2, 20, 0, {w: Math.min(W - 60, 200)});
