@@ -696,3 +696,9 @@ label.btn{cursor:pointer}
   .ap-gal figure{height:240px}
   .ap-gal figure:first-child{grid-row:auto}
 }
+
+/* Miniaturas 3D (padrão de todos os apps; paleta ciano #22B8D6 + âmbar #FFC24D) */
+.side a .ic3d{width:24px;height:24px;flex:none;object-fit:contain;margin:-2px 0;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5));transition:transform .15s var(--e),filter .15s var(--e)}
+.side a:hover .ic3d,.side a.on .ic3d{transform:scale(1.12);filter:drop-shadow(0 3px 6px rgba(34,184,214,.35))}
+.side a:not(.on):not(:hover) .ic3d{filter:drop-shadow(0 2px 3px rgba(0,0,0,.5)) saturate(.8) brightness(.92)}
+@media (max-width:900px){.side a .ic3d{width:26px;height:26px;margin:0}}
