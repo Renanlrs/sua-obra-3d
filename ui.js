@@ -91,17 +91,24 @@ var UI = (function () {
       localStorage.setItem('suaobra3d.coach', '1');
       entrarApp();
       if (q.get('pav')) M.setPav(+q.get('pav'));   /* &pav=1 abre o 1º andar */
+      if (q.get('folha')) PRANCHA.folha = q.get('folha');   /* &folha=marcenaria|todas */
       if (q.get('v')) irPara(q.get('v'));
       if (t3) {   /* &t3=tour&i=3&teto=0&etapa=2 — para conferência e print */
         if (q.get('teto') === '0') t3.setTeto(false);
         if (q.get('luz')) { var L = q.get('luz').split(',').map(Number); t3.luz(L[0], L[1], L[2]); }
         if (q.has('etapa')) t3.setEtapa(+q.get('etapa'));
+        if (q.has('obra')) t3.passoObra(+q.get('obra'));   /* &obra=0.4 congela a animação Construir naquele ponto */
         if (q.get('t3') === 'tour') { t3.setModo('tour'); t3.irParada(+(q.get('i') || 0), true); }
         else if (q.get('t3')) t3.setModo(q.get('t3'));
       }
       /* &cat=1 abre o catálogo · &selmov=N seleciona o N-ésimo móvel e enquadra o ambiente dele · &catk=quarto abre uma categoria */
       if (q.has('insp')) setInsp(true, q.get('insp') === 'sel');   /* &insp=1 abre a folha do inspector (celular) */
       if (q.has('cat')) { toggleCatalogo(true); if (q.get('catk')) { catCat = q.get('catk'); catalogo(); } }
+      if (q.has('marc')) {   /* &marc=2,3,freijo configura o 1º móvel de marcenaria e o seleciona — conferência e print */
+        var mq = M.proj.moveis.filter(function (m) { return MOVEIS.eMarcenaria(m); })[+(q.get('marci') || 0)], pm = q.get('marc').split(',');
+        if (mq) { mq.marc = MOVEIS.marc(mq); mq.marc.portas = +pm[0] || 0; mq.marc.gavetas = +pm[1] || 0; if (pm[2]) mq.marc.frente = pm[2]; if (pm[3]) mq.marc.puxador = pm[3]; M.commit('Marcenaria (conferência)'); PRANCHA.mov = mq.id;
+          if (t3) { t3.atualizar(); t3.setTeto(false); t3.olharPara(mq.x / 100, mq.y / 100, +(q.get('mz') || 4)); var aq = M.ambienteDe(mq); if (q.has('mamb') && aq) { t3.setModo('tour'); t3.irAmbiente(aq.id); } } selecionarMovel(mq.id); if (viewAtual === 'prancha') irPara('prancha'); }
+      }
       if (q.has('selmov')) {
         var mvq = M.proj.moveis[+q.get('selmov') || 0];
         if (mvq) { var ambq = M.ambienteDe(mvq); if (ambq && viewAtual === 'planta') PLAN.enquadrarAmb(ambq); selecionarMovel(mvq.id); }
@@ -273,6 +280,7 @@ var UI = (function () {
     });
   }
   function conteudoView(v){
+    if (v === 'prancha') return PRANCHA.html();
     var p = M.proj;
     if (v === 'ambientes') {
       var h = '<h2>Ambientes</h2><p class="vsub">' + p.ambientes.length + ' ambientes · ' + M.fmtM2(M.areaTotalAmbientes()) + ' no total. Clique para selecionar na planta.</p>';
@@ -321,6 +329,7 @@ var UI = (function () {
         '<button class="tg on" id="t3-teto" title="Mostrar ou esconder a laje e o telhado">Teto</button>' +
         '<span class="sep"></span>' +
         '<label class="etapa" title="Etapas da obra (4D)">OBRA <input type="range" id="t3-etapa" min="0" max="5" step="1" value="5"><b id="t3-etapa-v">Acabamento</b></label>' +
+        '<button class="tg" id="t3-construir" title="Ver a casa nascer da planta: estrutura, paredes, telhado e acabamento subindo (C)">▶ Construir</button>' +
         '<span class="sep"></span>' +
         '<button class="tg fach-tg" id="fach-tg" title="Painel da fachada: estilo, prompt, cobertura, cores, janelas, porta, letreiro (F)">🎨 Fachada</button>' +
         '<button class="tg" id="t3-mob" title="Catálogo de móveis (M)">Mobiliar</button>' +
@@ -527,6 +536,7 @@ var UI = (function () {
   }
 
   function ligarView(v, pad){
+    if (v === 'prancha') { PRANCHA.ligar(pad, function () { irPara('prancha'); }); return; }
     if (v === 'tresd' && window.TRES) { ligar3D(pad); return; }
     if (v === 'piscina') {
       var addP = pad.querySelector('#pis-add'); if (addP) addP.onclick = function () { var i2 = M.LIB.map(function (l) { return l.nome; }).indexOf('Piscina'); addDaLib(i2); irPara('piscina'); };
@@ -665,6 +675,7 @@ var UI = (function () {
       h += '<section><h6>MEDIDAS</h6><div class="f-row">' +
         campo('m-w', 'LARGURA', M.fmtMs(dm.w), 'm') + campo('m-d', 'PROFUND.', M.fmtMs(dm.d), 'm') + '</div>' +
         '<div class="f-row">' + campo('m-alt', 'ALTURA', M.fmtMs(dm.alt), 'm') + campo('m-elev', 'ELEVAÇÃO', M.fmtMs(mv.elev || 0), 'm') + '</div></section>';
+      if (MOVEIS.eMarcenaria && MOVEIS.eMarcenaria(mv)) h += htmlMarcenaria(mv);
       h += '<section><h6>POSIÇÃO</h6><div class="f-row">' +
         campo('m-x', 'X (CENTRO)', M.fmtMs(mv.x), 'm') + campo('m-y', 'Y (CENTRO)', M.fmtMs(mv.y), 'm') + '</div>' +
         '<div class="f-row">' + campo('m-rot', 'ÂNGULO', String(mv.rot || 0), '°') +
@@ -1316,6 +1327,89 @@ var UI = (function () {
     }
   }
 
+  /* ---------- MARCENARIA: portas, gavetas, lado, puxador e acabamento do móvel ---------- */
+  function htmlMarcenaria(mv){
+    var c = MOVEIS.marc(mv), ligado = !!mv.marc;
+    function passo(k, rot, v){ return '<div class="f"><label>' + rot + '</label><div class="marc-n"><button class="btn sm" data-marc-n="' + k + '" data-d="-1">−</button><b>' + v + '</b><button class="btn sm" data-marc-n="' + k + '" data-d="1">+</button></div></div>'; }
+    function chips(k, lista, atual){ return '<div class="chips">' + lista.map(function (o) { return '<button class="chip' + (o.k === atual ? ' on' : '') + '" data-marc="' + k + '" data-v="' + o.k + '" title="' + o.rot + '">' + o.rot + '</button>'; }).join('') + '</div>'; }
+    function cores(k, atual){ return '<div class="marc-cores">' + MOVEIS.ACABAMENTOS.map(function (o) { return '<button class="marc-cor' + (o.k === atual ? ' on' : '') + '" data-marc="' + k + '" data-v="' + o.k + '" title="' + o.rot + '" style="background:' + o.cor + '"></button>'; }).join('') + '</div>'; }
+    var h = '<section class="marc"><h6>MARCENARIA ' + (ligado ? '<span class="marc-on">sob medida</span>' : '<span class="marc-off">modelo de catálogo</span>') + '</h6>';
+    h += '<div class="marc-prev">' + vistaFrontalMovel(mv, 220, 120) + '</div>';
+    h += '<div class="f-row">' + passo('portas', 'PORTAS', c.portas) + passo('gavetas', 'GAVETAS', c.gavetas) + '</div>';
+    if (c.portas && c.gavetas) h += '<div class="f"><label>GAVETEIRO</label>' + chips('lado', [{k:'esq', rot:'À esquerda'}, {k:'dir', rot:'À direita'}], c.lado) + '</div>';
+    h += '<div class="f"><label>PUXADOR</label>' + chips('puxador', MOVEIS.PUXADORES, c.puxador) + '</div>';
+    h += '<div class="f"><label>FRENTES · ' + esc(MOVEIS.acabamento(c.frente).rot) + '</label>' + cores('frente', c.frente) + '</div>';
+    h += '<div class="f"><label>CAIXA · ' + esc(MOVEIS.acabamento(c.corpo).rot) + '</label>' + cores('corpo', c.corpo) + '</div>';
+    h += '<div class="acts"><button class="btn" data-marc-prancha="1">Ver vistas na prancha</button>' + (ligado ? '<button class="btn" data-marc-reset="1">Voltar ao modelo do catálogo</button>' : '') + '</div>';
+    return h + '</section>';
+  }
+  /* vista frontal do móvel (SVG), opcionalmente cotada — inspector e prancha; lê MOVEIS.frentes */
+  function vistaFrontalMovel(mv, pw, ph, op){
+    op = op || {};
+    var F = MOVEIS.frentes(mv), cotas = !!op.cotas, mg = cotas ? 34 : 14;
+    var e = Math.min((pw - 2 * mg) / F.w, (ph - 2 * mg) / F.alt), W = F.w * e, H = F.alt * e, ox = (pw - W) / 2, oy = (ph - H) / 2;
+    function X(x){ return ox + (x + F.w / 2) * e; } function Y(y){ return oy + H - y * e; }
+    var tinta = '#22272B', s = '<svg class="vista-mov" viewBox="0 0 ' + pw + ' ' + ph + '" width="' + pw + '" height="' + ph + '" xmlns="http://www.w3.org/2000/svg">';
+    if (F.rod) s += '<rect x="' + X(-F.w / 2 + 2) + '" y="' + Y(F.rod) + '" width="' + (F.w - 4) * e + '" height="' + F.rod * e + '" fill="#2B2D31"/>';
+    s += '<rect x="' + X(-F.w / 2) + '" y="' + Y(F.y1) + '" width="' + W + '" height="' + (F.y1 - F.y0) * e + '" fill="' + F.corCorpo + '" stroke="' + tinta + '" stroke-width=".8"/>';
+    if (F.tampo) s += '<rect x="' + (X(-F.w / 2) - 1) + '" y="' + Y(F.alt) + '" width="' + (W + 2) + '" height="' + Math.max(1.5, F.tampo * e) + '" fill="#D9D6CF" stroke="' + tinta + '" stroke-width=".8"/>';
+    F.L.forEach(function (f) {
+      var x = X(f.x), y = Y(f.y + f.h), w = f.w * e, h = f.h * e, P = F.c.puxador;
+      s += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + F.cor + '" stroke="' + tinta + '" stroke-width=".8"/>';
+      if (f.t === 'porta') {   /* convenção de desenho: o "V" tracejado aponta para o lado das dobradiças */
+        var hx = f.abre === 'esq' ? x : x + w, ox2 = f.abre === 'esq' ? x + w : x;
+        s += '<path d="M' + ox2 + ' ' + y + ' L' + hx + ' ' + (y + h / 2) + ' L' + ox2 + ' ' + (y + h) + '" fill="none" stroke="' + tinta + '" stroke-width=".6" stroke-dasharray="3 2" opacity=".6"/>';
+      }
+      if (P === 'barra' || P === 'botao') {
+        if (f.t === 'gaveta') s += P === 'barra' ? '<rect x="' + (x + w / 2 - Math.min(16, w * .25)) + '" y="' + (y + Math.max(3, 5 * e)) + '" width="' + Math.min(32, w * .5) + '" height="2" fill="#7A7F86"/>' : '<circle cx="' + (x + w / 2) + '" cy="' + (y + h / 2) + '" r="2" fill="#7A7F86"/>';
+        else {
+          var px = f.abre === 'esq' ? x + w - 4 : x + 2, lh = Math.min(30 * e, h * .4);
+          s += P === 'barra' ? '<rect x="' + px + '" y="' + (F.tipo === 'aereo' ? y + h - lh - 3 : y + 6) + '" width="2" height="' + lh + '" fill="#7A7F86"/>' : '<circle cx="' + (px + 1) + '" cy="' + (F.tipo === 'aereo' ? y + h - 8 : y + 9) + '" r="2" fill="#7A7F86"/>';
+        }
+      } else if (P === 'cava') s += '<rect x="' + x + '" y="' + (F.tipo === 'aereo' ? y + h - 2 : y) + '" width="' + w + '" height="2" fill="#1E1F22"/>';
+    });
+    if (cotas) {
+      s += cotaH(X(-F.w / 2), X(F.w / 2), Y(0) + 16, M.fmtMs(F.w)) + cotaV(X(F.w / 2) + 14, Y(0), Y(F.alt), M.fmtMs(F.alt));
+      var ps = F.L.filter(function (f) { return f.t === 'porta'; }), gs = F.L.filter(function (f) { return f.t === 'gaveta'; });
+      if (ps.length > 1 || (ps.length && gs.length)) s += cotaH(X(ps[0].x), X(ps[0].x + ps[0].w), Y(F.alt) - 8, M.fmtMs(ps[0].w));
+      if (gs.length && ps.length) s += cotaH(X(gs[0].x), X(gs[0].x + gs[0].w), Y(F.alt) - 8, M.fmtMs(gs[0].w));
+    }
+    return s + '</svg>';
+  }
+  /* vista lateral e superior (simples) do móvel, cotadas */
+  function vistaLateralMovel(mv, pw, ph){
+    var F = MOVEIS.frentes(mv), mg = 30, e = Math.min((pw - 2 * mg) / F.d, (ph - 2 * mg) / F.alt), W = F.d * e, H = F.alt * e, ox = (pw - W) / 2, oy = (ph - H) / 2;
+    var s = '<svg class="vista-mov" viewBox="0 0 ' + pw + ' ' + ph + '" width="' + pw + '" height="' + ph + '" xmlns="http://www.w3.org/2000/svg">';
+    s += '<rect x="' + ox + '" y="' + (oy + H - (F.y1) * e) + '" width="' + W + '" height="' + (F.y1 - F.y0) * e + '" fill="' + F.corCorpo + '" stroke="#22272B" stroke-width=".8"/>';
+    s += '<rect x="' + (ox + W - 1.8 * e) + '" y="' + (oy + H - F.y1 * e) + '" width="' + Math.max(1.5, 1.8 * e) + '" height="' + (F.y1 - F.y0) * e + '" fill="' + F.cor + '" stroke="#22272B" stroke-width=".6"/>';
+    if (F.rod) s += '<rect x="' + ox + '" y="' + (oy + H - F.rod * e) + '" width="' + (W - 5 * e) + '" height="' + F.rod * e + '" fill="#2B2D31"/>';
+    if (F.tampo) s += '<rect x="' + ox + '" y="' + oy + '" width="' + (W + 1) + '" height="' + Math.max(1.5, F.tampo * e) + '" fill="#D9D6CF" stroke="#22272B" stroke-width=".8"/>';
+    s += cotaH(ox, ox + W, oy + H + 14, M.fmtMs(F.d));
+    return s + '</svg>';
+  }
+  function cotaH(x1, x2, y, txt){
+    return '<g class="cota"><line x1="' + x1 + '" y1="' + y + '" x2="' + x2 + '" y2="' + y + '" stroke="#C0392B" stroke-width=".7"/>' +
+      '<line x1="' + x1 + '" y1="' + (y - 4) + '" x2="' + x1 + '" y2="' + (y + 4) + '" stroke="#C0392B" stroke-width=".7"/><line x1="' + x2 + '" y1="' + (y - 4) + '" x2="' + x2 + '" y2="' + (y + 4) + '" stroke="#C0392B" stroke-width=".7"/>' +
+      '<text x="' + (x1 + x2) / 2 + '" y="' + (y - 3) + '" font-size="8" text-anchor="middle" fill="#C0392B" font-family="Arial">' + txt + '</text></g>';
+  }
+  function cotaV(x, y1, y2, txt){
+    var my = (y1 + y2) / 2;
+    return '<g class="cota"><line x1="' + x + '" y1="' + y1 + '" x2="' + x + '" y2="' + y2 + '" stroke="#C0392B" stroke-width=".7"/>' +
+      '<line x1="' + (x - 4) + '" y1="' + y1 + '" x2="' + (x + 4) + '" y2="' + y1 + '" stroke="#C0392B" stroke-width=".7"/><line x1="' + (x - 4) + '" y1="' + y2 + '" x2="' + (x + 4) + '" y2="' + y2 + '" stroke="#C0392B" stroke-width=".7"/>' +
+      '<text x="' + (x + 10) + '" y="' + my + '" font-size="8" fill="#C0392B" font-family="Arial" transform="rotate(-90 ' + (x + 10) + ' ' + my + ')" text-anchor="middle">' + txt + '</text></g>';
+  }
+  function ligarMarcenaria(mv){
+    function grava(k, v, nome){ var c = MOVEIS.marc(mv); c[k] = v; mv.marc = c; M.commit(nome); PLAN.render(); inspector(); if (t3) t3.atualizar(true); }
+    insp.querySelectorAll('[data-marc-n]').forEach(function (b) { b.onclick = function () {
+      var k = b.getAttribute('data-marc-n'), c = MOVEIS.marc(mv), v = c[k] + (+b.getAttribute('data-d'));
+      if (v < 0 || v > (k === 'portas' ? 8 : 6)) return;
+      if (v === 0 && !(k === 'portas' ? c.gavetas : c.portas)) return;
+      grava(k, v, (k === 'portas' ? 'Portas' : 'Gavetas') + ' do móvel: ' + v);
+    }; });
+    insp.querySelectorAll('[data-marc]').forEach(function (b) { b.onclick = function () { grava(b.getAttribute('data-marc'), b.getAttribute('data-v'), 'Marcenaria: ' + (b.title || b.textContent)); }; });
+    var pr = insp.querySelector('[data-marc-prancha]'); if (pr) pr.onclick = function () { PRANCHA.folha = 'marcenaria'; PRANCHA.mov = mv.id; irPara('prancha'); };
+    var rs = insp.querySelector('[data-marc-reset]'); if (rs) rs.onclick = function () { delete mv.marc; M.commit('Móvel volta ao catálogo'); PLAN.render(); inspector(); if (t3) t3.atualizar(true); };
+  }
   function ligarInspectorMovel(mv){
     function bind(id, aplicar){
       var el = insp.querySelector('#' + id); if (!el) return;
@@ -1341,6 +1435,7 @@ var UI = (function () {
     bind('m-y',   function (v) { var n = M.parseM(v); if (n !== null) { mv.y = n; fim('Mover móvel'); } });
     bind('m-rot', function (v) { var n = parseFloat(String(v).replace(',', '.')); if (!isNaN(n)) { mv.rot = ((Math.round(n) % 360) + 360) % 360; fim('Girar móvel'); } });
     insp.querySelectorAll('[data-mact]').forEach(function (b) { b.onclick = function () { acaoMovel(b.getAttribute('data-mact'), mv.id); }; });
+    if (MOVEIS.eMarcenaria && MOVEIS.eMarcenaria(mv)) ligarMarcenaria(mv);
   }
   /* ações do móvel — servem ao inspector, ao menu radial, ao 3D e aos atalhos */
   function acaoMovel(k, id){
@@ -1614,6 +1709,8 @@ var UI = (function () {
     {n:'Camadas',             g:'',       f:function(){ irPara('camadas'); }},
     {n:'Cotas',               g:'',       f:function(){ irPara('cotas'); }},
     {n:'Relatório técnico',   g:'',       f:function(){ irPara('relatorio'); }},
+    {n:'Prancha técnica A3 (planta em escala, carimbo, marcenaria)', g:'', f:function(){ irPara('prancha'); }},
+    {n:'Construir a casa (animação no 3D)', g:'', f:function(){ irPara('tresd'); setTimeout(function () { var b = document.querySelector('#t3-construir'); if (b) b.click(); }, 400); }},
     {n:'Renders',             g:'',       f:function(){ irPara('renders'); }},
     {n:'Salvar versão do estudo', g:'',   f:function(){ var v2 = M.salvarVersao(''); toast('Versão “' + v2.nome + '” guardada.'); }},
     {n:'Exportar orçamento em CSV', g:'', f:function(){ exportar('csv'); }},
@@ -1725,7 +1822,7 @@ var UI = (function () {
       if (k === 'r') setTool('room');
       if (k === 't' && viewAtual === 'planta') setTool('cob');   /* T = telhado à parte */
       if (k === 'g') $('#btn-grid').click();
-      if (k === 'c') $('#btn-cotas').click();
+      if (k === 'c') { var bcs = viewAtual === 'tresd' ? document.querySelector('#t3-construir') : null; if (bcs) bcs.click(); else $('#btn-cotas').click(); }
       if (k === 'p') irPara('planta');
       if (k === 'a') irPara('ambientes');
       if (k === '3') irPara('tresd');
@@ -1799,6 +1896,7 @@ var UI = (function () {
       selPos: function (id, pos) { var r = $('#radial'); if (!r.hidden || PLAN.sel === id) radial(M.movelDe(id), pos); },
       movMove: function (mv) { $('#radial').hidden = true; inspector(); },
       movFim: function (mv) { var a = M.ambienteDe(mv); mv.amb = a ? a.id : undefined; M.commit('Mover móvel'); inspector(); radial(mv); },
+      obra: function (t, et, fim) { var b2 = pad.querySelector('#t3-construir'); if (b2 && fim) { b2.classList.remove('on'); b2.textContent = '▶ Construir'; } },
       etapa: function (n) { var rg2 = pad.querySelector('#t3-etapa'), rv2 = pad.querySelector('#t3-etapa-v'); if (rg2) { rg2.value = n; rv2.textContent = TRES.ETAPAS[n]; } }
     }});
     if (!t3) return;
@@ -1808,7 +1906,9 @@ var UI = (function () {
     pad.querySelectorAll('#t3-modos button').forEach(function (b) { b.onclick = function () { t3.setModo(b.getAttribute('data-modo')); }; });
     pad.querySelector('#t3-teto').onclick = function () { t3.setTeto(!t3.teto); this.classList.toggle('on', t3.teto); };
     var rg = pad.querySelector('#t3-etapa'), rv = pad.querySelector('#t3-etapa-v');
-    rg.oninput = function () { t3.setEtapa(+this.value); rv.textContent = TRES.ETAPAS[+this.value]; };
+    rg.oninput = function () { if (t3.construindo) t3.pararObra(); t3.setEtapa(+this.value); rv.textContent = TRES.ETAPAS[+this.value]; };
+    var bc = pad.querySelector('#t3-construir');
+    bc.onclick = function () { t3.construirObra(); bc.classList.toggle('on', t3.construindo); bc.textContent = t3.construindo ? '■ Parar' : '▶ Construir'; };
     rv.textContent = TRES.ETAPAS[t3.etapa]; rg.value = t3.etapa;
     sel.onchange = function () { if (this.value === 'fachada') t3.verFachada(); else if (this.value === 'entrada') t3.verFachada(false, .5); else if (this.value !== '') t3.irParada(+this.value); this.value = ''; };
     pad.querySelector('#t3-ant').onclick = function () { t3.anterior(); };
@@ -2547,6 +2647,7 @@ var UI = (function () {
     selTap:selTap, fecharInsp:function(){ setInsp(false); }, get t3(){ return t3; }, novaCobertura:novaCobertura, acaoCobertura:acaoCobertura,
     linkDoProjeto:linkDoProjeto, dialogoCelular:dialogoCelular, abrirAR:abrirAR, abrirSol:abrirSol, dialogoVideo:dialogoVideo,
     toast:toast, saveState:saveState, zoomLabel:zoomLabel, coord:coord, hud:hud, msg:msg, menuContexto:menuContexto, fecharPop:fecharPop, copiarDeFoto:copiarDeFoto, pedirChave:pedirChave, popFachada:popFachada,
+    vistaFrontalMovel:vistaFrontalMovel, vistaLateralMovel:vistaLateralMovel,
     closeOverlays:closeOverlays, fecharApres:fecharApres, abrirApres:abrirApres, exportar:exportar,
     get shift(){ return shift; }, get alt(){ return alt; }, get espaco(){ return espaco; }
   };

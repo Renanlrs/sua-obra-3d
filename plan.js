@@ -744,6 +744,7 @@ var PLAN = (function () {
     get view(){ return view; },
     get sel(){ return sel; }, get selTipo(){ return selTipo; }, selecionar:selecionar, atual:atual,
     cobAtual:cobAtual, selecionarCob:selecionarCob,
+    aberturasSvg:aberturasSvg,
     movAtual:movAtual, selecionarMovel:selecionarMovel, telaDe:telaDe, PAREDE:PAREDE,
     setTool:function (t) { tool = t; }, get tool(){ return tool; },
     toggleGrid:function () { M.setCamada('grade', 'vis', !vis('grade')); M.salvar(); render(); return vis('grade'); },

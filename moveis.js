@@ -1096,6 +1096,72 @@ function MOVEIS_LIB(){
   }
   function frameRot(lado){ return lado === 'fundo' ? 180 : (lado === 'esq' ? -90 : (lado === 'dir' ? 90 : 0)); }
 
-  return {CATS:CATS, ITENS:ITENS, SYM:SYM, def:def, porCat:porCat, buscar:buscar, dims:dims, symDe:symDe, thumb:thumb, aabb:aabb, auto:auto, mundo:mundo, frameRot:frameRot, norm:norm};
+
+  /* ---------- MARCENARIA configurável (estilo componente dinâmico do SketchUp) ----------
+     Portas, gavetas, lado do gaveteiro, puxador e acabamento por instância (`mv.marc`).
+     `frentes(mv)` é a ÚNICA fonte do desenho das frentes: o 3D e a prancha técnica leem daqui.
+     Sem `mv.marc` o móvel continua com o modelo de catálogo. Medidas em cm, origem no piso,
+     x de −w/2 a +w/2 visto de frente. */
+  var MARC_TIPOS = {armario:1, aereo:1, gabinete:1, bancada:1, pia:1, comoda:1, rack:1};
+  var ACABAMENTOS = [
+    {k:'branco',   rot:'Branco',        cor:'#F1EFEA'}, {k:'off',      rot:'Off-white',     cor:'#E4DCCD'},
+    {k:'carvalho', rot:'Carvalho',      cor:'#C49A6C'}, {k:'freijo',   rot:'Freijó',        cor:'#9C6B43'},
+    {k:'nogueira', rot:'Nogueira',      cor:'#6B4630'}, {k:'grafite',  rot:'Grafite',       cor:'#3B3E43'},
+    {k:'verde',    rot:'Verde sálvia',  cor:'#7F9278'}, {k:'azul',     rot:'Azul petróleo', cor:'#2F4F5E'}
+  ];
+  var PUXADORES = [{k:'barra', rot:'Barra'}, {k:'cava', rot:'Cava'}, {k:'botao', rot:'Botão'}, {k:'toque', rot:'Toque (sem)'}];
+  function acabamento(k){ for (var i = 0; i < ACABAMENTOS.length; i++) if (ACABAMENTOS[i].k === k) return ACABAMENTOS[i]; return ACABAMENTOS[0]; }
+  function eMarcenaria(mv){ var d = mv && def(mv.k); return !!(d && MARC_TIPOS[d.m3d]); }
+  function marcPadrao(mv){
+    var d = def(mv.k), m = dims(mv), t = d ? d.m3d : '';
+    var c = {portas:2, gavetas:0, lado:'dir', puxador:'barra', frente:'carvalho', corpo:'branco'};
+    if (t === 'armario') { c.portas = Math.max(2, Math.round(m.w / 50)); }
+    if (t === 'aereo')   { c.portas = Math.max(2, Math.round(m.w / 45)); c.frente = 'branco'; c.puxador = 'cava'; }
+    if (t === 'gabinete'){ c.portas = 2; c.frente = 'nogueira'; }
+    if (t === 'bancada' || t === 'pia') { if (m.w >= 110) { c.gavetas = 3; c.portas = Math.max(1, Math.round((m.w - 45) / 45)); } else c.portas = Math.max(1, Math.round(m.w / 45)); }
+    if (t === 'comoda')  { c.portas = 0; c.gavetas = 4; c.frente = 'branco'; }
+    if (t === 'rack')    { c.portas = 2; c.frente = 'nogueira'; c.puxador = 'cava'; }
+    return c;
+  }
+  function marc(mv){   /* configuração efetiva: padrão do tipo + o que o usuário mudou */
+    var c = marcPadrao(mv), o = mv.marc || {};
+    for (var k in o) if (o[k] !== undefined && o[k] !== null) c[k] = o[k];
+    c.portas = Math.max(0, Math.min(8, c.portas | 0)); c.gavetas = Math.max(0, Math.min(6, c.gavetas | 0));
+    if (!c.portas && !c.gavetas) c.portas = 1;
+    return c;
+  }
+  function frentes(mv){
+    var d = def(mv.k), m = dims(mv), t = d ? d.m3d : '', c = marc(mv), g = .4;
+    var rod = t === 'aereo' ? 0 : t === 'rack' ? 6 : 10;
+    var tampo = (t === 'gabinete' || t === 'pia' || t === 'bancada') ? 4 : 0;
+    var y0 = rod, y1 = m.alt - tampo, H = y1 - y0, W = m.w, L = [];
+    var wg = c.portas && c.gavetas ? Math.min(50, W * .45) : (c.gavetas ? W : 0);
+    var gx0 = c.portas ? (c.lado === 'esq' ? -W / 2 : W / 2 - wg) : -W / 2;
+    for (var i = 0; i < c.gavetas; i++) {
+      var hh = H / c.gavetas;
+      L.push({t:'gaveta', x:gx0 + g / 2, y:y1 - (i + 1) * hh + g / 2, w:wg - g, h:hh - g});
+    }
+    if (c.portas) {
+      var px0 = c.gavetas && c.lado === 'esq' ? -W / 2 + wg : -W / 2, pw = (W - (c.gavetas ? wg : 0)) / c.portas;
+      for (var j = 0; j < c.portas; j++) L.push({t:'porta', x:px0 + j * pw + g / 2, y:y0 + g / 2, w:pw - g, h:H - g, abre:(c.portas === 1 ? (c.lado === 'esq' ? 'dir' : 'esq') : (j % 2 ? 'dir' : 'esq'))});
+    }
+    return {tipo:t, w:W, d:m.d, alt:m.alt, rod:rod, tampo:tampo, y0:y0, y1:y1, c:c, cor:acabamento(c.frente).cor, corCorpo:acabamento(c.corpo).cor, L:L};
+  }
+  /* lista de corte simplificada (peças em MDF 18 mm) — entra na prancha da marcenaria */
+  function pecas(mv){
+    var F = frentes(mv), e = 1.8, P = [];
+    var hc = F.y1 - F.y0, dc = F.d - e;
+    P.push(['Lateral', 2, hc, dc]); P.push(['Base', 1, F.w - 2 * e, dc]);
+    if (!F.tampo) P.push(['Tampo', 1, F.w, F.d]); else P.push(['Travessa superior', 2, F.w - 2 * e, 10]);
+    P.push(['Fundo (6 mm)', 1, F.w - 1, hc - 1]);
+    if (F.c.gavetas && F.c.portas) P.push(['Divisória', 1, hc - 2 * e, dc]);
+    var nP = F.L.filter(function (f) { return f.t === 'porta'; }), nG = F.L.filter(function (f) { return f.t === 'gaveta'; });
+    if (nP.length) P.push(['Porta', nP.length, nP[0].h, nP[0].w]);
+    if (nG.length) { P.push(['Frente de gaveta', nG.length, nG[0].h, nG[0].w]); P.push(['Caixa de gaveta (lat.)', nG.length * 2, Math.max(8, nG[0].h - 6), dc - 6]); }
+    if (nP.length && hc > 60) P.push(['Prateleira', Math.max(1, Math.floor(hc / 45)), (nP.length * nP[0].w) - 2 * e, dc - 4]);
+    return P.map(function (p) { return {nome:p[0], qtd:p[1], a:Math.round(p[2] * 10) / 10, b:Math.round(p[3] * 10) / 10}; });
+  }
+
+  return {CATS:CATS, MARC_TIPOS:MARC_TIPOS, ACABAMENTOS:ACABAMENTOS, PUXADORES:PUXADORES, eMarcenaria:eMarcenaria, marc:marc, marcPadrao:marcPadrao, frentes:frentes, pecas:pecas, acabamento:acabamento, ITENS:ITENS, SYM:SYM, def:def, porCat:porCat, buscar:buscar, dims:dims, symDe:symDe, thumb:thumb, aabb:aabb, auto:auto, mundo:mundo, frameRot:frameRot, norm:norm};
 }
 var MOVEIS = MOVEIS_LIB();

@@ -9,9 +9,9 @@ h1{font-size:15px;margin:0 0 16px}
 </style></head><body>
 <h1>SUA OBRA 3D — verificação do modelo e das vistas</h1>
 <div id="out"></div>
-<div id="resumo"></div>
+<div id="resumo" style="position:fixed;top:0;right:0;padding:10px 16px;font:bold 22px monospace;z-index:9"></div>
 <script src="qr.js"></script><script src="icons.js"></script><script src="moveis.js"></script><script src="model.js"></script><script src="visao.js"></script>
-<script src="views.js"></script>
+<script src="views.js"></script><script src="prancha.js"></script>
 <script src="tres.js"></script>
 <script>
 var ok=0, bad=0, out=document.getElementById('out');
@@ -572,6 +572,47 @@ salasA.forEach(function (nome) { [260, 400, 700, 1200].forEach(function (W) { [3
     ms.slice(i + 1).forEach(function (m2) { if (baixosA[m.k] || baixosA[m2.k] || m.elev || m2.elev) return; var c = MOVEIS.aabb(m2); if (b.x < c.x + c.w - 1 && c.x < b.x + b.w - 1 && b.y < c.y + c.h - 1 && c.y < b.y + b.h - 1) ruimA.push(nome + ' ' + W + '×' + D + ' ' + lado + ' ' + m.k + '×' + m2.k); }); });
 }); }); }); });
 t('as 7 salas de academia mobiliam limpo em 48 tamanhos × 4 lados de porta', ruimA.length === 0, ruimA.slice(0, 4).join(' | '));
+M.novo('casa-terrea', 1000, 2500);
+
+/* ---------- marcenaria configurável (01/11) ---------- */
+M.novo('casa-terrea', 1000, 2500);
+var mvB = M.addMovel('bancada', 300, 300, 0); mvB.w = 180;
+t('bancada é marcenaria; sofá não', MOVEIS.eMarcenaria(mvB) && !MOVEIS.eMarcenaria({k:'sofa'}));
+var F0 = MOVEIS.frentes(mvB);
+t('bancada 1,80 nasce com 3 gavetas + portas', F0.c.gavetas === 3 && F0.c.portas >= 2, F0.c.portas + 'p ' + F0.c.gavetas + 'g');
+function cabe(F){ return F.L.every(function (f) { return f.x >= -F.w / 2 - .01 && f.x + f.w <= F.w / 2 + .01 && f.y >= F.y0 - .01 && f.y + f.h <= F.y1 + .01; }); }
+function semSobrepor(F){ return F.L.every(function (a, i) { return F.L.slice(i + 1).every(function (b) { return !(a.x < b.x + b.w - .01 && b.x < a.x + a.w - .01 && a.y < b.y + b.h - .01 && b.y < a.y + a.h - .01); }); }); }
+var ruimM = [];
+['armario', 'armarioAereo', 'gabinete', 'bancada', 'pia', 'trocador', 'rack', 'guardaRoupa', 'despensa'].forEach(function (k) {
+  if (!MOVEIS.def(k)) return;
+  [0, 1, 3, 6].forEach(function (g) { [0, 1, 2, 5, 8].forEach(function (p) { ['esq', 'dir'].forEach(function (l) { [60, 120, 240].forEach(function (w) {
+    var mv = {k:k, w:w, marc:{portas:p, gavetas:g, lado:l}}, F = MOVEIS.frentes(mv);
+    if (!cabe(F) || !semSobrepor(F)) ruimM.push(k + ' ' + w + ' ' + p + 'p' + g + 'g ' + l);
+    if (F.c.portas + F.c.gavetas === 0) ruimM.push(k + ' sem frente');
+  }); }); }); });
+});
+t('frentes cabem no móvel e não se sobrepõem (9 tipos × 4 gav × 5 portas × 2 lados × 3 larguras)', ruimM.length === 0, ruimM.slice(0, 3).join(' | '));
+mvB.marc = MOVEIS.marc(mvB); mvB.marc.lado = 'esq';
+var Fe = MOVEIS.frentes(mvB), gv = Fe.L.filter(function (f) { return f.t === 'gaveta'; })[0];
+t('gaveteiro à esquerda fica na esquerda', gv.x < 0 && gv.x <= -Fe.w / 2 + 1);
+mvB.w = 240; var Fw = MOVEIS.frentes(mvB);
+var cob = Fw.L.filter(function (f) { return f.t === 'porta'; }).reduce(function (s, f) { return s + f.w + .4; }, 0) + (Fw.c.gavetas ? Fw.L.filter(function (f) { return f.t === 'gaveta'; })[0].w + .4 : 0);
+t('mudar a largura recalcula as frentes (portas + gaveteiro = 2,40)', Fw.w === 240 && Math.abs(cob - 240) < .01, cob);
+var pc = MOVEIS.pecas(mvB);
+t('lista de corte tem laterais, portas e frentes de gaveta', pc.some(function (p) { return p.nome === 'Lateral' && p.qtd === 2; }) && pc.some(function (p) { return p.nome === 'Porta'; }) && pc.some(function (p) { return p.nome === 'Frente de gaveta' && p.qtd === 3; }));
+t('acabamento desconhecido cai no padrão', MOVEIS.acabamento('xyz').k === 'branco');
+delete mvB.marc;
+t('sem mv.marc o móvel volta ao padrão do tipo', MOVEIS.marc(mvB).lado === 'dir');
+
+/* ---------- prancha A3 ---------- */
+t('escala técnica: casa 10×12 m cabe a 1:100 numa área de 240×260 mm', PRANCHA.escolheEscala(PRANCHA.ESC_PLANTA, 1000 + 260, 1200 + 260, 240, 260) === 75 || PRANCHA.escolheEscala(PRANCHA.ESC_PLANTA, 1000 + 260, 1200 + 260, 240, 260) === 100);
+t('escala técnica sobe quando o desenho cresce', PRANCHA.escolheEscala(PRANCHA.ESC_PLANTA, 3000, 3000, 240, 260) > PRANCHA.escolheEscala(PRANCHA.ESC_PLANTA, 1000, 1000, 240, 260));
+var svgP = PRANCHA.plantaSvg(0, 100);
+t('planta da prancha sai em mm reais (largura = desenho ÷ escala)', /width="[\d.]+mm"/.test(svgP) && svgP.indexOf('A = ') > 0, svgP.length + ' chars');
+var hP = PRANCHA.html();
+t('prancha tem carimbo, quadro de áreas e as duas folhas no modo Todas', (PRANCHA.folha = 'todas', hP = PRANCHA.html(), /QUADRO DE ÁREAS/.test(hP) && /RESPONSÁVEL TÉCNICO/.test(hP) && /data-folha="marcenaria"/.test(hP)));
+t('quadro de áreas usa a área calculada', hP.indexOf(M.fmtM2(M.areaConstruida())) > 0);
+PRANCHA.folha = 'arquitetonica';
 M.novo('casa-terrea', 1000, 2500);
 
 var r=document.getElementById('resumo');

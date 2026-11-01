@@ -990,7 +990,38 @@ function TRES_ENGINE(THREE, M){
     function banco(W, D, x, z, y, incl){ var b = bx(W, .08, D, Mt.estofado, x, z, y); if (incl) b.rotation.x = incl; return b; }
     function eixoX(r, L, mat, x, z, y){ var m = cl(r, L, mat, x, z, 0, 10); m.rotation.z = Math.PI / 2; m.position.y = y; return m; }
 
-    if (tipo === 'sofa' || tipo === 'poltrona') {
+    /* marcenaria configurada (mv.marc): corpo + frentes de MOVEIS.frentes — mesma fonte da prancha */
+    function marcenaria(){
+      var F = lib.frentes(mv), mf = corMat(F.cor), mc = corMat(F.corCorpo), pux = Mt.metal, esc = corMat('#1E1F22');
+      var y0 = F.y0 * CM, y1 = F.y1 * CM, fz = dp / 2 + .009;
+      if (F.rod) bx(w - .04, y0, dp - .06, esc, 0, -.03, 0);                       /* rodapé recuado */
+      bx(w, y1 - y0, dp - .018, mc, 0, -.009, y0);                                 /* corpo */
+      F.L.forEach(function (f) {
+        var fw = f.w * CM, fh = f.h * CM, cx = (f.x + f.w / 2) * CM, fy = f.y * CM;
+        bx(fw, fh, .018, mf, cx, fz, fy);
+        var P = F.c.puxador;
+        if (P === 'barra') {
+          if (f.t === 'gaveta') bx(Math.min(.32, fw * .5), .014, .02, pux, cx, fz + .02, fy + fh - .05);
+          else { var hx = f.abre === 'esq' ? cx + fw / 2 - .04 : cx - fw / 2 + .04; bx(.014, Math.min(.3, fh * .4), .02, pux, hx, fz + .02, F.tipo === 'aereo' ? fy + .04 : fy + fh - Math.min(.3, fh * .4) - .06); }
+        } else if (P === 'botao') {
+          var bxp = f.t === 'gaveta' ? cx : (f.abre === 'esq' ? cx + fw / 2 - .05 : cx - fw / 2 + .05), byp = f.t === 'gaveta' ? fy + fh / 2 : (F.tipo === 'aereo' ? fy + .08 : fy + fh - .1);
+          var bt = cl(.014, .025, pux, bxp, fz + .02, byp, 10); bt.rotation.x = Math.PI / 2;
+        } else if (P === 'cava') {
+          bx(fw, .012, .006, esc, cx, fz + .01, F.tipo === 'aereo' ? fy + .004 : fy + fh - .016, true);
+        }
+      });
+      if (F.tampo) {
+        var tp = F.tipo === 'gabinete' ? Mt.laje : Mt.branco;
+        bx(w + .02, F.tampo * CM, dp + .02, tp, 0, 0, alt - F.tampo * CM);
+        if (F.tipo === 'gabinete') { cl(Math.min(w, dp) * .28, .12, Mt.louca, 0, 0, alt - .1, 18); cl(.015, .18, Mt.inox, 0, -dp / 2 + .1, alt, 8); }
+        if (F.tipo === 'pia') { bx(Math.min(w * .5, .8), .02, dp * .58, Mt.inox, -w * .12, .02, alt); cl(.015, .22, Mt.inox, -w * .12, -dp / 2 + .1, alt, 8); }
+      } else if (F.tipo === 'rack') {
+        bx(w * .62, .45, .04, Mt.preto, 0, -dp / 2 + .1, alt + .02);
+      }
+    }
+    if (mv.marc && lib && lib.eMarcenaria && lib.eMarcenaria(mv)) {
+      marcenaria();
+    } else if (tipo === 'sofa' || tipo === 'poltrona') {
       bx(w, .42, dp, Mt.azul, 0, 0); bx(w, alt - .42, .22, Mt.azul, 0, -dp / 2 + .11, .42);
       bx(.18, .24, dp, Mt.azul, -w / 2 + .09, 0, .42); bx(.18, .24, dp, Mt.azul, w / 2 - .09, 0, .42);
       nA = Math.max(1, Math.round((w - .36) / .68)); var cw = (w - .36) / nA;
@@ -3009,6 +3040,49 @@ function TRES_ENGINE(THREE, M){
     var progresso = null;
     function setProgresso(p){ progresso = p; sujo = true; }
 
+    /* ---------- CONSTRUIR: a casa nasce da planta (estilo SketchUp push/pull) ----------
+       t 0 → 1: pisos rentes ao chão (a planta) → estrutura sobe → paredes sobem → telhado desce
+       → acabamento e móveis crescem. A câmera gira devagar em volta. Nada é reconstruído: só
+       escala/posição dos grupos que o `construir()` já montou. `passoObra(t)` = conferência. */
+    var obra = null, OBRA_FASES = [[0, .1], [.1, .28], [.25, .58], [.58, .74], [.72, .94]];
+    function fase(t, i){ var f = OBRA_FASES[i]; return ease(clamp((t - f[0]) / (f[1] - f[0]), 0, 1)); }
+    function aplicarObra(t){
+      if (!cena) return;
+      var G = cena.G, pa = fase(t, 2), mn = .002;
+      G.pisos.visible = G.estrutura.visible = G.paredes.visible = G.acabamento.visible = G.moveis.visible = true;
+      G.pisos.scale.y = Math.max(mn, Math.max(fase(t, 0) * .05, pa));
+      G.estrutura.scale.y = Math.max(mn, fase(t, 1)); G.estrutura.visible = t >= OBRA_FASES[1][0];
+      G.paredes.scale.y = Math.max(mn, pa); G.paredes.visible = t >= OBRA_FASES[2][0];
+      var cb5 = fase(t, 3); G.cobertura.visible = teto && t >= OBRA_FASES[3][0]; G.cobertura.position.y = (1 - cb5) * 7;
+      var ac = Math.max(mn, fase(t, 4)); G.acabamento.scale.y = ac; G.moveis.scale.y = ac;
+      G.acabamento.visible = G.moveis.visible = t >= OBRA_FASES[4][0];
+      var et = t < .1 ? 1 : t < .25 ? 2 : t < .58 ? 3 : t < .72 ? 4 : 5;
+      if (et !== etapa) { etapa = et; cena.raiz.traverse(function (o) {
+        if (o.userData && o.userData.pronto) o.material = et < 5 ? o.userData.cru : o.userData.pronto;
+        if (o.userData && o.userData.lp) o.visible = et < 5;
+        if (o.userData && o.userData.ferro) o.visible = et === 2;
+      }); if (cb.etapa) cb.etapa(et); }
+      if (cb.obra) cb.obra(t, et);
+      sujo = true;
+    }
+    function fimObra(){
+      if (!cena) return;
+      var G = cena.G; obra = null;
+      ['pisos', 'estrutura', 'paredes', 'acabamento', 'moveis'].forEach(function (k) { G[k].scale.y = 1; });
+      G.cobertura.position.y = 0;
+      etapa = 5; aplicarEtapa(); if (cb.etapa) cb.etapa(5); if (cb.obra) cb.obra(1, 5, true);
+    }
+    function construirObra(op){
+      if (!cena) return;
+      op = op || {};
+      if (obra) { fimObra(); return; }
+      if (modo !== 'orbit') setModo('orbit');
+      obra = {t:0, dur:op.dur || 9, gira:op.gira !== false};
+      orbD.dist = Math.max(cena.casa.w, cena.casa.d) * 1.35 + 6; orbD.phi = .98;
+      aplicarObra(0);
+    }
+    function passoObra(t){ if (!cena) return; if (!obra) obra = {t:0, dur:9, gira:false, manual:true}; obra.t = clamp(t, 0, 1); aplicarObra(obra.t); if (t >= 1 && !obra.manual) fimObra(); }
+
     /* ---------- laço ---------- */
     var ultimo = performance.now();
     function quadroAnim(agora){
@@ -3063,6 +3137,12 @@ function TRES_ENGINE(THREE, M){
       if (etapa >= 4) cena.G.acabamento.traverse(function (o) { if (o.userData.agua) { o.position.y = -.25 + Math.sin(agora * .0012) * .012; sujo = true; } });
 
       if (filme) avancarFilme(dt);
+      if (obra && !obra.manual) {
+        obra.t = Math.min(1, obra.t + dt / obra.dur);
+        if (obra.gira && modo === 'orbit') orbD.theta += dt * .28;
+        aplicarObra(obra.t);
+        if (obra.t >= 1) fimObra();
+      }
       camera.position.copy(pos); camera.lookAt(alvo);
       if (sujo || filme) {
         renderer.render(scene, camera); sujo = false;
@@ -3252,6 +3332,7 @@ function TRES_ENGINE(THREE, M){
         if (modo !== 'orbit') setModo('orbit');
         orbD.alvo.set(x, 1.4, z); orbD.dist = clamp(dist || 14, 4, 80); orbD.phi = 1.15; sujo = true;
       },
+      construirObra:construirObra, passoObra:passoObra, pararObra:function () { if (obra) fimObra(); }, get construindo(){ return !!obra; },
       filmar:filmar, roteiro:roteiro, get filmando(){ return !!filme; }, pararFilme:pararFilme, passoFilme:passoFilme, get canvas(){ return canvas; },
       entrarAR:entrarAR, sairAR:sairAR, arEscala:arEscala, arGirar:arGirar, get emAR(){ return !!ar; },
       atualizar:reconstruir, _dbg:function () { return {ptr:Object.keys(ptr), let:!!arrastoLet, ab:!!arrastoAb, mov:!!arrastoMov, modo:modo, solPos:sol.position.toArray(), solInt:sol.intensity}; },

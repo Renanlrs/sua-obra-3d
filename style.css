@@ -702,3 +702,87 @@ label.btn{cursor:pointer}
 .side a:hover .ic3d,.side a.on .ic3d{transform:scale(1.12);filter:drop-shadow(0 3px 6px rgba(34,184,214,.35))}
 .side a:not(.on):not(:hover) .ic3d{filter:drop-shadow(0 2px 3px rgba(0,0,0,.5)) saturate(.8) brightness(.92)}
 @media (max-width:900px){.side a .ic3d{width:26px;height:26px;margin:0}}
+
+/* ============ PRANCHA A3 (estilo LayOut) ============ */
+.pr-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pr-bar h2{margin:0}
+.pr-bar .grow{flex:1}
+.pr-palco{background:#C9CED3;border-radius:10px;padding:14px 4px;display:flex;flex-direction:column;align-items:center;gap:18px;overflow:auto}
+.pr-folha{width:420mm;height:297mm;background:#fff;color:#14181C;box-shadow:0 6px 24px rgba(0,0,0,.25);position:relative;flex:none;font-family:Arial,Helvetica,sans-serif}
+.pr-moldura{position:absolute;left:25mm;top:10mm;right:10mm;bottom:10mm;border:.6mm solid #14181C;display:grid;grid-template-columns:1fr 112mm}
+.pr-area{position:relative;padding:6mm;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.pr-plantas{display:flex;gap:8mm;align-items:flex-end;justify-content:center;flex-wrap:nowrap}
+.pr-fig{margin:0;display:flex;flex-direction:column;align-items:center}
+.pr-fig figcaption,.pr-3d figcaption{margin-top:2mm;text-align:center;font-size:3.2mm;line-height:1.3}
+.pr-fig figcaption b,.pr-3d figcaption b{display:block;border-bottom:.35mm solid #14181C;padding:0 4mm .6mm;letter-spacing:.04em}
+.pr-fig figcaption span,.pr-3d figcaption span{font-size:2.6mm;color:#3A444D}
+.pr-norte{position:absolute;right:5mm;top:5mm}
+.pr-vazio{color:#6B7885;font-size:4mm;text-align:center;line-height:1.6;max-width:150mm}
+.pr-lado{border-left:.6mm solid #14181C;display:flex;flex-direction:column;min-height:0}
+.pr-3d{margin:0;padding:3mm;border-bottom:.35mm solid #14181C;display:flex;flex-direction:column;align-items:center}
+.pr-3d img,.pr-3d svg{width:100%;height:62mm;object-fit:cover;display:block;border-radius:.6mm}
+.pr-quadro{padding:2.5mm 3mm;border-bottom:.35mm solid #14181C;flex:1;min-height:0;overflow:hidden}
+.pq-t{font-size:2.9mm;font-weight:700;letter-spacing:.06em;margin-bottom:1.4mm}
+.pr-quadro table{width:100%;border-collapse:collapse;font-size:2.45mm}
+.pr-quadro td{padding:.35mm 0;border-bottom:.15mm solid #D5DADF}
+.pr-quadro td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pq-pav td{font-weight:700;padding-top:1.4mm;font-size:2.3mm;letter-spacing:.05em;color:#3A444D}
+.pq-tot td{font-weight:700;border-bottom:none;border-top:.3mm solid #14181C}
+.pr-notas{margin:0;padding-left:4mm;font-size:2.5mm;line-height:1.5}
+.pr-mini{font-size:2.5mm;margin:0;line-height:1.4}
+.pr-carimbo{display:flex;flex-direction:column;font-size:2.4mm}
+.pr-carimbo .cb-c{border-top:.25mm solid #14181C;padding:.9mm 2mm;min-width:0;flex:1}
+.pr-carimbo .cb-c label{display:block;font-size:1.9mm;letter-spacing:.06em;color:#4A545D;margin-bottom:.3mm}
+.pr-carimbo .cb-c strong{font-size:3mm;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr-carimbo .cb-proj strong{font-size:3.8mm}
+.pr-carimbo input{all:unset;display:block;width:100%;font-size:2.9mm;font-weight:700;color:#14181C;border-bottom:.15mm dashed #9AA5AF}
+.pr-carimbo input::placeholder{color:#AAB3BB;font-weight:400}
+.pr-carimbo .cb-row{display:flex}
+.pr-carimbo .cb-row .cb-c+.cb-c{border-left:.25mm solid #14181C}
+.cb-marca{background:#14181C;color:#fff;padding:2mm 3mm;display:flex;align-items:baseline;gap:2mm}
+.cb-marca b{font-size:3.4mm;letter-spacing:.12em}.cb-marca span{font-size:2.2mm;opacity:.75}
+.cb-folha strong{font-size:4.2mm!important}
+/* folha de marcenaria */
+.pr-marc{flex-direction:column;align-items:stretch;justify-content:flex-start;gap:4mm}
+.pm-item{display:flex;gap:6mm;align-items:flex-start;border-bottom:.25mm solid #C5CCD2;padding-bottom:3mm;flex:1;min-height:0}
+.pm-item:last-child{border-bottom:none}
+.pm-vistas{display:flex;gap:4mm;align-items:flex-end;flex:none}
+.pm-vistas figure{margin:0;text-align:center}
+.pm-vistas figcaption{font-size:2.4mm;letter-spacing:.04em;margin-top:1mm;font-weight:700}
+.pm-info{flex:1;min-width:0;font-size:2.6mm}
+.pm-t{font-weight:700;font-size:3.4mm;letter-spacing:.03em;margin-bottom:1mm}
+.pm-t span{font-weight:400;color:#4A545D;font-size:2.6mm;margin-left:2mm}
+.pm-spec{color:#3A444D;margin-bottom:1.2mm}
+.pm-acab{display:flex;align-items:center;gap:1.4mm;margin-bottom:2mm}
+.pm-acab i{width:3.4mm;height:3.4mm;border:.2mm solid #14181C;display:inline-block;border-radius:.4mm}
+.pm-acab i+*{margin-right:2mm}
+.pm-pecas{width:100%;border-collapse:collapse;font-size:2.35mm}
+.pm-pecas th{text-align:left;font-size:2.1mm;letter-spacing:.04em;border-bottom:.3mm solid #14181C;padding:.4mm 0}
+.pm-pecas td{border-bottom:.15mm solid #D5DADF;padding:.3mm 0}
+.pm-pecas td.n,.pm-pecas th:nth-child(n+2){text-align:right;white-space:nowrap}
+@media print{
+  @page{size:A3 landscape;margin:0}
+  body.imprimindo-prancha *{visibility:hidden}
+  body.imprimindo-prancha .pr-palco,body.imprimindo-prancha .pr-palco *{visibility:visible}
+  body.imprimindo-prancha .pr-palco{position:absolute;left:0;top:0;background:none;padding:0;gap:0;display:block;overflow:visible;border-radius:0}
+  body.imprimindo-prancha .pr-folha{zoom:1!important;box-shadow:none;break-after:page;page-break-after:always}
+  body.imprimindo-prancha .pr-folha:last-child{break-after:auto;page-break-after:auto}
+  body.imprimindo-prancha .pr-carimbo input{border-bottom:none}
+  body.imprimindo-prancha .pr-carimbo input::placeholder{color:transparent}
+}
+
+/* ============ painel MARCENARIA (inspector do móvel) ============ */
+.marc h6 span{font-weight:500;letter-spacing:0;text-transform:none;font-size:10px;margin-left:6px;padding:1px 6px;border-radius:99px}
+.marc-on{background:rgba(57,198,140,.18);color:#39C68C}
+.marc-off{background:rgba(255,255,255,.07);color:var(--txt-3)}
+.marc-prev{background:#F4F2EE;border-radius:8px;display:flex;justify-content:center;margin:4px 0 10px}
+.marc-prev svg{max-width:100%;height:auto}
+.marc-n{display:flex;align-items:center;gap:8px}
+.marc-n b{min-width:18px;text-align:center;font-variant-numeric:tabular-nums}
+.marc-n .btn{width:28px;justify-content:center;padding:0}
+.marc-cores{display:flex;gap:6px;flex-wrap:wrap}
+.marc-cor{width:24px;height:24px;border-radius:6px;border:1px solid rgba(255,255,255,.18);cursor:pointer;padding:0}
+.marc-cor.on{outline:2px solid #39C68C;outline-offset:2px}
+.pr-bar .seg{display:flex;gap:2px;padding:3px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px}
+.pr-bar .seg button{height:28px;padding:0 12px;border:none;border-radius:6px;background:transparent;color:var(--txt-2);cursor:pointer;font-size:12px;font-weight:600}
+.pr-bar .seg button.on{background:var(--acento);color:#06222E}
