@@ -5,3 +5,6 @@ _shots/
 _foto.png
 _fach.png
 !icones3d/*.png
+!docs/*.png
+!site/*.png
+!site/**/*.png
